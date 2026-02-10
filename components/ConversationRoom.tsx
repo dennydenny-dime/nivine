@@ -78,7 +78,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   useEffect(() => {
     const initSession = async () => {
       try {
-        const apiKey = getSystemApiKey();
+        const apiKey = import.meta.env.VITE_API_KEY;
         if (!apiKey) {
           setError("Environment Config Error: No API Key found. In Vercel, please set your variable as 'VITE_API_KEY' or 'REACT_APP_API_KEY'.");
           return;
