@@ -103,8 +103,8 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-        <nav className="h-16 flex items-center px-4 max-w-7xl mx-auto w-full">
+      <div className="min-h-screen text-slate-100 flex flex-col">
+        <nav className="h-20 flex items-center px-4 max-w-7xl mx-auto w-full">
           <div className="flex items-center gap-3">
             <SynapseLogo className="w-8 h-8 shadow-lg shadow-white/5" />
             <span className="text-xl font-bold tracking-tight">Synapse <span className="text-indigo-400">AI</span></span>
@@ -116,9 +116,9 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+    <div className="min-h-screen text-slate-100 selection:bg-indigo-500/30">
       {/* Navigation - hidden in conversation mode if desired, but here we keep it for exit */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 transition-transform duration-500">
+      <nav className="fixed top-0 left-0 right-0 z-50 glass-soft border-b border-slate-800/60 transition-transform duration-500">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={goBack}>
             <SynapseLogo className="w-8 h-8 shadow-lg shadow-white/5" />
@@ -145,13 +145,13 @@ const App: React.FC = () => {
             </button>
             <button 
               onClick={openPricing}
-              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.PRICING ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.PRICING ? 'bg-indigo-600 text-white cta-glow' : 'hover:bg-slate-800/80'}`}
             >
               Plans
             </button>
             <button 
               onClick={openQuiz}
-              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.QUIZ ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.QUIZ ? 'bg-indigo-600 text-white cta-glow' : 'hover:bg-slate-800/80'}`}
             >
               Quizzes
             </button>
@@ -171,7 +171,7 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className={`pt-20 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
+      <main className={`pt-24 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
         {currentView === View.LANDING && (
           <LandingPage onStart={startConversation} onSeePlans={openPricing} />
         )}
@@ -193,7 +193,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-900 mt-auto">
+      <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-800/60 mt-auto bg-slate-950/40 backdrop-blur-sm">
         &copy; 2024 Synapse AI. Powered by Gemini. All rights reserved.
       </footer>
     </div>

@@ -73,7 +73,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center animate-in fade-in zoom-in-95 duration-500">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-indigo-500/10">
+      <div className="w-full max-w-md card-premium shiny-outline rounded-3xl p-8 shadow-2xl shadow-indigo-500/10">
         <div className="text-center mb-8">
           <SynapseLogo className="w-16 h-16 mx-auto mb-4 shadow-xl shadow-white/5" />
           <h2 className="text-3xl font-bold">{isLogin ? 'Welcome Back' : 'Join Synapse AI'}</h2>
@@ -83,7 +83,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         <button 
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all mb-6"
+          className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all mb-6 hover:-translate-y-0.5"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#EA4335" d="M12 5.04c1.94 0 3.51.68 4.75 1.81l3.5-3.5C18.16 1.33 15.31 0 12 0 7.31 0 3.33 2.69 1.45 6.6l3.96 3.08C6.35 7.17 8.98 5.04 12 5.04z" />
