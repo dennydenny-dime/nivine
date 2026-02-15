@@ -17,7 +17,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Free Plan */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col hover:border-slate-700 transition-all">
+        <div className="card-premium rounded-3xl p-8 flex flex-col hover:border-slate-600 hover:-translate-y-1 transition-all duration-300">
           <div className="mb-8">
             <h3 className="text-xl font-bold mb-2">Starter</h3>
             <div className="flex items-baseline gap-1">
@@ -42,14 +42,14 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
           </ul>
           <button 
             onClick={onBack}
-            className="w-full py-3 bg-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-500 transition-all"
+            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-xl font-bold text-sm hover:from-indigo-500 hover:to-cyan-400 transition-all cta-glow"
           >
             Active Plan
           </button>
         </div>
 
         {/* Paid Plan Mock */}
-        <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 flex flex-col relative shadow-2xl transform md:-translate-y-4">
+        <div className="card-premium shiny-outline border-2 border-indigo-500/40 rounded-3xl p-8 flex flex-col relative shadow-2xl transform md:-translate-y-4">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-slate-400 text-[10px] font-bold uppercase tracking-widest px-4 py-1 rounded-full">
             Coming Soon
           </div>
@@ -84,7 +84,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
         </div>
 
         {/* Enterprise Mock Plan */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col hover:border-slate-700 transition-all">
+        <div className="card-premium rounded-3xl p-8 flex flex-col hover:border-slate-600 hover:-translate-y-1 transition-all duration-300">
           <div className="mb-8">
             <h3 className="text-xl font-bold mb-2">Team</h3>
             <div className="flex items-baseline gap-1">

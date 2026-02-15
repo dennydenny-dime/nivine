@@ -54,17 +54,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
 
   return (
     <div className="animate-in fade-in duration-1000">
-      <div className="text-center mb-12 space-y-6 flex flex-col items-center">
+      <div className="card-premium shiny-outline rounded-3xl p-6 sm:p-10 mb-10 relative overflow-hidden">
+        <div className="absolute -top-24 -right-20 w-64 h-64 bg-indigo-500/20 blur-3xl rounded-full"></div>
+        <div className="absolute -bottom-24 -left-20 w-64 h-64 bg-cyan-500/20 blur-3xl rounded-full"></div>
+      <div className="text-center mb-12 space-y-6 flex flex-col items-center relative z-10">
         <div className="relative group">
           <div className="absolute -inset-4 bg-white/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
           <SynapseLogo className="w-24 h-24 sm:w-32 sm:h-32 relative synapse-glow mb-4 transform group-hover:scale-105 transition duration-500 shadow-2xl shadow-white/5" />
         </div>
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight">
-          Master Your <span className="synapse-gradient">Communication</span>
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight">
+          Transform Your <span className="gradient-text">Speaking Presence</span>
         </h1>
-        <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          The neuron-powered speech lab. Practice presentations and high-stakes interviews with a coach that adapts to your style, vocabulary, and mood.
+        <p className="text-lg text-slate-300/90 max-w-3xl mx-auto leading-relaxed">
+          Premium AI communication coaching for interviews, leadership, and high-stakes conversations. Real-time voice practice with feedback that feels personal, sharp, and actionable.
         </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-slate-300">
+          <span className="glass-soft rounded-full px-4 py-1.5">⚡ Live voice coaching</span>
+          <span className="glass-soft rounded-full px-4 py-1.5">🌍 Multilingual practice</span>
+          <span className="glass-soft rounded-full px-4 py-1.5">📈 Quiz-based progression</span>
+        </div>
         
         {/* Global Language Selector */}
         <div className="relative inline-block w-64 mt-4">
@@ -85,6 +93,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
           </div>
         </div>
       </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
         {/* Left Side: Preset Cards */}
@@ -101,7 +110,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
               <button
                 key={idx}
                 onClick={() => handlePresetStart(p)}
-                className="p-6 glass rounded-2xl text-left hover:border-blue-500/50 hover:bg-slate-900/50 transition-all group"
+                className="p-6 card-premium rounded-2xl text-left hover:-translate-y-0.5 hover:border-blue-500/50 transition-all duration-300 group"
               >
                 <div className="text-[10px] uppercase tracking-[0.2em] text-pink-400 font-black mb-1.5">{p.mood}</div>
                 <h3 className="text-lg font-bold group-hover:text-blue-400 transition-colors">{p.role}</h3>
@@ -112,7 +121,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
         </div>
 
         {/* Right Side: Custom Form Wizard */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl synapse-glow min-h-[500px] flex flex-col transition-all duration-500">
+        <div className="card-premium shiny-outline rounded-3xl p-8 shadow-2xl synapse-glow min-h-[500px] flex flex-col transition-all duration-500">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-2xl font-semibold">Custom Coach</h2>
@@ -215,7 +224,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
                     <button 
                       onClick={nextStep}
                       disabled={!customDescription.trim() || !name.trim()}
-                      className="w-full py-4 bg-blue-600 rounded-xl font-bold text-lg hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                      className="w-full py-4 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-xl font-bold text-lg hover:from-indigo-500 hover:to-cyan-400 transition-all cta-glow disabled:opacity-50"
                     >
                       Finalize Setup →
                     </button>
@@ -252,7 +261,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
                       <button onClick={prevStep} className="flex-1 py-4 bg-slate-800 rounded-xl font-bold text-slate-400 hover:bg-slate-700 transition-all">Back</button>
                       <button 
                         onClick={handleStartSession}
-                        className="flex-[2] py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl font-bold text-lg hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25"
+                        className="flex-[2] py-4 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-xl font-bold text-lg hover:from-indigo-500 hover:to-cyan-400 transition-all cta-glow"
                       >
                         Engage Neural Link
                       </button>
