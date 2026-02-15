@@ -17,6 +17,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
     setHasKey(!!apiKey && apiKey.length > 0);
   }, []);
 
+
+  const personaMeta: Record<string, { title: string; description: string }> = {
+    Maya: {
+      title: 'Ex Recruiter',
+      description: 'Runs realistic interviews, checks clarity, and gives direct hiring-focused feedback.'
+    },
+    Ethan: {
+      title: 'Angel Investor',
+      description: 'Pushes for crisp business storytelling, traction proof, and confident pitch delivery.'
+    },
+    Nora: {
+      title: 'Company Manager',
+      description: 'Practices clear team communication, stakeholder alignment, and calm decision updates.'
+    },
+    Leo: {
+      title: 'Salesman',
+      description: 'Trains objection handling, discovery flow, and concise value-first closing language.'
+    }
+  };
+
   const handlePresetStart = (persona: Persona) => {
     onStart({ ...persona, difficultyLevel: 5, language });
   };
@@ -88,8 +108,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
               className="p-6 card-premium rounded-2xl text-left hover:-translate-y-0.5 hover:border-blue-500/50 transition-all duration-300 group"
             >
               <div className="text-[10px] uppercase tracking-[0.2em] text-cyan-400 font-black mb-1.5">{p.mood}</div>
-              <h3 className="text-lg font-bold group-hover:text-blue-400 transition-colors">{p.role.split(':')[0]}</h3>
-              <p className="text-sm text-slate-400 mt-2 leading-relaxed">{p.role.split(':')[1]?.trim() || p.role}</p>
+              <h3 className="text-lg font-bold group-hover:text-blue-400 transition-colors">{personaMeta[p.name]?.title || p.role}</h3>
+              <p className="text-sm text-slate-400 mt-2 leading-relaxed">{personaMeta[p.name]?.description || p.role}</p>
               <p className="text-xs text-slate-500 mt-3">Coach: {p.name}</p>
             </button>
           ))}
