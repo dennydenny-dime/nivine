@@ -99,18 +99,18 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         const hardness = persona.difficultyLevel || 5;
 
-        // Map hardness to behavioral traits
+        // Map hardness to coaching strictness while keeping tone respectful and human
         let intensityInstruction = "";
         if (hardness <= 2) {
-          intensityInstruction = "LEVEL 1-2: Extremely friendly, warm, and gentle. Use high praise and simple language. Be a cheerleader.";
+          intensityInstruction = "LEVEL 1-2: Very warm and supportive. Keep feedback simple, positive, and practical.";
         } else if (hardness <= 4) {
-          intensityInstruction = "LEVEL 3-4: Supportive and encouraging coworker. Professional but very kind and approachable.";
+          intensityInstruction = "LEVEL 3-4: Friendly professional coach. Give concise corrections and clear examples.";
         } else if (hardness <= 6) {
-          intensityInstruction = "LEVEL 5-6: Objective professional coach. Balanced feedback, neutral tone, constructive criticism.";
+          intensityInstruction = "LEVEL 5-6: Balanced coach. Be direct and honest, but always respectful and constructive.";
         } else if (hardness <= 8) {
-          intensityInstruction = "LEVEL 7-8: Strict and demanding executive. High standards, sharp tone, focused on efficiency and impact.";
+          intensityInstruction = "LEVEL 7-8: High standards, no fluff. Be concise, specific, and improvement-focused without being rude.";
         } else {
-          intensityInstruction = "LEVEL 9-10: Hostile and high-pressure interrogator. No room for error. Cold, extremely serious, and ruthlessly analytical of the user's speech.";
+          intensityInstruction = "LEVEL 9-10: Maximum rigor. Challenge weak responses quickly, but stay polite, calm, and professional.";
         }
 
         const sessionPromise = ai.live.connect({
@@ -132,8 +132,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             2. Language: The session starts in ${currentLanguage}. Detect and switch instantly if the user changes language or if instructed.
             3. Flow: Start immediately. Introduction: "Neural link established at Intensity Level ${hardness}. I am ${persona.name}. Let's begin."
             4. Real-time Feedback: Point out mistakes in communication style and vocabulary directly during the conversation.
-            5. LATENCY PRIORITY: Respond immediately. Keep responses concise, punchy, and fast-paced. Do not simulate "thinking" pauses. Interject quickly if necessary.
-            6. AUDIO REALISM: To feel like a real human presence, occasionally include subtle audio cues such as a soft chuckle/laugh (when context is funny or light) or a gentle clearing of the throat/cough (when shifting topics or thinking). These should be natural and not disruptive.`,
+            5. TONE RULE: Always speak nicely, respectfully, and straight to the point. No hostile, sarcastic, or demeaning language.
+            6. HUMAN CONVERSATION STYLE: Sound like a real human conversation partner: short natural turns, occasional conversational transitions, and context-aware follow-up questions.
+            7. LATENCY PRIORITY: Respond immediately. Keep responses concise, punchy, and fast-paced. Do not simulate "thinking" pauses. Interject quickly if necessary.
+            8. AUDIO REALISM: To feel like a real human presence, occasionally include subtle audio cues such as a soft chuckle/laugh (when context is funny or light) or a gentle clearing of the throat/cough (when shifting topics or thinking). These should be natural and not disruptive.`,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
           },

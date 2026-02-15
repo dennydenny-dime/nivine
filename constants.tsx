@@ -2,11 +2,34 @@
 import { Mood, Persona } from './types';
 
 export const PRESET_PERSONAS: Persona[] = [
-  { name: 'Sarah', role: 'Executive Recruiter', mood: 'Formal', gender: 'Female', language: 'English' },
-  { name: 'David', role: 'Angel Investor', mood: 'Challenging', gender: 'Male', language: 'English' },
-  { name: 'Alex', role: 'Supportive Coworker', mood: 'Friendly', gender: 'Male', language: 'English' },
-  { name: 'Dr. Miller', role: 'Strict Academic Supervisor', mood: 'Strict', gender: 'Female', language: 'English' },
-  { name: 'The Audience', role: 'Keynote Presentation Crowd', mood: 'Encouraging', gender: 'Female', language: 'English' },
+  {
+    name: 'Maya',
+    role: 'Ex-Recruiter: asks practical interview questions, gives direct hiring-oriented feedback, and helps the user sound confident and clear.',
+    mood: 'Friendly',
+    gender: 'Female',
+    language: 'English'
+  },
+  {
+    name: 'Ethan',
+    role: 'Angel Investor: focuses on business clarity, traction, unit economics, and concise pitch storytelling.',
+    mood: 'Formal',
+    gender: 'Male',
+    language: 'English'
+  },
+  {
+    name: 'Nora',
+    role: 'Company Manager: runs realistic team and stakeholder conversations with calm, structured, solution-focused communication.',
+    mood: 'Encouraging',
+    gender: 'Female',
+    language: 'English'
+  },
+  {
+    name: 'Leo',
+    role: 'Salesman: practices objection handling, discovery questions, and closing with clear value-first messaging.',
+    mood: 'Friendly',
+    gender: 'Male',
+    language: 'English'
+  },
 ];
 
 export const MOODS: Mood[] = ['Formal', 'Friendly', 'Strict', 'Encouraging', 'Challenging'];
