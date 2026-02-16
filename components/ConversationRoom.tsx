@@ -99,6 +99,17 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         const hardness = persona.difficultyLevel || 5;
 
+        const rolePlayDirective = (() => {
+          const role = (persona.role || '').toLowerCase();
+          if (role.includes('salesman') || role.includes('sales')) {
+            return 'ROLE-SPECIFIC BEHAVIOR: Act like a real salesperson. Focus on objection handling, value framing, negotiation, closing language, confidence, and urgency.';
+          }
+          if (role.includes('manager')) {
+            return 'ROLE-SPECIFIC BEHAVIOR: Act like a company manager. Focus on leadership communication, prioritization, accountability, stakeholder alignment, team performance, and clear decision-making.';
+          }
+          return `ROLE-SPECIFIC BEHAVIOR: Stay fully in character as ${persona.role} and evaluate the user through that professional lens.`;
+        })();
+
         // Map hardness to behavioral traits
         let intensityInstruction = "";
         if (hardness <= 2) {
@@ -128,6 +139,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             
             NEURAL INTENSITY SETTING (Hardness ${hardness}/10):
             ${intensityInstruction}
+            ${rolePlayDirective}
             
             COACHING FOCUS:
             1. Monitor for fillers (um, ah, like), weak vocabulary, and tone inconsistencies.
