@@ -39,31 +39,65 @@ const App: React.FC = () => {
     if (savedUser) {
       setCurrentUser(JSON.parse(savedUser));
     }
-    
+
+    const getFullscreenElement = () => {
+      const fullscreenDocument = document as Document & { webkitFullscreenElement?: Element | null };
+      return document.fullscreenElement || fullscreenDocument.webkitFullscreenElement || null;
+    };
+
     const handleFullscreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
+      setIsFullScreen(!!getFullscreenElement());
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
+    };
   }, []);
 
   const enterFullScreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.warn(`Fullscreen entry denied: ${err.message}`);
-      });
+    const fullscreenDocument = document as Document & {
+      webkitFullscreenElement?: Element | null;
+    };
+    const fullscreenElement = document.fullscreenElement || fullscreenDocument.webkitFullscreenElement;
+    if (fullscreenElement) return;
+
+    const fullscreenRoot = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+    const requestFullscreen = fullscreenRoot.requestFullscreen || fullscreenRoot.webkitRequestFullscreen;
+
+    if (!requestFullscreen) {
+      return;
     }
+
+    Promise.resolve(requestFullscreen.call(fullscreenRoot)).catch((err: Error) => {
+      console.warn(`Fullscreen entry denied: ${err.message}`);
+    });
   }, []);
 
   const toggleFullScreen = useCallback(() => {
-    if (!document.fullscreenElement) {
+    const fullscreenDocument = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+
+    if (!document.fullscreenElement && !fullscreenDocument.webkitFullscreenElement) {
       enterFullScreen();
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
+      return;
     }
+
+    const exitFullscreen = document.exitFullscreen || fullscreenDocument.webkitExitFullscreen;
+    if (!exitFullscreen) {
+      return;
+    }
+
+    Promise.resolve(exitFullscreen.call(document)).catch((err: Error) => {
+      console.warn(`Fullscreen exit denied: ${err.message}`);
+    });
   }, [enterFullScreen]);
 
   const handleLogin = (user: User) => {
