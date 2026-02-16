@@ -74,6 +74,8 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
         The scenario and challenge MUST be written in ${selectedLanguage}.
         The scenario should be highly realistic and detailed.`,
         config: {
+          thinkingConfig: { thinkingBudget: 0 },
+          maxOutputTokens: 450,
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -109,7 +111,7 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
       }
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: `You are an expert communication coach. Evaluate this response to a communication challenge.
         
         The interaction Language is: ${selectedLanguage}. Ensure the feedback is provided in ${selectedLanguage}.
@@ -123,6 +125,8 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
         Analyze strictly based on clarity, tone, professionalism, and persuasiveness.
         The Grade should be tough but fair. "A+" is rare. "F" is for complete failure to address the challenge or offensive tone.`,
         config: {
+          thinkingConfig: { thinkingBudget: 0 },
+          maxOutputTokens: 550,
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,

@@ -97,9 +97,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{language} Mode</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {PRESET_PERSONAS.map((p, idx) => (
+            {PRESET_PERSONAS.map((p) => (
               <button
-                key={idx}
+                key={`${p.name}-${p.role}`}
                 onClick={() => handlePresetStart(p)}
                 className="p-6 glass rounded-2xl text-left hover:border-blue-500/50 hover:bg-slate-900/50 transition-all group"
               >

@@ -99,6 +99,17 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         const hardness = persona.difficultyLevel || 5;
 
+        const rolePlayDirective = (() => {
+          const role = (persona.role || '').toLowerCase();
+          if (role.includes('salesman') || role.includes('sales')) {
+            return 'ROLE-SPECIFIC BEHAVIOR: Act like a real salesperson. Focus on objection handling, value framing, negotiation, closing language, confidence, and urgency.';
+          }
+          if (role.includes('manager')) {
+            return 'ROLE-SPECIFIC BEHAVIOR: Act like a company manager. Focus on leadership communication, prioritization, accountability, stakeholder alignment, team performance, and clear decision-making.';
+          }
+          return `ROLE-SPECIFIC BEHAVIOR: Stay fully in character as ${persona.role} and evaluate the user through that professional lens.`;
+        })();
+
         // Map hardness to behavioral traits
         let intensityInstruction = "";
         if (hardness <= 2) {
@@ -113,6 +124,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           intensityInstruction = "LEVEL 9-10: Hostile and high-pressure interrogator. No room for error. Cold, extremely serious, and ruthlessly analytical of the user's speech.";
         }
 
+        let liveSession: any = null;
+
         const sessionPromise = ai.live.connect({
           model: 'gemini-2.5-flash-native-audio-preview-12-2025',
           config: {
@@ -126,6 +139,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             
             NEURAL INTENSITY SETTING (Hardness ${hardness}/10):
             ${intensityInstruction}
+            ${rolePlayDirective}
             
             COACHING FOCUS:
             1. Monitor for fillers (um, ah, like), weak vocabulary, and tone inconsistencies.
@@ -141,18 +155,16 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             onopen: () => {
               setIsConnecting(false);
               const source = audioContextRef.current!.createMediaStreamSource(stream);
-              // Reduced buffer size from 4096 to 2048 to lower input latency (approx 128ms at 16kHz)
-              const scriptProcessor = audioContextRef.current!.createScriptProcessor(2048, 1, 1);
+              // Reduced buffer size from 4096 -> 1024 to lower input latency further (~64ms at 16kHz)
+              const scriptProcessor = audioContextRef.current!.createScriptProcessor(1024, 1, 1);
               
               scriptProcessor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
                 const pcmBlob = createBlob(inputData);
-                // Rely on sessionPromise resolving to send input
-                sessionPromise.then(s => {
-                  try { s.sendRealtimeInput({ media: pcmBlob }); } catch(err) {
-                    console.warn("Input dropped:", err);
-                  }
-                });
+                if (!liveSession) return;
+                try { liveSession.sendRealtimeInput({ media: pcmBlob }); } catch(err) {
+                  console.warn("Input dropped:", err);
+                }
               };
 
               source.connect(scriptProcessor);
@@ -226,7 +238,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           }
         });
 
-        sessionRef.current = await sessionPromise;
+        liveSession = await sessionPromise;
+        sessionRef.current = liveSession;
       } catch (err: any) {
         console.error("Initialization Error:", err);
         setError("Could not establish neural link. Ensure mic access is granted and your billing is active.");
