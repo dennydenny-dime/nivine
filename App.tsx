@@ -7,6 +7,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import AuthPage from './components/AuthPage';
 import Leaderboard from './components/Leaderboard';
+import CustomFeaturePage from './components/CustomFeaturePage';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -26,7 +27,8 @@ enum View {
   CONVERSATION = 'conversation',
   QUIZ = 'quiz',
   PRICING = 'pricing',
-  LEADERBOARD = 'leaderboard'
+  LEADERBOARD = 'leaderboard',
+  CUSTOM_FEATURE = 'custom-feature'
 }
 
 const App: React.FC = () => {
@@ -131,6 +133,10 @@ const App: React.FC = () => {
     setCurrentView(View.LEADERBOARD);
   };
 
+  const openCustomFeature = () => {
+    setCurrentView(View.CUSTOM_FEATURE);
+  };
+
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
@@ -192,7 +198,7 @@ const App: React.FC = () => {
             </button>
             <button 
               onClick={openPricing}
-              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.PRICING ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.PRICING || currentView === View.CUSTOM_FEATURE ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
             >
               Plans
             </button>
@@ -236,7 +242,11 @@ const App: React.FC = () => {
         )}
 
         {currentView === View.PRICING && (
-          <PricingPage onBack={goBack} />
+          <PricingPage onBack={goBack} onOpenCustomFeature={openCustomFeature} />
+        )}
+
+        {currentView === View.CUSTOM_FEATURE && (
+          <CustomFeaturePage onBackToPlans={openPricing} />
         )}
 
         {currentView === View.LEADERBOARD && (
