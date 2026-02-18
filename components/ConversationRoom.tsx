@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
-import { COMMON_LANGUAGES, getSystemApiKey } from '../constants';
+import { COMMON_LANGUAGES, getSystemApiKey, VOICE_MAP } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 
 interface ConversationRoomProps {
