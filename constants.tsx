@@ -43,7 +43,11 @@ export const getSystemApiKey = (): string | undefined => {
     // @ts-ignore
     if (typeof import.meta !== 'undefined' && import.meta.env) {
       // @ts-ignore
-      key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+      key =
+        import.meta.env.VITE_API_KEY ||
+        import.meta.env.GEMINI_API_KEY ||
+        import.meta.env.REACT_APP_API_KEY ||
+        import.meta.env.API_KEY;
     }
   } catch (e) {
     // Ignore ReferenceErrors if import.meta is not defined
@@ -58,6 +62,7 @@ export const getSystemApiKey = (): string | undefined => {
       key = process.env.API_KEY || 
             process.env.REACT_APP_API_KEY || 
             process.env.NEXT_PUBLIC_API_KEY ||
+            process.env.GEMINI_API_KEY ||
             process.env.VITE_API_KEY;
     }
   } catch (e) {
