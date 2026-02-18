@@ -43,28 +43,57 @@ const App: React.FC = () => {
     }
     
     const handleFullscreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      setIsFullScreen(!!doc.fullscreenElement || !!doc.webkitFullscreenElement);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
+    };
   }, []);
 
   const enterFullScreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.warn(`Fullscreen entry denied: ${err.message}`);
-      });
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+
+    const docEl = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+
+    const inFullscreen = !!doc.fullscreenElement || !!doc.webkitFullscreenElement;
+    if (inFullscreen) return;
+
+    const requestFullscreen = docEl.requestFullscreen?.bind(docEl) ?? docEl.webkitRequestFullscreen?.bind(docEl);
+    if (!requestFullscreen) {
+      // iOS Safari may not support fullscreen on regular pages.
+      return;
     }
+
+    Promise.resolve(requestFullscreen()).catch((err) => {
+      console.warn(`Fullscreen entry denied: ${err?.message ?? err}`);
+    });
   }, []);
 
   const toggleFullScreen = useCallback(() => {
-    if (!document.fullscreenElement) {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+
+    if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
       enterFullScreen();
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
+      const exitFullscreen = document.exitFullscreen?.bind(document) ?? doc.webkitExitFullscreen?.bind(document);
+      if (!exitFullscreen) return;
+
+      Promise.resolve(exitFullscreen()).catch((err) => {
+        console.warn(`Fullscreen exit denied: ${err?.message ?? err}`);
+      });
     }
   }, [enterFullScreen]);
 
