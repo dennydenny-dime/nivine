@@ -1,121 +1,77 @@
-
 import React from 'react';
 
 interface PricingPageProps {
   onBack: () => void;
 }
 
+const individualPlans = [
+  { label: 'Free', value: '3 sessions/mo' },
+  { label: 'Pro — $19/mo', value: 'Unlimited sessions' },
+  { label: 'Premium — $39/mo', value: 'All scenarios + analytics' },
+];
+
+const teamPlans = [
+  { label: 'Starter — $299/mo', value: 'Up to 25 seats' },
+  { label: 'Growth — $799/mo', value: 'Up to 100 seats' },
+  { label: 'Enterprise', value: 'Custom pricing' },
+];
+
 const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-6xl mx-auto py-12">
-      <div className="text-center mb-16">
-        <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Choose Your <span className="gradient-text">Coaching Plan</span></h2>
-        <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-          Scale your communication skills with flexible options tailored to your learning pace.
+      <div className="text-center mb-14">
+        <h2 className="text-4xl md:text-5xl font-extrabold mb-4">
+          Pricing Built for <span className="gradient-text">Every Stage</span>
+        </h2>
+        <p className="text-slate-400 text-lg max-w-3xl mx-auto">
+          Choose between individual subscriptions or institutional seats, with clear options for learners and teams.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Free Plan */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col hover:border-slate-700 transition-all">
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-2">Starter</h3>
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold">$0</span>
-              <span className="text-slate-500 text-sm">/ forever</span>
-            </div>
-            <p className="text-slate-400 text-sm mt-4">Perfect for casual practice and getting started.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-slate-950 border border-cyan-500/40 rounded-[28px] p-7 md:p-10 shadow-[0_0_60px_rgba(8,145,178,0.08)]">
+          <p className="text-cyan-400 uppercase tracking-[0.2em] text-xs md:text-sm font-semibold mb-5">B2C — Freemium SaaS</p>
+          <h3 className="text-3xl md:text-4xl font-bold text-slate-100 mb-6">Individual Plans</h3>
+          <p className="text-slate-400 text-lg leading-relaxed mb-8 max-w-lg">
+            Free tier (3 sessions/month) drives viral growth. Paid plans unlock unlimited practice, detailed analytics,
+            and advanced scenarios.
+          </p>
+
+          <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
+            {individualPlans.map((plan) => (
+              <div key={plan.label} className="grid grid-cols-[1fr_auto] gap-4 items-start py-5">
+                <span className="text-slate-200 font-semibold text-2xl leading-tight">{plan.label}</span>
+                <span className="text-slate-300 text-2xl leading-tight text-right">{plan.value}</span>
+              </div>
+            ))}
           </div>
-          <ul className="space-y-4 mb-8 flex-1">
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Standard Neural Link
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Basic Feedback Engine
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Daily Quiz Access
-            </li>
-          </ul>
-          <button 
-            onClick={onBack}
-            className="w-full py-3 bg-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-500 transition-all"
-          >
-            Active Plan
-          </button>
         </div>
 
-        {/* Paid Plan Mock */}
-        <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 flex flex-col relative shadow-2xl transform md:-translate-y-4">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-slate-400 text-[10px] font-bold uppercase tracking-widest px-4 py-1 rounded-full">
-            Coming Soon
-          </div>
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-2 text-indigo-400">Pro Synapse</h3>
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold">$19</span>
-              <span className="text-slate-500 text-sm">/ month</span>
-            </div>
-            <p className="text-slate-400 text-sm mt-4">Professional grade coaching with persistent memory.</p>
-          </div>
-          <ul className="space-y-4 mb-8 flex-1">
-            <li className="flex items-center gap-3 text-sm text-slate-200">
-              <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Advanced Voice Profiles
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-200">
-              <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              High-Fidelity Synthesis
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-200">
-              <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Deep Linguistic Analysis
-            </li>
-          </ul>
-          <button 
-            disabled
-            className="w-full py-4 border border-slate-800 rounded-xl font-bold text-sm text-slate-600 cursor-not-allowed"
-          >
-            Unlock Later
-          </button>
-        </div>
+        <div className="bg-slate-950 border border-cyan-500/40 rounded-[28px] p-7 md:p-10 shadow-[0_0_60px_rgba(8,145,178,0.08)]">
+          <p className="text-cyan-400 uppercase tracking-[0.2em] text-xs md:text-sm font-semibold mb-5">B2B — Institutional</p>
+          <h3 className="text-3xl md:text-4xl font-bold text-slate-100 mb-6">Team &amp; Campus Plans</h3>
+          <p className="text-slate-400 text-lg leading-relaxed mb-8 max-w-lg">
+            Bootcamps, universities, and career centers pay per-seat or flat monthly. High LTV, low churn.
+          </p>
 
-        {/* Enterprise Mock Plan */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col hover:border-slate-700 transition-all">
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-2">Team</h3>
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold">Custom</span>
-            </div>
-            <p className="text-slate-400 text-sm mt-4">Corporate solutions for HR and Sales teams.</p>
+          <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
+            {teamPlans.map((plan) => (
+              <div key={plan.label} className="grid grid-cols-[1fr_auto] gap-4 items-start py-5">
+                <span className="text-slate-200 font-semibold text-2xl leading-tight">{plan.label}</span>
+                <span className="text-slate-300 text-2xl leading-tight text-right">{plan.value}</span>
+              </div>
+            ))}
           </div>
-          <ul className="space-y-4 mb-8 flex-1">
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Centralized Billing
-            </li>
-            <li className="flex items-center gap-3 text-sm text-slate-300">
-              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Custom Persona Training
-            </li>
-          </ul>
-          <button 
-            disabled
-            className="w-full py-3 border border-slate-800 rounded-xl font-bold text-sm text-slate-600 cursor-not-allowed"
-          >
-            Contact Sales
-          </button>
         </div>
       </div>
 
-      <div className="mt-16 text-center text-slate-500 text-sm max-w-xl mx-auto space-y-4">
-        <p>
-          Neural Link capabilities are currently open for all verified pilots.
-          Future upgrades will include specialized communication engines and long-term skill tracking.
-        </p>
+      <div className="mt-10 flex justify-center">
+        <button
+          onClick={onBack}
+          className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors text-slate-100 font-semibold"
+        >
+          Back
+        </button>
       </div>
     </div>
   );
