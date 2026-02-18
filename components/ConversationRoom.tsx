@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
-import { COMMON_LANGUAGES } from '../constants';
+import { COMMON_LANGUAGES, getSystemApiKey } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 
 interface ConversationRoomProps {
@@ -142,7 +142,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   useEffect(() => {
     const initSession = async () => {
       try {
-        const apiKey = import.meta.env.VITE_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.REACT_APP_API_KEY || import.meta.env.API_KEY;
+        const apiKey = getSystemApiKey();
         if (!apiKey) {
           setError("Environment Config Error: No API key found. Set one of: VITE_API_KEY, GEMINI_API_KEY, or REACT_APP_API_KEY.");
           return;
