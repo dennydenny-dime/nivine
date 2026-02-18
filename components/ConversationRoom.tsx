@@ -113,6 +113,19 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           intensityInstruction = "LEVEL 9-10: Hostile and high-pressure interrogator. No room for error. Cold, extremely serious, and ruthlessly analytical of the user's speech.";
         }
 
+
+
+        const roleLower = (persona.role || '').toLowerCase();
+        let roleSpecificInstruction = 'Stay fully aligned with your professional role at all times.';
+
+        if (roleLower.includes('salesman')) {
+          roleSpecificInstruction =
+            'Act like a real salesman: focus on customer pain points, objections, value proposition, pricing clarity, closing tactics, and negotiation. Ask discovery questions and push for concrete next steps.';
+        } else if (roleLower.includes('company manager')) {
+          roleSpecificInstruction =
+            'Act like a real company manager: prioritize team performance, ownership, execution quality, stakeholder communication, deadlines, and measurable outcomes. Give structured managerial feedback and decision-oriented guidance.';
+        }
+
         const sessionPromise = ai.live.connect({
           model: 'gemini-2.5-flash-native-audio-preview-12-2025',
           config: {
@@ -133,7 +146,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             3. Flow: Start immediately. Introduction: "Neural link established at Intensity Level ${hardness}. I am ${persona.name}. Let's begin."
             4. Real-time Feedback: Point out mistakes in communication style and vocabulary directly during the conversation.
             5. LATENCY PRIORITY: Respond immediately. Keep responses concise, punchy, and fast-paced. Do not simulate "thinking" pauses. Interject quickly if necessary.
-            6. AUDIO REALISM: To feel like a real human presence, occasionally include subtle audio cues such as a soft chuckle/laugh (when context is funny or light) or a gentle clearing of the throat/cough (when shifting topics or thinking). These should be natural and not disruptive.`,
+            6. AUDIO REALISM: To feel like a real human presence, occasionally include subtle audio cues such as a soft chuckle/laugh (when context is funny or light) or a gentle clearing of the throat/cough (when shifting topics or thinking). These should be natural and not disruptive.
+            7. ROLE FIDELITY: ${roleSpecificInstruction}`,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
           },
