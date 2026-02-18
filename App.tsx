@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import EntryPage from './components/EntryPage';
 import LandingPage from './components/LandingPage';
+import MainAppPage from './components/MainAppPage';
 import ConversationRoom from './components/ConversationRoom';
 import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
@@ -191,11 +191,11 @@ const App: React.FC = () => {
 
       <main className={`pt-20 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
         {currentView === View.LANDING && (
-          <EntryPage onEnterApp={openApp} />
+          <LandingPage onEnterApp={openApp} />
         )}
 
         {currentView === View.APP && (
-          <LandingPage onStart={startConversation} onSeePlans={openPricing} />
+          <MainAppPage onStart={startConversation} onSeePlans={openPricing} />
         )}
 
         {currentView === View.CONVERSATION && selectedPersona && (
