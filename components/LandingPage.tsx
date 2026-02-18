@@ -92,7 +92,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold flex items-center gap-2">
               <span className="w-1.5 h-6 bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-              Neural Training Modules
+              Professional Role Modules
             </h2>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{language} Mode</span>
           </div>
@@ -105,7 +105,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
               >
                 <div className="text-[10px] uppercase tracking-[0.2em] text-pink-400 font-black mb-1.5">{p.mood}</div>
                 <h3 className="text-lg font-bold group-hover:text-blue-400 transition-colors">{p.role}</h3>
-                <p className="text-sm text-slate-500 mt-2">Simulate a session with {p.name} in {language}.</p>
+                <p className="text-sm text-slate-500 mt-2">Practice a realistic conversation with {p.name} in {language}.</p>
               </button>
             ))}
           </div>
@@ -115,8 +115,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl synapse-glow min-h-[500px] flex flex-col transition-all duration-500">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-2xl font-semibold">Custom Coach</h2>
-              <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Network Config Step {step} / 2</p>
+              <h2 className="text-2xl font-semibold">Custom Role</h2>
+              <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Setup Step {step} / 2</p>
             </div>
             <div className="flex gap-2">
               <div className={`w-3 h-1.5 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-blue-500 w-6' : 'bg-slate-700'}`}></div>
@@ -181,7 +181,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Communication Hardness (1-10)</label>
+                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Coaching Intensity (1-10)</label>
                         <span className="text-[10px] font-bold text-blue-400">{difficultyLevel} - {getIntensityLabel(difficultyLevel)}</span>
                       </div>
                       <input 
@@ -226,8 +226,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 flex-1 flex flex-col">
                     <div className="text-center py-4">
                       <div className="w-16 h-16 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl synapse-glow">🌍</div>
-                      <h3 className="text-xl font-bold">Linguistic Origin</h3>
-                      <p className="text-sm text-slate-400 mt-2">The synapse will initialize in this language, but understands all dialects.</p>
+                      <h3 className="text-xl font-bold">Preferred Language</h3>
+                      <p className="text-sm text-slate-400 mt-2">The conversation will begin in this language and adapt if you switch.</p>
                     </div>
 
                     <div className="flex-1 flex flex-col justify-center">
@@ -238,13 +238,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
                       >
                         {COMMON_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                       </select>
-                      <p className="text-[10px] text-slate-500 text-center mt-3 uppercase tracking-widest font-black">Dynamic Polyglot Engine: Active</p>
+                      <p className="text-[10px] text-slate-500 text-center mt-3 uppercase tracking-widest font-black">Multilingual Support: Active</p>
                     </div>
 
                     <div className="bg-slate-950/50 border border-slate-800/50 p-4 rounded-2xl mt-4">
                       <div className="flex items-center gap-3 text-xs text-slate-500">
                         <span className="flex-shrink-0 w-6 h-6 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center text-[10px]">✨</span>
-                        <span><b>Synapse Ready:</b> The coach will automatically detect and respond to any language shifts during your session.</span>
+                        <span><b>Session Ready:</b> Your role partner will detect and respond to language changes during the conversation.</span>
                       </div>
                     </div>
 
@@ -254,7 +254,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onSeePlans }) => {
                         onClick={handleStartSession}
                         className="flex-[2] py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl font-bold text-lg hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25"
                       >
-                        Engage Neural Link
+                        Start Role Session
                       </button>
                     </div>
                   </div>
