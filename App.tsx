@@ -181,7 +181,7 @@ const App: React.FC = () => {
               onClick={openApp}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.APP ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
             >
-              Main App
+              Neural Training Modules
             </button>
             <button 
               onClick={openLeaderboard}
