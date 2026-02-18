@@ -2,11 +2,11 @@
 import { Mood, Persona } from './types';
 
 export const PRESET_PERSONAS: Persona[] = [
-  { name: 'Sarah', role: 'Executive Recruiter', mood: 'Formal', gender: 'Female', language: 'English' },
-  { name: 'David', role: 'Angel Investor', mood: 'Challenging', gender: 'Male', language: 'English' },
-  { name: 'Alex', role: 'Supportive Coworker', mood: 'Friendly', gender: 'Male', language: 'English' },
-  { name: 'Dr. Miller', role: 'Strict Academic Supervisor', mood: 'Strict', gender: 'Female', language: 'English' },
-  { name: 'The Audience', role: 'Keynote Presentation Crowd', mood: 'Encouraging', gender: 'Female', language: 'English' },
+  { name: 'Sarah Collins', role: 'Senior Executive Recruiter', mood: 'Formal', gender: 'Female', language: 'English' },
+  { name: 'David Chen', role: 'Partner at an Early-Stage Venture Fund', mood: 'Challenging', gender: 'Male', language: 'English' },
+  { name: 'Alex Rivera', role: 'Cross-Functional Product Teammate', mood: 'Friendly', gender: 'Male', language: 'English' },
+  { name: 'Dr. Miller', role: 'Thesis Advisor and Research Supervisor', mood: 'Strict', gender: 'Female', language: 'English' },
+  { name: 'Conference Audience', role: 'Industry Conference Attendees', mood: 'Encouraging', gender: 'Female', language: 'English' },
 ];
 
 export const MOODS: Mood[] = ['Formal', 'Friendly', 'Strict', 'Encouraging', 'Challenging'];

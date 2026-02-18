@@ -99,18 +99,18 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         const hardness = persona.difficultyLevel || 5;
 
-        // Map hardness to behavioral traits
+        // Map hardness to realistic coaching intensity
         let intensityInstruction = "";
         if (hardness <= 2) {
-          intensityInstruction = "LEVEL 1-2: Extremely friendly, warm, and gentle. Use high praise and simple language. Be a cheerleader.";
+          intensityInstruction = "LEVEL 1-2: Warm and confidence-building coach. Use calm encouragement, simple phrasing, and gentle corrections.";
         } else if (hardness <= 4) {
-          intensityInstruction = "LEVEL 3-4: Supportive and encouraging coworker. Professional but very kind and approachable.";
+          intensityInstruction = "LEVEL 3-4: Supportive professional. Friendly tone with clear guidance and practical suggestions.";
         } else if (hardness <= 6) {
-          intensityInstruction = "LEVEL 5-6: Objective professional coach. Balanced feedback, neutral tone, constructive criticism.";
+          intensityInstruction = "LEVEL 5-6: Balanced communication coach. Neutral, direct feedback with concise examples and actionable improvements.";
         } else if (hardness <= 8) {
-          intensityInstruction = "LEVEL 7-8: Strict and demanding executive. High standards, sharp tone, focused on efficiency and impact.";
+          intensityInstruction = "LEVEL 7-8: High-standard interviewer/executive. Time-conscious, challenging, and focused on precision, structure, and impact.";
         } else {
-          intensityInstruction = "LEVEL 9-10: Hostile and high-pressure interrogator. No room for error. Cold, extremely serious, and ruthlessly analytical of the user's speech.";
+          intensityInstruction = "LEVEL 9-10: Rigorous panel-style evaluator. Demanding, highly analytical, and uncompromising on clarity, evidence, and confidence.";
         }
 
         const sessionPromise = ai.live.connect({
@@ -122,18 +122,19 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             },
             // Optimize for speed: Disable thinking budget to reduce Time To First Token (TTFT)
             thinkingConfig: { thinkingBudget: 0 },
-            systemInstruction: `You are acting as ${persona.name}, whose profile is: ${persona.role}. Your primary mood is ${persona.mood}. 
-            
-            NEURAL INTENSITY SETTING (Hardness ${hardness}/10):
+            systemInstruction: `You are ${persona.name}, a ${persona.role}. Maintain a ${persona.mood.toLowerCase()} communication style while staying realistic and professional.
+
+            COACHING INTENSITY (Level ${hardness}/10):
             ${intensityInstruction}
-            
-            COACHING FOCUS:
-            1. Monitor for fillers (um, ah, like), weak vocabulary, and tone inconsistencies.
-            2. Language: The session starts in ${currentLanguage}. Detect and switch instantly if the user changes language or if instructed.
-            3. Flow: Start immediately. Introduction: "Neural link established at Intensity Level ${hardness}. I am ${persona.name}. Let's begin."
-            4. Real-time Feedback: Point out mistakes in communication style and vocabulary directly during the conversation.
-            5. LATENCY PRIORITY: Respond immediately. Keep responses concise, punchy, and fast-paced. Do not simulate "thinking" pauses. Interject quickly if necessary.
-            6. AUDIO REALISM: To feel like a real human presence, occasionally include subtle audio cues such as a soft chuckle/laugh (when context is funny or light) or a gentle clearing of the throat/cough (when shifting topics or thinking). These should be natural and not disruptive.`,
+
+            ROLE & DELIVERY RULES:
+            1. Stay in role at all times and respond as a real human in that role would in a live conversation.
+            2. Keep language natural and conversational. Avoid sci-fi wording, system-like narration, or mentioning being an AI.
+            3. Session starts in ${currentLanguage}. If the user switches languages or asks for a different language, switch immediately and continue naturally.
+            4. Begin with: "Hi, I'm ${persona.name}. I'll be your ${persona.role} for this session. Let's get started."
+            5. Give real-time communication coaching: call out fillers, vague wording, weak structure, tone mismatches, and unclear arguments.
+            6. Use concise turn-taking with low latency. Ask follow-up questions and push for specificity when needed.
+            7. Maintain realism: no exaggerated theatrics, no hostile abuse, no fantasy framing. Be credible, direct, and context-aware.`,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
           },
@@ -248,11 +249,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
         <div className="p-8 bg-slate-900 border border-red-500/30 rounded-3xl text-center max-w-md shadow-2xl">
           <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⚠️</div>
-          <h3 className="text-xl font-bold text-white mb-2">Neural Link Failed</h3>
+          <h3 className="text-xl font-bold text-white mb-2">Connection Failed</h3>
           <p className="text-slate-400 text-sm mb-6 leading-relaxed">{error}</p>
           <div className="flex flex-col gap-3">
             <button onClick={onExit} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all shadow-lg text-white">
-              Return to Labs
+              Return to Home
             </button>
           </div>
         </div>
@@ -271,8 +272,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             <h2 className="text-xl font-bold text-white tracking-tight">{persona.name}</h2>
             <p className="text-blue-400 font-bold text-[10px] uppercase tracking-widest line-clamp-1 max-w-[250px]">{persona.role}</p>
             <div className="flex flex-wrap gap-2 mt-1">
-              <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-black uppercase tracking-widest">Neural Feed: Active</span>
-              <span className="text-[8px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-black uppercase">Intensity: {persona.difficultyLevel}/10</span>
+              <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-black uppercase tracking-widest">Live Session: Active</span>
+              <span className="text-[8px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-black uppercase">Coaching Level: {persona.difficultyLevel}/10</span>
             </div>
           </div>
         </div>
@@ -306,7 +307,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         {isConnecting && (
           <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center space-y-4">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] animate-pulse">Initializing Synapse Network...</p>
+            <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] animate-pulse">Starting live conversation...</p>
           </div>
         )}
 
@@ -326,7 +327,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           </div>
           <div className="absolute bottom-3 flex items-center gap-3">
              <div className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-700">
-               {isSpeaking ? `COACH SYNAPSE FIRING` : 'AWAITING NEURAL INPUT'}
+               {isSpeaking ? 'Coach Speaking' : 'Listening'}
              </div>
           </div>
         </div>
@@ -339,8 +340,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-12">
               <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-blue-400 animate-pulse border border-slate-700">⚡</div>
               <div>
-                <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Neural Link Synchronized</p>
-                <p className="text-slate-600 italic text-sm mt-1">Speak clearly to begin your training session.</p>
+                <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Session Ready</p>
+                <p className="text-slate-600 italic text-sm mt-1">Speak naturally to begin your role-play.</p>
               </div>
             </div>
           )}
@@ -357,7 +358,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
                 <p className="text-sm md:text-base">{t.text}</p>
               </div>
               <span className="text-[8px] uppercase font-black text-slate-600 mt-2 px-1 tracking-[0.2em]">
-                {t.speaker === 'user' ? 'Linguistic Impulse' : 'Neuro-Response'}
+                {t.speaker === 'user' ? 'You' : persona.name}
               </span>
             </div>
           ))}
@@ -367,11 +368,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       <div className="mt-4 flex items-center justify-center gap-6 py-2.5 px-6 bg-slate-900/50 rounded-full border border-slate-800 w-fit mx-auto shadow-lg backdrop-blur-sm animate-in fade-in duration-1000 delay-500">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Signal Locked</span>
+          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Microphone Connected</span>
         </div>
         <div className="h-3 w-px bg-slate-800"></div>
         <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
-          Secure Neural Stream v3.2
+          Real-time Voice Session
         </div>
       </div>
     </div>
