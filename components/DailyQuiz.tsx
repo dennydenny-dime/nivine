@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import {
   QuizQuestion,
@@ -202,6 +202,25 @@ const scoreToGrade = (score: number): 'A+' | 'A' | 'B' | 'C' | 'D' | 'F' => {
   return 'F';
 };
 
+
+type SpeechRecognitionConstructor = new () => SpeechRecognition;
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    SpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 interface DailyQuizProps {
   onSeeLeaderboard?: () => void;
 }
@@ -216,6 +235,93 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
   const [userResponse, setUserResponse] = useState('');
   const [result, setResult] = useState<SynapseEvaluation | null>(null);
   const [evaluating, setEvaluating] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  const getSpeechLanguageCode = (language: string): string => {
+    const speechLanguageMap: Record<string, string> = {
+      English: 'en-US',
+      Spanish: 'es-ES',
+      French: 'fr-FR',
+      German: 'de-DE',
+      Italian: 'it-IT',
+      Portuguese: 'pt-PT',
+      Hindi: 'hi-IN',
+      Arabic: 'ar-SA',
+      Japanese: 'ja-JP',
+      Korean: 'ko-KR',
+      Mandarin: 'zh-CN',
+      Russian: 'ru-RU',
+    };
+
+    return speechLanguageMap[language] || 'en-US';
+  };
+
+  useEffect(() => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    setSpeechSupported(true);
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = getSpeechLanguageCode(selectedLanguage);
+
+    recognition.onstart = () => {
+      setSpeechError(null);
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setSpeechError(event.message || `Voice input error: ${event.error}`);
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript || '')
+        .join(' ')
+        .trim();
+
+      setUserResponse(transcript);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+      recognitionRef.current = null;
+    };
+  }, [selectedLanguage]);
+
+  const startVoiceInput = () => {
+    if (!recognitionRef.current || isListening) return;
+    setSpeechError(null);
+
+    try {
+      recognitionRef.current.lang = getSpeechLanguageCode(selectedLanguage);
+      recognitionRef.current.start();
+    } catch (error) {
+      setSpeechError(`Unable to start voice input. ${(error as Error).message}`);
+      setIsListening(false);
+    }
+  };
+
+  const stopVoiceInput = () => {
+    if (!recognitionRef.current || !isListening) return;
+    recognitionRef.current.stop();
+    setIsListening(false);
+  };
 
   const saveStats = (quizResult: SynapseEvaluation) => {
     const currentUser: User = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
@@ -473,6 +579,7 @@ All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLang
   };
 
   const reset = () => {
+    stopVoiceInput();
     setStep('selection');
     setQuiz(null);
     setResult(null);
@@ -604,12 +711,38 @@ All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLang
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">Your Verbal Response ({selectedLanguage})</label>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={isListening ? stopVoiceInput : startVoiceInput}
+                    disabled={!speechSupported}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                      isListening
+                        ? 'bg-red-500/20 border-red-500 text-red-300 hover:bg-red-500/30'
+                        : 'bg-indigo-500/10 border-indigo-500 text-indigo-300 hover:bg-indigo-500/20'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {isListening ? '⏹ Stop Voice Input' : '🎤 Start Voice Input'}
+                  </button>
+                  <span className="text-xs text-slate-500">
+                    {speechSupported
+                      ? isListening
+                        ? 'Listening... speak your answer naturally.'
+                        : 'You can speak or type your answer.'
+                      : 'Voice input is not supported in this browser.'}
+                  </span>
+                </div>
+
+                {speechError && (
+                  <p className="text-xs text-amber-400 mb-2">{speechError}</p>
+                )}
+
                 <textarea
                   rows={6}
                   value={userResponse}
                   onChange={(e) => setUserResponse(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-slate-200 text-lg leading-relaxed placeholder:text-slate-700"
-                  placeholder="Type exactly what you would say out loud..."
+                  placeholder="Speak using the mic or type exactly what you would say out loud..."
                 />
               </div>
               <button
