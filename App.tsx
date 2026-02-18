@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import EntryPage from './components/EntryPage';
 import LandingPage from './components/LandingPage';
 import ConversationRoom from './components/ConversationRoom';
 import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import AuthPage from './components/AuthPage';
 import Leaderboard from './components/Leaderboard';
-import { Persona, User, UserStats } from './types';
+import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -21,6 +22,7 @@ export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) =
 
 enum View {
   LANDING = 'landing',
+  APP = 'app',
   CONVERSATION = 'conversation',
   QUIZ = 'quiz',
   PRICING = 'pricing',
@@ -84,6 +86,10 @@ const App: React.FC = () => {
     setCurrentView(View.CONVERSATION);
   };
 
+  const openApp = () => {
+    setCurrentView(View.APP);
+  };
+
   const openQuiz = () => {
     setCurrentView(View.QUIZ);
   };
@@ -137,6 +143,18 @@ const App: React.FC = () => {
               )}
             </button>
             <button 
+              onClick={() => setCurrentView(View.LANDING)}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.LANDING ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+            >
+              Home
+            </button>
+            <button 
+              onClick={openApp}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.APP ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+            >
+              Main App
+            </button>
+            <button 
               onClick={openLeaderboard}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-2 ${currentView === View.LEADERBOARD ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-slate-800'}`}
             >
@@ -173,6 +191,10 @@ const App: React.FC = () => {
 
       <main className={`pt-20 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
         {currentView === View.LANDING && (
+          <EntryPage onEnterApp={openApp} />
+        )}
+
+        {currentView === View.APP && (
           <LandingPage onStart={startConversation} onSeePlans={openPricing} />
         )}
 
