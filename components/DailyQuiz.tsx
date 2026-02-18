@@ -1,8 +1,15 @@
-
 import React, { useState } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
-import { QuizQuestion, QuizCategory, Difficulty, QuizResult, User, UserStats } from '../types';
+import {
+  QuizQuestion,
+  QuizCategory,
+  Difficulty,
+  SynapseEvaluation,
+  User,
+  UserStats,
+} from '../types';
 import { COMMON_LANGUAGES, getSystemApiKey } from '../constants';
+import { clamp, computeSynapseTotal, scoreToGrade } from '../utils/synapseScoring';
 
 const CATEGORIES: { id: QuizCategory; icon: string; label: string }[] = [
   { id: 'Interview', icon: '💼', label: 'Job Interviews' },
@@ -26,29 +33,32 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('English');
   const [quiz, setQuiz] = useState<QuizQuestion | null>(null);
   const [userResponse, setUserResponse] = useState('');
-  const [result, setResult] = useState<QuizResult | null>(null);
+  const [result, setResult] = useState<SynapseEvaluation | null>(null);
   const [evaluating, setEvaluating] = useState(false);
 
-  const saveStats = (quizResult: QuizResult) => {
+  const saveStats = (quizResult: SynapseEvaluation) => {
     const currentUser: User = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
     const savedStats = localStorage.getItem('tm_user_stats');
-    let stats: UserStats = savedStats ? JSON.parse(savedStats) : { totalQuizzes: 0, totalXP: 0, avgRating: 0 };
-    
-    const xpEarned = Math.round(quizResult.rating * (selectedDifficulty === 'Expert' ? 2 : selectedDifficulty === 'Intermediate' ? 1.5 : 1));
-    
+    const stats: UserStats = savedStats ? JSON.parse(savedStats) : { totalQuizzes: 0, totalXP: 0, avgRating: 0 };
+
+    const xpEarned = Math.round(
+      quizResult.synapse_total_score *
+        (selectedDifficulty === 'Expert' ? 2 : selectedDifficulty === 'Intermediate' ? 1.5 : 1),
+    );
+
     const newTotalQuizzes = stats.totalQuizzes + 1;
     const newTotalXP = stats.totalXP + xpEarned;
-    const newAvgRating = ((stats.avgRating * stats.totalQuizzes) + quizResult.rating) / newTotalQuizzes;
+    const newAvgRating =
+      ((stats.avgRating * stats.totalQuizzes) + quizResult.synapse_total_score) / newTotalQuizzes;
 
     const updatedStats = {
       totalQuizzes: newTotalQuizzes,
       totalXP: newTotalXP,
-      avgRating: Math.round(newAvgRating * 10) / 10
+      avgRating: Math.round(newAvgRating * 10) / 10,
     };
 
     localStorage.setItem('tm_user_stats', JSON.stringify(updatedStats));
 
-    // Sync to global pool
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
     const userIndex = pool.findIndex((u: any) => u.email === currentUser.email);
     if (userIndex !== -1) {
@@ -63,14 +73,14 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
     try {
       const apiKey = getSystemApiKey();
       if (!apiKey) {
-        alert("API Key missing. Check Vercel settings.");
+        alert('API Key missing. Check Vercel settings.');
         setLoading(false);
         return;
       }
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Generate a communication challenge for the category "${selectedCategory}" with a difficulty level of "${selectedDifficulty}". 
+        contents: `Generate a communication challenge for the category "${selectedCategory}" with a difficulty level of "${selectedDifficulty}".
         The scenario and challenge MUST be written in ${selectedLanguage}.
         The scenario should be highly realistic and detailed.`,
         config: {
@@ -81,11 +91,11 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
               id: { type: Type.STRING },
               scenario: { type: Type.STRING },
               challenge: { type: Type.STRING },
-              tips: { type: Type.ARRAY, items: { type: Type.STRING } }
+              tips: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
-            required: ['id', 'scenario', 'challenge', 'tips']
-          }
-        }
+            required: ['id', 'scenario', 'challenge', 'tips'],
+          },
+        },
       });
       const data = JSON.parse(response.text);
       setQuiz({ ...data, category: selectedCategory, difficulty: selectedDifficulty });
@@ -103,41 +113,144 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
     try {
       const apiKey = getSystemApiKey();
       if (!apiKey) {
-        alert("API Key missing.");
+        alert('API Key missing.');
         setEvaluating(false);
         return;
       }
+
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `You are an expert communication coach. Evaluate this response to a communication challenge.
-        
-        The interaction Language is: ${selectedLanguage}. Ensure the feedback is provided in ${selectedLanguage}.
-        
-        Category: ${quiz?.category}
-        Difficulty: ${quiz?.difficulty}
-        Scenario: ${quiz?.scenario}
-        Challenge: ${quiz?.challenge}
-        User's Response: "${userResponse}"
-        
-        Analyze strictly based on clarity, tone, professionalism, and persuasiveness.
-        The Grade should be tough but fair. "A+" is rare. "F" is for complete failure to address the challenge or offensive tone.`,
+        contents: `You are evaluating an interview response.
+
+QUESTION:
+${quiz?.challenge}
+
+CANDIDATE ANSWER:
+${userResponse}
+
+Evaluate using the Synapse Communication Score™ pillars:
+
+Structure Score (0–20)
+
+Does the answer follow Situation, Task, Action, Result?
+
+Is there clear sequencing?
+
+Is the result explicit?
+
+Clarity Score (0–15)
+
+Are sentences direct and easy to understand?
+
+Is there minimal ambiguity?
+
+Is wording precise?
+
+Impact Score (0–15)
+
+Are measurable outcomes included?
+
+Are specific numbers used?
+
+Is business impact clear?
+
+Confidence Language Score (0–15)
+
+Avoids weak phrases ("I think", "maybe", "kind of")
+
+Uses assertive language
+
+Sounds decisive
+
+Response Relevance Score (0–15)
+
+Directly answers the question
+
+Avoids tangents
+
+Stays aligned with interviewer intent
+
+Return STRICT JSON in this format:
+
+{
+"structure_score": number,
+"clarity_score": number,
+"impact_score": number,
+"confidence_score": number,
+"relevance_score": number,
+"strengths": ["bullet1", "bullet2"],
+"weaknesses": ["bullet1", "bullet2"],
+"improvement_suggestions": ["bullet1", "bullet2"]
+}
+
+Do not include filler analysis or conciseness scoring.
+Those are handled separately.
+
+Do not include explanations outside JSON.
+
+All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLanguage}.`,
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              grade: { type: Type.STRING, enum: ['A+', 'A', 'B', 'C', 'D', 'F'] },
-              rating: { type: Type.NUMBER, description: 'A score from 0 to 100' },
-              strengths: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Specific areas where the user did great' },
-              weaknesses: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Specific areas where the user messed up or could improve' },
-              detailedFeedback: { type: Type.STRING, description: 'Overall synthesis of performance' }
+              structure_score: { type: Type.NUMBER },
+              clarity_score: { type: Type.NUMBER },
+              impact_score: { type: Type.NUMBER },
+              confidence_score: { type: Type.NUMBER },
+              relevance_score: { type: Type.NUMBER },
+              strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+              weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+              improvement_suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
-            required: ['grade', 'rating', 'strengths', 'weaknesses', 'detailedFeedback']
-          }
-        }
+            required: [
+              'structure_score',
+              'clarity_score',
+              'impact_score',
+              'confidence_score',
+              'relevance_score',
+              'strengths',
+              'weaknesses',
+              'improvement_suggestions',
+            ],
+          },
+        },
       });
-      const parsedResult = JSON.parse(response.text);
+
+      const diagnostics = JSON.parse(response.text);
+      const structure = clamp(Math.round(diagnostics.structure_score), 0, 20);
+      const clarity = clamp(Math.round(diagnostics.clarity_score), 0, 15);
+      const impact = clamp(Math.round(diagnostics.impact_score), 0, 15);
+      const confidence = clamp(Math.round(diagnostics.confidence_score), 0, 15);
+      const relevance = clamp(Math.round(diagnostics.relevance_score), 0, 15);
+
+      const computedScore = computeSynapseTotal({
+        structure,
+        clarity,
+        impact,
+        confidence,
+        relevance,
+        answer: userResponse,
+      });
+
+      const parsedResult: SynapseEvaluation = {
+        synapse_total_score: computedScore.synapse_total_score,
+        percentile: computedScore.percentile,
+        pillar_breakdown: computedScore.pillar_breakdown,
+        diagnostics: {
+          structure_score: structure,
+          clarity_score: clarity,
+          impact_score: impact,
+          confidence_score: confidence,
+          relevance_score: relevance,
+          strengths: diagnostics.strengths || [],
+          weaknesses: diagnostics.weaknesses || [],
+          improvement_suggestions: diagnostics.improvement_suggestions || [],
+        },
+        trend_delta: 0,
+      };
+
       setResult(parsedResult);
       saveStats(parsedResult);
       setStep('result');
@@ -169,7 +282,6 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Step 1: Selection */}
       {step === 'selection' && (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="text-center">
@@ -180,23 +292,23 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <div>
               <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-6">1. Configuration</h3>
-              
+
               <div className="mb-6">
-                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Quiz Language</label>
-                 <div className="relative">
-                    <select 
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="w-full appearance-none bg-slate-900 border border-slate-700 text-white py-3 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-bold"
-                    >
-                      {COMMON_LANGUAGES.map(lang => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                    </div>
-                 </div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Quiz Language</label>
+                <div className="relative">
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    className="w-full appearance-none bg-slate-900 border border-slate-700 text-white py-3 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-bold"
+                  >
+                    {COMMON_LANGUAGES.map((lang) => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -205,8 +317,8 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
                     className={`flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
-                      selectedCategory === cat.id 
-                        ? 'bg-indigo-500/10 border-indigo-500 text-white shadow-lg shadow-indigo-500/10' 
+                      selectedCategory === cat.id
+                        ? 'bg-indigo-500/10 border-indigo-500 text-white shadow-lg shadow-indigo-500/10'
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
@@ -225,8 +337,8 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
                     key={diff}
                     onClick={() => setSelectedDifficulty(diff)}
                     className={`w-full p-6 rounded-2xl border transition-all flex justify-between items-center ${
-                      selectedDifficulty === diff 
-                        ? 'bg-indigo-500 border-indigo-400 text-white scale-[1.02]' 
+                      selectedDifficulty === diff
+                        ? 'bg-indigo-500 border-indigo-400 text-white scale-[1.02]'
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
@@ -242,8 +354,8 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
                   </button>
                 ))}
               </div>
-              
-              <button 
+
+              <button
                 onClick={generateQuiz}
                 className="w-full mt-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl font-bold text-lg hover:from-indigo-500 hover:to-purple-500 transition-all shadow-xl shadow-indigo-500/25"
               >
@@ -254,7 +366,6 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
         </div>
       )}
 
-      {/* Step 2: The Challenge */}
       {step === 'quiz' && quiz && (
         <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
           <div className="flex items-center justify-between mb-4">
@@ -282,7 +393,7 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">Your Verbal Response ({selectedLanguage})</label>
-                <textarea 
+                <textarea
                   rows={6}
                   value={userResponse}
                   onChange={(e) => setUserResponse(e.target.value)}
@@ -290,7 +401,7 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
                   placeholder="Type exactly what you would say out loud..."
                 />
               </div>
-              <button 
+              <button
                 onClick={evaluateResponse}
                 disabled={evaluating || !userResponse.trim()}
                 className="w-full py-5 bg-indigo-600 rounded-2xl font-bold text-lg hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-3"
@@ -307,88 +418,86 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
         </div>
       )}
 
-      {/* Step 3: Result */}
       {step === 'result' && result && (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <div className="text-center space-y-4">
-            <h2 className="text-3xl font-bold">Session Performance <span className="gradient-text">Report</span></h2>
+            <h2 className="text-3xl font-bold">Synapse <span className="gradient-text">Performance Tracking</span></h2>
             <div className="inline-flex flex-col items-center">
               <div className={`w-32 h-32 rounded-full flex items-center justify-center text-5xl font-black shadow-2xl border-4 ${
-                result.grade.startsWith('A') ? 'border-green-500 text-green-500 bg-green-500/5 shadow-green-500/20' :
-                result.grade.startsWith('B') ? 'border-blue-500 text-blue-500 bg-blue-500/5 shadow-blue-500/20' :
-                result.grade.startsWith('C') ? 'border-yellow-500 text-yellow-500 bg-yellow-500/5 shadow-yellow-500/20' :
+                scoreToGrade(result.synapse_total_score).startsWith('A') ? 'border-green-500 text-green-500 bg-green-500/5 shadow-green-500/20' :
+                scoreToGrade(result.synapse_total_score).startsWith('B') ? 'border-blue-500 text-blue-500 bg-blue-500/5 shadow-blue-500/20' :
+                scoreToGrade(result.synapse_total_score).startsWith('C') ? 'border-yellow-500 text-yellow-500 bg-yellow-500/5 shadow-yellow-500/20' :
                 'border-red-500 text-red-500 bg-red-500/5 shadow-red-500/20'
               }`}>
-                {result.grade}
+                {result.synapse_total_score}
               </div>
               <div className="mt-4 flex items-center gap-2 text-indigo-400 font-bold uppercase text-[10px] tracking-widest">
-                XP EARNED: +{Math.round(result.rating * (selectedDifficulty === 'Expert' ? 2 : selectedDifficulty === 'Intermediate' ? 1.5 : 1))}
+                XP EARNED: +{Math.round(result.synapse_total_score * (selectedDifficulty === 'Expert' ? 2 : selectedDifficulty === 'Intermediate' ? 1.5 : 1))}
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="h-2 w-32 bg-slate-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${result.rating}%` }}></div>
-                </div>
-                <span className="text-sm font-bold text-slate-500">{result.rating}%</span>
+              <div className="mt-2 text-sm font-bold text-slate-400">
+                Grade {scoreToGrade(result.synapse_total_score)} · Percentile {result.percentile}
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl h-full">
-                <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                  <span className="text-green-500">✨</span> Where You Excelled
-                </h3>
-                <ul className="space-y-4">
-                  {result.strengths.map((s, i) => (
-                    <li key={i} className="flex gap-4 items-start group">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 ring-4 ring-green-500/20"></div>
-                      <p className="text-slate-300 text-sm leading-relaxed group-hover:text-white transition-colors">{s}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl h-full">
-                <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                  <span className="text-amber-500">⚠️</span> Areas for Growth
-                </h3>
-                <ul className="space-y-4">
-                  {result.weaknesses.map((w, i) => (
-                    <li key={i} className="flex gap-4 items-start group">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 ring-4 ring-amber-500/20"></div>
-                      <p className="text-slate-300 text-sm leading-relaxed group-hover:text-white transition-colors">{w}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl">
+            <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-6">Pillar Breakdown</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Structure <div className="text-2xl font-black mt-2">{result.pillar_breakdown.structure}/20</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Clarity <div className="text-2xl font-black mt-2">{result.pillar_breakdown.clarity}/15</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Impact <div className="text-2xl font-black mt-2">{result.pillar_breakdown.impact}/15</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Confidence <div className="text-2xl font-black mt-2">{result.pillar_breakdown.confidence}/15</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Relevance <div className="text-2xl font-black mt-2">{result.pillar_breakdown.relevance}/15</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Conciseness <div className="text-2xl font-black mt-2">{result.pillar_breakdown.conciseness}/15</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Filler Density <div className="text-2xl font-black mt-2">{result.pillar_breakdown.filler_density}/10</div></div>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">Trend Delta <div className="text-2xl font-black mt-2">{result.trend_delta >= 0 ? '+' : ''}{result.trend_delta}</div></div>
             </div>
           </div>
 
-          <div className="bg-indigo-600/5 border border-indigo-500/20 p-8 rounded-3xl text-center">
-            <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-4">Detailed Coach's Summary</h3>
-            <p className="text-slate-300 leading-relaxed italic">
-              "{result.detailedFeedback}"
-            </p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl h-full">
+              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2"><span className="text-green-500">✨</span> Strengths</h3>
+              <ul className="space-y-4">
+                {result.diagnostics.strengths.map((s, i) => (
+                  <li key={i} className="text-slate-300 text-sm leading-relaxed">• {s}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl h-full">
+              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2"><span className="text-amber-500">⚠️</span> Weaknesses</h3>
+              <ul className="space-y-4">
+                {result.diagnostics.weaknesses.map((w, i) => (
+                  <li key={i} className="text-slate-300 text-sm leading-relaxed">• {w}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl h-full">
+              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2"><span className="text-cyan-400">🛠</span> Improvement Suggestions</h3>
+              <ul className="space-y-4">
+                {result.diagnostics.improvement_suggestions.map((tip, i) => (
+                  <li key={i} className="text-slate-300 text-sm leading-relaxed">• {tip}</li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-             <button 
-                onClick={onSeeLeaderboard}
-                className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-bold hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                View Global Rank
-              </button>
-            <button 
+            <button
+              onClick={onSeeLeaderboard}
+              className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-bold hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+              View Global Rank
+            </button>
+            <button
               onClick={reset}
               className="w-full sm:w-auto px-10 py-4 bg-slate-800 rounded-2xl font-bold hover:bg-slate-700 transition-all"
             >
               Take Another Quiz
             </button>
-            <button 
+            <button
               onClick={() => setStep('quiz')}
               className="w-full sm:w-auto px-10 py-4 border border-slate-800 rounded-2xl font-bold hover:bg-slate-900 transition-all text-slate-500 hover:text-white"
             >
