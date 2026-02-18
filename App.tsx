@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import LandingPage from './components/LandingPage';
 import MainAppPage from './components/MainAppPage';
+import CustomCoachPage from './components/CustomCoachPage';
 import ConversationRoom from './components/ConversationRoom';
 import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
@@ -26,7 +27,8 @@ enum View {
   CONVERSATION = 'conversation',
   QUIZ = 'quiz',
   PRICING = 'pricing',
-  LEADERBOARD = 'leaderboard'
+  LEADERBOARD = 'leaderboard',
+  CUSTOM_COACH = 'custom_coach'
 }
 
 const App: React.FC = () => {
@@ -131,6 +133,10 @@ const App: React.FC = () => {
     setCurrentView(View.LEADERBOARD);
   };
 
+  const openCustomCoach = () => {
+    setCurrentView(View.CUSTOM_COACH);
+  };
+
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
@@ -184,6 +190,12 @@ const App: React.FC = () => {
               Neural Training Modules
             </button>
             <button 
+              onClick={openCustomCoach}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.CUSTOM_COACH ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+            >
+              Custom Coach
+            </button>
+            <button 
               onClick={openLeaderboard}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-2 ${currentView === View.LEADERBOARD ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-slate-800'}`}
             >
@@ -224,7 +236,11 @@ const App: React.FC = () => {
         )}
 
         {currentView === View.APP && (
-          <MainAppPage onStart={startConversation} onSeePlans={openPricing} />
+          <MainAppPage onStart={startConversation} />
+        )}
+
+        {currentView === View.CUSTOM_COACH && (
+          <CustomCoachPage onStart={startConversation} />
         )}
 
         {currentView === View.CONVERSATION && selectedPersona && (
@@ -245,7 +261,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-900 mt-auto">
-        &copy; 2024 Synapse AI. Powered by Gemini. All rights reserved.
+        &copy; 2024 Synapse AI. All rights reserved.
       </footer>
     </div>
   );
