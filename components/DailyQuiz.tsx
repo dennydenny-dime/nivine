@@ -35,6 +35,134 @@ const FILLER_WORDS = [
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const WEAK_LANGUAGE_PHRASES = [
+  'i think',
+  'maybe',
+  'kind of',
+  'sort of',
+  'i guess',
+  'probably',
+  'possibly',
+];
+
+const PASSIVE_VOICE_PATTERNS: RegExp[] = [
+  /\b(?:was|were|is|are|been|be|being)\s+\w+ed\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+\w+en\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+\w+n\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+made\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+done\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+given\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+taken\b/g,
+  /\b(?:was|were|is|are|been|be|being)\s+seen\b/g,
+];
+
+const STAR_SIGNAL_PATTERNS = {
+  situation: [
+    /\b(situation|context|background|at the time|when i joined|initially|before)\b/g,
+  ],
+  task: [
+    /\b(task|goal|objective|mandate|i needed to|my responsibility|i was asked to)\b/g,
+  ],
+  action: [
+    /\b(action|i led|i implemented|i built|i created|i analyzed|i proposed|i executed|i coordinated)\b/g,
+  ],
+  result: [
+    /\b(result|outcome|impact|as a result|therefore|we achieved|it increased|it reduced)\b/g,
+  ],
+};
+
+const findRegexMatches = (text: string, patterns: RegExp[]): number =>
+  patterns.reduce((sum, pattern) => sum + (text.match(pattern)?.length || 0), 0);
+
+const calculateWeakLanguagePenalty = (answer: string): number => {
+  const normalized = answer.toLowerCase();
+  const words = normalized.match(/\b[\w'-]+\b/g) || [];
+  if (!words.length) return 0;
+
+  const weakMatches = WEAK_LANGUAGE_PHRASES.reduce((count, phrase) => {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+    return count + (normalized.match(new RegExp(`\\b${escaped}\\b`, 'g'))?.length || 0);
+  }, 0);
+
+  const weakDensity = (weakMatches / words.length) * 100;
+  if (weakDensity <= 0.4) return 0;
+  if (weakDensity <= 1.2) return 1;
+  if (weakDensity <= 2.5) return 2;
+  if (weakDensity <= 4) return 3;
+  return 4;
+};
+
+const calculateQuantifiedResultsBoost = (answer: string): number => {
+  const quantifiedPatterns = [
+    /\b\d+(?:\.\d+)?\s?%\b/g,
+    /\b\d+(?:\.\d+)?\s?(?:x|times)\b/g,
+    /\b(?:\$|€|£)\s?\d+(?:[,.]\d+)*(?:\s?(?:k|m|b))?\b/gi,
+    /\b\d+(?:[,.]\d+)*(?:\s?(?:k|m|b))?\b/gi,
+    /\b(?:roi|revenue|conversion|churn|nps|cac|retention|cost|profit|pipeline)\b/gi,
+  ];
+
+  const matches = findRegexMatches(answer, quantifiedPatterns);
+  if (matches >= 6) return 3;
+  if (matches >= 3) return 2;
+  if (matches >= 1) return 1;
+  return 0;
+};
+
+const calculateStarScoreDelta = (answer: string): number => {
+  const normalized = answer.toLowerCase();
+  const categoryHits = [
+    STAR_SIGNAL_PATTERNS.situation,
+    STAR_SIGNAL_PATTERNS.task,
+    STAR_SIGNAL_PATTERNS.action,
+    STAR_SIGNAL_PATTERNS.result,
+  ].map((patterns) => findRegexMatches(normalized, patterns));
+
+  const coveredCategories = categoryHits.filter((hits) => hits > 0).length;
+  if (coveredCategories === 4) return 2;
+  if (coveredCategories === 3) return 1;
+  if (coveredCategories <= 1) return -2;
+  return 0;
+};
+
+const calculateRepetitionPenalty = (answer: string): number => {
+  const normalized = answer.toLowerCase();
+  const words = normalized.match(/\b[\w'-]+\b/g) || [];
+  if (words.length < 40) return 0;
+
+  const cleanedWords = words.filter((word) => word.length > 2);
+  const uniqueCount = new Set(cleanedWords).size;
+  const lexicalDiversity = cleanedWords.length ? uniqueCount / cleanedWords.length : 1;
+
+  const sentenceFragments = normalized
+    .split(/[.!?]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  const repeatedSentences = sentenceFragments.reduce((count, sentence, index) => {
+    if (index === 0) return count;
+    return count + (sentenceFragments[index - 1] === sentence ? 1 : 0);
+  }, 0);
+
+  if (lexicalDiversity < 0.28 || repeatedSentences >= 2) return 3;
+  if (lexicalDiversity < 0.36 || repeatedSentences >= 1) return 2;
+  if (lexicalDiversity < 0.44) return 1;
+  return 0;
+};
+
+const calculatePassiveVoicePenalty = (answer: string): number => {
+  const normalized = answer.toLowerCase();
+  const words = normalized.match(/\b[\w'-]+\b/g) || [];
+  if (!words.length) return 0;
+
+  const passiveHits = findRegexMatches(normalized, PASSIVE_VOICE_PATTERNS);
+  const passiveDensity = (passiveHits / words.length) * 100;
+
+  if (passiveDensity <= 1) return 0;
+  if (passiveDensity <= 2.5) return 1;
+  if (passiveDensity <= 4) return 2;
+  return 3;
+};
+
 const calculateConcisenessScore = (answer: string): number => {
   const words = (answer.match(/\b[\w'-]+\b/g) || []).length;
   if (words <= 15) return 3;
@@ -272,10 +400,16 @@ All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLang
       });
 
       const diagnostics = JSON.parse(response.text);
-      const structure = clamp(Math.round(diagnostics.structure_score), 0, 20);
-      const clarity = clamp(Math.round(diagnostics.clarity_score), 0, 15);
-      const impact = clamp(Math.round(diagnostics.impact_score), 0, 15);
-      const confidence = clamp(Math.round(diagnostics.confidence_score), 0, 15);
+      const weakLanguagePenalty = calculateWeakLanguagePenalty(userResponse);
+      const quantifiedResultsBoost = calculateQuantifiedResultsBoost(userResponse);
+      const starDelta = calculateStarScoreDelta(userResponse);
+      const repetitionPenalty = calculateRepetitionPenalty(userResponse);
+      const passiveVoicePenalty = calculatePassiveVoicePenalty(userResponse);
+
+      const structure = clamp(Math.round(diagnostics.structure_score) + starDelta, 0, 20);
+      const clarity = clamp(Math.round(diagnostics.clarity_score) - repetitionPenalty, 0, 15);
+      const impact = clamp(Math.round(diagnostics.impact_score) + quantifiedResultsBoost, 0, 15);
+      const confidence = clamp(Math.round(diagnostics.confidence_score) - weakLanguagePenalty - passiveVoicePenalty, 0, 15);
       const relevance = clamp(Math.round(diagnostics.relevance_score), 0, 15);
 
       const conciseness = calculateConcisenessScore(userResponse);
@@ -306,9 +440,24 @@ All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLang
           impact_score: impact,
           confidence_score: confidence,
           relevance_score: relevance,
-          strengths: diagnostics.strengths || [],
-          weaknesses: diagnostics.weaknesses || [],
-          improvement_suggestions: diagnostics.improvement_suggestions || [],
+          strengths: [
+            ...(diagnostics.strengths || []),
+            ...(quantifiedResultsBoost >= 2 ? ['Strong quantified evidence with measurable outcomes.'] : []),
+            ...(starDelta >= 2 ? ['Clear STAR flow: situation, task, actions, and results are all present.'] : []),
+          ],
+          weaknesses: [
+            ...(diagnostics.weaknesses || []),
+            ...(weakLanguagePenalty >= 2 ? ['Weak language detected (e.g., I think/maybe/kind of/sort of).'] : []),
+            ...(repetitionPenalty >= 2 ? ['Rambling/repetition detected; tighten and avoid repeating ideas.'] : []),
+            ...(passiveVoicePenalty >= 2 ? ['Frequent passive voice detected; use active voice for stronger impact.'] : []),
+            ...(starDelta <= -1 ? ['STAR structure is incomplete; make Situation, Task, Action, and Result explicit.'] : []),
+            ...(quantifiedResultsBoost === 0 ? ['Add quantified results (percentages, revenue, time saved, growth) to prove impact.'] : []),
+          ],
+          improvement_suggestions: [
+            ...(diagnostics.improvement_suggestions || []),
+            'Use direct active verbs and remove hedging phrases to sound more decisive.',
+            'Anchor answers with STAR and include at least one clear metric in the result.',
+          ],
         },
         trend_delta: 0,
       };
