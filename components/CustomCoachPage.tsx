@@ -79,7 +79,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart }) => {
               </div>
               <div className="p-4 bg-slate-950 rounded-lg text-[10px] font-mono text-slate-500 break-all border border-slate-800 text-left">
                 <p className="mb-2 font-bold text-slate-400">Vercel Configuration:</p>
-                Add <span className="text-indigo-400">VITE_API_KEY</span> or <span className="text-indigo-400">REACT_APP_API_KEY</span> to your Project Settings.
+                Add <span className="text-indigo-400">VITE_API_KEY</span>, <span className="text-indigo-400">GEMINI_API_KEY</span>, or <span className="text-indigo-400">REACT_APP_API_KEY</span> to your Project Settings.
               </div>
             </div>
           ) : (

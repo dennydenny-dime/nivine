@@ -142,9 +142,9 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   useEffect(() => {
     const initSession = async () => {
       try {
-        const apiKey = import.meta.env.VITE_API_KEY;
+        const apiKey = import.meta.env.VITE_API_KEY || import.meta.env.GEMINI_API_KEY || import.meta.env.REACT_APP_API_KEY || import.meta.env.API_KEY;
         if (!apiKey) {
-          setError("Environment Config Error: No API Key found. In Vercel, please set your variable as 'VITE_API_KEY' or 'REACT_APP_API_KEY'.");
+          setError("Environment Config Error: No API key found. Set one of: VITE_API_KEY, GEMINI_API_KEY, or REACT_APP_API_KEY.");
           return;
         }
 
@@ -307,7 +307,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         sessionRef.current = await sessionPromise;
       } catch (err: any) {
         console.error("Initialization Error:", err);
-        setError("Could not establish neural link. Ensure mic access is granted and your billing is active.");
+        setError("Could not establish neural link. Ensure microphone access is granted and your API key is configured correctly.");
       }
     };
 
