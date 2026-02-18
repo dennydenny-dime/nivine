@@ -86,3 +86,23 @@ export interface TranscriptionItem {
   text: string;
   timestamp: number;
 }
+
+export interface NeuralSpeechScoreCard {
+  overallScore: number;
+  totalWords: number;
+  fillerCount: number;
+  fillerDensity: number;
+  avgWordsPerTurn: number;
+  confidenceScore: number;
+  clarityScore: number;
+  concisenessScore: number;
+  summary: string;
+}
+
+export interface ConversationHistoryItem {
+  id: string;
+  date: string;
+  persona: Persona;
+  transcriptions: TranscriptionItem[];
+  scoreCard?: NeuralSpeechScoreCard;
+}

@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
-import { Persona, TranscriptionItem } from '../types';
-import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
+import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
+import { COMMON_LANGUAGES } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 
 interface ConversationRoomProps {
@@ -10,12 +10,74 @@ interface ConversationRoomProps {
   onExit: () => void;
 }
 
+
+const FILLER_WORDS = new Set(['um', 'uh', 'like', 'you know', 'actually', 'basically', 'literally', 'so']);
+
+const clampScore = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
+
+const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechScoreCard => {
+  const userTurns = items.filter((item) => item.speaker === 'user');
+  const fullText = userTurns.map((item) => item.text.toLowerCase()).join(' ');
+  const words = fullText.match(/\b[\w']+\b/g) || [];
+  const totalWords = words.length;
+
+  let fillerCount = 0;
+  for (const filler of FILLER_WORDS) {
+    if (filler.includes(' ')) {
+      const escaped = filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const multiWordMatches = fullText.match(new RegExp(`\\b${escaped}\\b`, 'g'));
+      fillerCount += multiWordMatches?.length || 0;
+    } else {
+      fillerCount += words.filter((word) => word === filler).length;
+    }
+  }
+
+  const averageWordsPerSentence = (() => {
+    const sentences = userTurns
+      .flatMap((turn) => turn.text.split(/[.!?]+/))
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (!sentences.length || !totalWords) return totalWords;
+    return totalWords / sentences.length;
+  })();
+
+  const avgWordsPerTurn = userTurns.length ? totalWords / userTurns.length : 0;
+  const fillerDensity = totalWords ? (fillerCount / totalWords) * 100 : 0;
+
+  const confidenceScore = clampScore(100 - fillerDensity * 4);
+  const clarityScore = clampScore(100 - Math.abs(averageWordsPerSentence - 16) * 4);
+  const concisenessScore = clampScore(100 - Math.max(avgWordsPerTurn - 28, 0) * 3);
+  const overallScore = clampScore(confidenceScore * 0.35 + clarityScore * 0.35 + concisenessScore * 0.3);
+
+  const summary =
+    overallScore >= 85
+      ? 'High-performance communication. Your delivery was sharp, clear, and confident.'
+      : overallScore >= 70
+        ? 'Strong communication baseline. Tighten filler words and keep responses more concise for elite performance.'
+        : overallScore >= 55
+          ? 'Developing communication skill. Focus on clearer structure and reducing filler habits.'
+          : 'Needs improvement. Practice slower, structured responses with fewer fillers to build confidence.';
+
+  return {
+    overallScore,
+    totalWords,
+    fillerCount,
+    fillerDensity: Math.round(fillerDensity * 10) / 10,
+    avgWordsPerTurn: Math.round(avgWordsPerTurn * 10) / 10,
+    confidenceScore,
+    clarityScore,
+    concisenessScore,
+    summary,
+  };
+};
+
 const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
+  const [scoreCard, setScoreCard] = useState<NeuralSpeechScoreCard | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -42,15 +104,17 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const handleSaveAndExit = useCallback(() => {
     if (transcriptions.length > 0) {
       try {
-        const historyItem = {
+        const currentScoreCard = buildNeuralSpeechScoreCard(transcriptions);
+        const historyItem: ConversationHistoryItem = {
           id: Date.now().toString(),
           date: new Date().toISOString(),
           persona,
-          transcriptions
+          transcriptions,
+          scoreCard: currentScoreCard,
         };
-        
+
         const storedHistory = localStorage.getItem('tm_conversation_history');
-        const history = storedHistory ? JSON.parse(storedHistory) : [];
+        const history: ConversationHistoryItem[] = storedHistory ? JSON.parse(storedHistory) : [];
         // Keep last 50 sessions to manage storage size
         const updatedHistory = [historyItem, ...history].slice(0, 50);
         
@@ -257,6 +321,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     }
   }, [transcriptions]);
 
+  useEffect(() => {
+    if (!transcriptions.length) {
+      setScoreCard(null);
+      return;
+    }
+    setScoreCard(buildNeuralSpeechScoreCard(transcriptions));
+  }, [transcriptions]);
+
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
@@ -377,6 +450,37 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           ))}
         </div>
       </div>
+
+
+      {scoreCard && (
+        <div className="mt-4 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black">Neural Speech Scorecard</p>
+              <h3 className="text-lg font-bold text-white">Session Score: {scoreCard.overallScore}/100</h3>
+            </div>
+            <div className="text-xs text-slate-400 max-w-xl">{scoreCard.summary}</div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-950 rounded-xl border border-slate-800 p-3">
+              <p className="text-[10px] text-slate-500 uppercase font-black">Confidence</p>
+              <p className="text-xl font-bold text-blue-400">{scoreCard.confidenceScore}</p>
+            </div>
+            <div className="bg-slate-950 rounded-xl border border-slate-800 p-3">
+              <p className="text-[10px] text-slate-500 uppercase font-black">Clarity</p>
+              <p className="text-xl font-bold text-blue-400">{scoreCard.clarityScore}</p>
+            </div>
+            <div className="bg-slate-950 rounded-xl border border-slate-800 p-3">
+              <p className="text-[10px] text-slate-500 uppercase font-black">Conciseness</p>
+              <p className="text-xl font-bold text-blue-400">{scoreCard.concisenessScore}</p>
+            </div>
+            <div className="bg-slate-950 rounded-xl border border-slate-800 p-3">
+              <p className="text-[10px] text-slate-500 uppercase font-black">Fillers</p>
+              <p className="text-xl font-bold text-pink-400">{scoreCard.fillerDensity}%</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-center gap-6 py-2.5 px-6 bg-slate-900/50 rounded-full border border-slate-800 w-fit mx-auto shadow-lg backdrop-blur-sm animate-in fade-in duration-1000 delay-500">
         <div className="flex items-center gap-2">
