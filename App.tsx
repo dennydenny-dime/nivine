@@ -6,10 +6,8 @@ import CustomCoachPage from './components/CustomCoachPage';
 import ConversationRoom from './components/ConversationRoom';
 import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
-import AuthPage from './components/AuthPage';
 import Leaderboard from './components/Leaderboard';
 import { Persona, User } from './types';
-import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -33,39 +31,43 @@ enum View {
 }
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    const storedUser = localStorage.getItem('tm_current_user');
+    if (storedUser) {
+      return JSON.parse(storedUser);
+    }
+
+    return {
+      id: `local-${Date.now()}`,
+      email: 'guest@synapse.local',
+      name: 'Guest User',
+      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest'
+    };
+  });
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // Check for Supabase session on load
   useEffect(() => {
-    const hydrateSession = async () => {
-      try {
-        const hashSession = readSessionFromUrlHash();
-        if (hashSession) {
-          saveSession(hashSession);
-          const userProfile = await fetchUserWithAccessToken(hashSession.access_token);
-          const mappedUser = mapSupabaseUser(userProfile);
-          setCurrentUser(mappedUser);
-          localStorage.setItem('tm_current_user', JSON.stringify(mappedUser));
-          return;
-        }
+    localStorage.setItem('tm_current_user', JSON.stringify(currentUser));
 
-        const session = getStoredSession();
-        if (!session) return;
-
-        const userProfile = await fetchUserWithAccessToken(session.access_token);
-        const mappedUser = mapSupabaseUser(userProfile);
-        setCurrentUser(mappedUser);
-        localStorage.setItem('tm_current_user', JSON.stringify(mappedUser));
-      } catch (error) {
-        clearStoredSession();
-        localStorage.removeItem('tm_current_user');
-      }
-    };
-
-    hydrateSession();
+    const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
+    const existingIndex = pool.findIndex((entry: User) => entry.id === currentUser.id);
+    if (existingIndex === -1) {
+      pool.push({
+        ...currentUser,
+        xp: 0,
+        totalQuizzes: 0
+      });
+    } else {
+      pool[existingIndex] = {
+        ...pool[existingIndex],
+        name: currentUser.name,
+        avatar: currentUser.avatar,
+        email: currentUser.email
+      };
+    }
+    localStorage.setItem('tm_leaderboard_pool', JSON.stringify(pool));
 
     const handleFullscreenChange = () => {
       const doc = document as Document & { webkitFullscreenElement?: Element | null };
@@ -122,27 +124,6 @@ const App: React.FC = () => {
     }
   }, [enterFullScreen]);
 
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    localStorage.setItem('tm_current_user', JSON.stringify(user));
-  };
-
-  const handleLogout = async () => {
-    try {
-      const session = getStoredSession();
-      if (session?.access_token) {
-        await signOutSession(session.access_token);
-      }
-    } catch (error) {
-      console.warn('Supabase logout request failed', error);
-    } finally {
-      clearStoredSession();
-      setCurrentUser(null);
-      localStorage.removeItem('tm_current_user');
-      setCurrentView(View.LANDING);
-    }
-  };
-
   const startConversation = (persona: Persona) => {
     // Attempt to enter fullscreen as the user clicked a primary action button
     enterFullScreen();
@@ -175,20 +156,6 @@ const App: React.FC = () => {
     setSelectedPersona(null);
   };
 
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-        <nav className="h-16 flex items-center px-4 max-w-7xl mx-auto w-full">
-          <div className="flex items-center gap-3">
-            <SynapseLogo className="w-8 h-8 shadow-lg shadow-white/5" />
-            <span className="text-xl font-bold tracking-tight">Synapse <span className="text-indigo-400">AI</span></span>
-          </div>
-        </nav>
-        <AuthPage onLogin={handleLogin} />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
       {/* Navigation - hidden in conversation mode if desired, but here we keep it for exit */}
@@ -212,13 +179,7 @@ const App: React.FC = () => {
             </button>
             <div className="flex items-center gap-2 bg-slate-900 rounded-full pl-1 pr-3 py-1 border border-slate-800">
               <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
-              <button
-                onClick={handleLogout}
-                className="text-slate-500 hover:text-red-400 transition-colors"
-                title="Logout"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-              </button>
+              <span className="text-xs font-bold">{currentUser.name}</span>
             </div>
           </div>
           <div className="flex gap-2 md:gap-4 items-center overflow-x-auto md:overflow-visible pb-1 md:pb-0 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
@@ -274,13 +235,6 @@ const App: React.FC = () => {
             <div className="hidden md:flex items-center gap-2 bg-slate-900 rounded-full pl-1 pr-3 py-1 border border-slate-800">
               <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
               <span className="text-xs font-bold hidden sm:inline">{currentUser.name}</span>
-              <button 
-                onClick={handleLogout}
-                className="text-slate-500 hover:text-red-400 transition-colors ml-1"
-                title="Logout"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-              </button>
             </div>
           </div>
         </div>
