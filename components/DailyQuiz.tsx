@@ -369,8 +369,10 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
         model: 'gemini-3-flash-preview',
         contents: `Generate a communication challenge for the category "${selectedCategory}" with a difficulty level of "${selectedDifficulty}".
         The scenario and challenge MUST be written in ${selectedLanguage}.
-        The scenario should be highly realistic and detailed.`,
+        The scenario should be highly realistic and detailed.
+        Keep it practical, role-specific, and immediately usable for interview practice.`,
         config: {
+          thinkingConfig: { thinkingBudget: 0 },
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
@@ -407,7 +409,7 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
 
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: `You are evaluating an interview response.
 
 QUESTION:
@@ -478,6 +480,7 @@ Do not include explanations outside JSON.
 
 All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLanguage}.`,
         config: {
+          thinkingConfig: { thinkingBudget: 0 },
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
