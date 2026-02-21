@@ -9,6 +9,7 @@ import PricingPage from './components/PricingPage';
 import AuthPage from './components/AuthPage';
 import Leaderboard from './components/Leaderboard';
 import { Persona, User } from './types';
+import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -37,13 +38,35 @@ const App: React.FC = () => {
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // Check for saved session on load
+  // Check for Supabase session on load
   useEffect(() => {
-    const savedUser = localStorage.getItem('tm_current_user');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-    
+    const hydrateSession = async () => {
+      try {
+        const hashSession = readSessionFromUrlHash();
+        if (hashSession) {
+          saveSession(hashSession);
+          const userProfile = await fetchUserWithAccessToken(hashSession.access_token);
+          const mappedUser = mapSupabaseUser(userProfile);
+          setCurrentUser(mappedUser);
+          localStorage.setItem('tm_current_user', JSON.stringify(mappedUser));
+          return;
+        }
+
+        const session = getStoredSession();
+        if (!session) return;
+
+        const userProfile = await fetchUserWithAccessToken(session.access_token);
+        const mappedUser = mapSupabaseUser(userProfile);
+        setCurrentUser(mappedUser);
+        localStorage.setItem('tm_current_user', JSON.stringify(mappedUser));
+      } catch (error) {
+        clearStoredSession();
+        localStorage.removeItem('tm_current_user');
+      }
+    };
+
+    hydrateSession();
+
     const handleFullscreenChange = () => {
       const doc = document as Document & { webkitFullscreenElement?: Element | null };
       setIsFullScreen(!!doc.fullscreenElement || !!doc.webkitFullscreenElement);
@@ -104,10 +127,20 @@ const App: React.FC = () => {
     localStorage.setItem('tm_current_user', JSON.stringify(user));
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('tm_current_user');
-    setCurrentView(View.LANDING);
+  const handleLogout = async () => {
+    try {
+      const session = getStoredSession();
+      if (session?.access_token) {
+        await signOutSession(session.access_token);
+      }
+    } catch (error) {
+      console.warn('Supabase logout request failed', error);
+    } finally {
+      clearStoredSession();
+      setCurrentUser(null);
+      localStorage.removeItem('tm_current_user');
+      setCurrentView(View.LANDING);
+    }
   };
 
   const startConversation = (persona: Persona) => {

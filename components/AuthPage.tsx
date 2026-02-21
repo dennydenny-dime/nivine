@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import { SynapseLogo } from '../App';
+import { getGoogleOAuthUrl, mapSupabaseUser, saveSession, signInWithEmail, signUpWithEmail } from '../lib/supabaseAuth';
 
 interface AuthPageProps {
   onLogin: (user: User) => void;
@@ -13,18 +13,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const simulateServerCall = async (data: any) => {
-    setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setLoading(false);
-    return { ...data, id: Math.random().toString(36).substr(2, 9) };
-  };
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const syncToLeaderboardPool = (user: User) => {
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
     const existingIndex = pool.findIndex((u: any) => u.email === user.email);
-    
+
     if (existingIndex === -1) {
       pool.push({
         id: user.id,
@@ -42,33 +36,36 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
     e.preventDefault();
     if (!email || !password || (!isLogin && !name)) return;
 
-    const user = await simulateServerCall({
-      email,
-      name: isLogin ? email.split('@')[0] : name,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`
-    });
+    setLoading(true);
+    setAuthError(null);
 
-    const users = JSON.parse(localStorage.getItem('tm_users') || '[]');
-    const existingUser = users.find((u: any) => u.email === email);
-    
-    if (!existingUser) {
-      users.push(user);
-      localStorage.setItem('tm_users', JSON.stringify(users));
+    try {
+      const session = isLogin
+        ? await signInWithEmail(email, password)
+        : await signUpWithEmail(email, password, name);
+
+      if (!session.user) {
+        throw new Error('Unable to fetch user details from Supabase.');
+      }
+
+      saveSession(session);
+      const user = mapSupabaseUser(session.user);
+      syncToLeaderboardPool(user);
+      onLogin(user);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Authentication failed.');
+    } finally {
+      setLoading(false);
     }
-
-    const finalUser = existingUser || user;
-    syncToLeaderboardPool(finalUser);
-    onLogin(finalUser);
   };
 
   const handleGoogleSignIn = async () => {
-    const user = await simulateServerCall({
-      email: 'google.user@gmail.com',
-      name: 'Google Explorer',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=google'
-    });
-    syncToLeaderboardPool(user);
-    onLogin(user);
+    setAuthError(null);
+    try {
+      window.location.href = getGoogleOAuthUrl();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.');
+    }
   };
 
   return (
@@ -80,10 +77,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           <p className="text-slate-400 mt-2">Elevate your speech with AI coaching</p>
         </div>
 
-        <button 
+        <button
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all mb-6"
+          className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all mb-6 disabled:opacity-60"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#EA4335" d="M12 5.04c1.94 0 3.51.68 4.75 1.81l3.5-3.5C18.16 1.33 15.31 0 12 0 7.31 0 3.33 2.69 1.45 6.6l3.96 3.08C6.35 7.17 8.98 5.04 12 5.04z" />
@@ -103,7 +100,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           {!isLogin && (
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Full Name</label>
-              <input 
+              <input
                 type="text"
                 required
                 value={name}
@@ -115,7 +112,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           )}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Email Address</label>
-            <input 
+            <input
               type="email"
               required
               value={email}
@@ -126,7 +123,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Password</label>
-            <input 
+            <input
               type="password"
               required
               value={password}
@@ -136,10 +133,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
             />
           </div>
 
-          <button 
+          {authError && (
+            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{authError}</p>
+          )}
+
+          <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center"
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center disabled:opacity-60"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -150,8 +151,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         </form>
 
         <p className="text-center text-sm text-slate-500 mt-6">
-          {isLogin ? "Don't have an account?" : "Already have an account?"}
-          <button 
+          {isLogin ? "Don't have an account?" : 'Already have an account?'}
+          <button
             onClick={() => setIsLogin(!isLogin)}
             className="ml-1 text-indigo-400 font-bold hover:underline"
           >

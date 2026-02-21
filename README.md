@@ -15,6 +15,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1ubcYEKoruC1u0ihSS6ovuh
 
 1. Install dependencies:
    `npm install`
-2. Set the `VITE_API_KEY` (recommended) in `.env.local` to your Gemini API key (you can also set `GEMINI_API_KEY` for compatibility)
-3. Run the app:
+2. Create a `.env.local` file and set:
+   - `VITE_API_KEY` (or `GEMINI_API_KEY`) to your Gemini API key
+   - `VITE_SUPABASE_URL` to your Supabase project API URL (`https://<project-ref>.supabase.co`) or dashboard project URL
+   - `VITE_SUPABASE_ANON_KEY` to your Supabase anon public key
+3. In Supabase Auth settings, add your local URL (for example `http://localhost:5173`) to **Site URL** and **Redirect URLs** so Google OAuth can return to your app.
+4. Run the app:
    `npm run dev`
