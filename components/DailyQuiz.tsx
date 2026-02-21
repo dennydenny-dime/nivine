@@ -9,6 +9,7 @@ import {
   UserStats,
 } from '../types';
 import { COMMON_LANGUAGES, getSystemApiKey } from '../constants';
+import { getUserStats, setUserStats } from '../lib/userStorage';
 
 const CATEGORIES: { id: QuizCategory; icon: string; label: string }[] = [
   { id: 'Interview', icon: '💼', label: 'Job Interviews' },
@@ -325,8 +326,7 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
 
   const saveStats = (quizResult: SynapseEvaluation) => {
     const currentUser: User = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
-    const savedStats = localStorage.getItem('tm_user_stats');
-    const stats: UserStats = savedStats ? JSON.parse(savedStats) : { totalQuizzes: 0, totalXP: 0, avgRating: 0 };
+    const stats: UserStats = getUserStats(currentUser.id);
 
     const xpEarned = Math.round(
       quizResult.synapse_total_score *
@@ -344,7 +344,7 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
       avgRating: Math.round(newAvgRating * 10) / 10,
     };
 
-    localStorage.setItem('tm_user_stats', JSON.stringify(updatedStats));
+    setUserStats(currentUser.id, updatedStats);
 
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
     const userIndex = pool.findIndex((u: any) => u.email === currentUser.email);

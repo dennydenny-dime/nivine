@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
 import { COMMON_LANGUAGES, getSystemApiKey, VOICE_MAP } from '../constants';
+import { setUserConversationHistory, getUserConversationHistory } from '../lib/userStorage';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 
 interface ConversationRoomProps {
@@ -173,12 +174,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           scoreCard: currentScoreCard,
         };
 
-        const storedHistory = localStorage.getItem('tm_conversation_history');
-        const history: ConversationHistoryItem[] = storedHistory ? JSON.parse(storedHistory) : [];
+        const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
+        const history: ConversationHistoryItem[] = getUserConversationHistory(currentUser.id);
         // Keep last 50 sessions to manage storage size
         const updatedHistory = [historyItem, ...history].slice(0, 50);
-        
-        localStorage.setItem('tm_conversation_history', JSON.stringify(updatedHistory));
+
+        setUserConversationHistory(currentUser.id, updatedHistory);
       } catch (e) {
         console.error("Failed to save conversation history", e);
       }

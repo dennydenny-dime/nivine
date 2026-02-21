@@ -288,7 +288,7 @@ const App: React.FC = () => {
 
       <main className={`pt-32 md:pt-20 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
         {currentView === View.LANDING && (
-          <LandingPage onEnterApp={openApp} />
+          <LandingPage onEnterApp={openApp} currentUser={currentUser} />
         )}
 
         {currentView === View.APP && (

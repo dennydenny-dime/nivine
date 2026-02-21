@@ -1,7 +1,10 @@
 import React from 'react';
+import { ConversationHistoryItem, User, UserStats } from '../types';
+import { getUserConversationHistory, getUserStats } from '../lib/userStorage';
 
 interface LandingPageProps {
   onEnterApp: () => void;
+  currentUser: User;
 }
 
 const SectionTitle: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
@@ -11,9 +14,64 @@ const SectionTitle: React.FC<{ title: string; subtitle: string }> = ({ title, su
   </div>
 );
 
-const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, currentUser }) => {
+  const userStats: UserStats = getUserStats(currentUser.id);
+  const userHistory: ConversationHistoryItem[] = getUserConversationHistory(currentUser.id);
+  const latestSession = userHistory[0];
+  const averageConversationScore = userHistory.length
+    ? Math.round(
+      (userHistory.reduce((sum, item) => sum + (item.scoreCard?.overallScore || 0), 0) / userHistory.length) * 10,
+    ) / 10
+    : 0;
+
   return (
     <div className="space-y-10 sm:space-y-16 pb-10">
+      <section className="rounded-3xl border border-indigo-500/30 bg-slate-900/70 p-6 sm:p-8">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300">Personal Dashboard</p>
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-black">Welcome back, {currentUser.name.split(' ')[0]}.</h2>
+            <p className="text-slate-400 mt-1">Your progress is private to your account and updates every time you train.</p>
+          </div>
+          <button
+            onClick={onEnterApp}
+            className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition"
+          >
+            Continue Training
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs text-slate-500 uppercase tracking-widest">Total XP</p>
+            <p className="text-2xl font-bold mt-2">{userStats.totalXP.toLocaleString()}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs text-slate-500 uppercase tracking-widest">Quizzes Completed</p>
+            <p className="text-2xl font-bold mt-2">{userStats.totalQuizzes}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs text-slate-500 uppercase tracking-widest">Average Quiz Score</p>
+            <p className="text-2xl font-bold mt-2">{userStats.avgRating}%</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <p className="text-xs text-slate-500 uppercase tracking-widest">Conversation Score</p>
+            <p className="text-2xl font-bold mt-2">{averageConversationScore || '--'}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Latest Session</p>
+          {latestSession ? (
+            <p className="text-slate-300 mt-2">
+              {new Date(latestSession.date).toLocaleDateString()} · {latestSession.persona.name} ({latestSession.persona.role}) · Score {latestSession.scoreCard?.overallScore || '--'}
+            </p>
+          ) : (
+            <p className="text-slate-400 mt-2">No sessions yet. Start your first role-play to build your personal dashboard.</p>
+          )}
+        </div>
+      </section>
+
       <section className="relative overflow-hidden rounded-3xl border border-cyan-400/20 bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950 p-6 sm:p-10">
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_50%)]" />
         <div className="relative max-w-4xl space-y-6">
