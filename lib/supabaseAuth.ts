@@ -1,7 +1,29 @@
 import { User } from '../types';
 
-const RAW_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const readEnvValue = (keys: string[]) => {
+  for (const key of keys) {
+    const value = import.meta.env[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+};
+
+const RAW_SUPABASE_URL = readEnvValue([
+  'VITE_SUPABASE_URL',
+  'SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'REACT_APP_SUPABASE_URL'
+]);
+
+const SUPABASE_ANON_KEY = readEnvValue([
+  'VITE_SUPABASE_ANON_KEY',
+  'SUPABASE_ANON_KEY',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'REACT_APP_SUPABASE_ANON_KEY'
+]);
 
 const normalizeSupabaseUrl = (value?: string) => {
   if (!value) return value;
@@ -43,7 +65,7 @@ interface SupabaseSession {
 
 const buildHeaders = () => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.');
+    throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) in your environment.');
   }
 
   return {
@@ -146,7 +168,7 @@ export const signOutSession = async (accessToken: string) => {
 
 export const getGoogleOAuthUrl = () => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.');
+    throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_URL and SUPABASE_ANON_KEY) in your environment.');
   }
 
   const url = new URL(`${SUPABASE_URL}/auth/v1/authorize`);
