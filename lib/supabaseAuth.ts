@@ -14,6 +14,9 @@ const ENV_VALUES: Record<string, string | undefined> = {
 const readEnvValue = (keys: string[]) => {
   for (const key of keys) {
     const value = ENV_VALUES[key];
+const readEnvValue = (keys: string[]) => {
+  for (const key of keys) {
+    const value = import.meta.env[key];
     if (typeof value === 'string' && value.trim()) {
       return value.trim();
     }
