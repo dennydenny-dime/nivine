@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { LeaderboardEntry, UserStats, User } from '../types';
+import { getUserStats } from '../lib/userStorage';
 
 interface LeaderboardProps {
   onBack: () => void;
@@ -8,7 +9,7 @@ interface LeaderboardProps {
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ onBack }) => {
   const currentUser: User = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
-  const userStats: UserStats = JSON.parse(localStorage.getItem('tm_user_stats') || '{"totalXP":0,"totalQuizzes":0,"avgRating":0}');
+  const userStats: UserStats = getUserStats(currentUser.id);
 
   const globalRankings: LeaderboardEntry[] = useMemo(() => {
     // Get all real users from the pool
