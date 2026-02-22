@@ -7,6 +7,7 @@ import ConversationRoom from './components/ConversationRoom';
 import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
+import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -27,7 +28,8 @@ enum View {
   QUIZ = 'quiz',
   PRICING = 'pricing',
   LEADERBOARD = 'leaderboard',
-  CUSTOM_COACH = 'custom_coach'
+  CUSTOM_COACH = 'custom_coach',
+  MENTAL_PERFORMANCE = 'mental_performance'
 }
 
 const App: React.FC = () => {
@@ -151,6 +153,10 @@ const App: React.FC = () => {
     setCurrentView(View.CUSTOM_COACH);
   };
 
+  const openMentalPerformance = () => {
+    setCurrentView(View.MENTAL_PERFORMANCE);
+  };
+
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
@@ -213,6 +219,12 @@ const App: React.FC = () => {
               Custom Coach
             </button>
             <button 
+              onClick={openMentalPerformance}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all ${currentView === View.MENTAL_PERFORMANCE ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800'}`}
+            >
+              Mental Performance Coach
+            </button>
+            <button 
               onClick={openLeaderboard}
               className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all flex items-center gap-2 ${currentView === View.LEADERBOARD ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-slate-800'}`}
             >
@@ -251,6 +263,10 @@ const App: React.FC = () => {
 
         {currentView === View.CUSTOM_COACH && (
           <CustomCoachPage onStart={startConversation} />
+        )}
+
+        {currentView === View.MENTAL_PERFORMANCE && (
+          <MentalPerformanceCoachPage />
         )}
 
         {currentView === View.CONVERSATION && selectedPersona && (
