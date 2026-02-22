@@ -8,7 +8,19 @@ type ConversationTurn = {
   role: 'ai' | 'user';
   text: string;
   latencySec?: number;
+  micLevel?: number;
+  videoSnapshot?: VideoFrameSignals;
+  signals?: RealtimeSignals;
   timestamp: number;
+};
+
+type VideoFrameSignals = {
+  frameStability: number;
+  faceCentering: number;
+  gazeFocus: number;
+  blinkProxy: number;
+  jawTensionProxy: number;
+  postureStability: number;
 };
 
 type RealtimeSignals = {
@@ -176,7 +188,7 @@ const getStoredSummaries = (): SessionSummary[] => {
   }
 };
 
-const analyzeResponse = (text: string, latencySec: number, micLevel: number): RealtimeSignals => {
+const analyzeResponse = (text: string, latencySec: number, micLevel: number, videoSignals?: VideoFrameSignals | null): RealtimeSignals => {
   const words = wordCount(text);
   const fillers = countTokens(text, [' um ', ' uh ', ' like ', ' you know ', ' actually ']);
   const claimHits = countTokens(text, ['i believe', 'my claim', 'core point']);
@@ -196,15 +208,22 @@ const analyzeResponse = (text: string, latencySec: number, micLevel: number): Re
   const structuredThinking = clamp(40 + structureCoverage * 10 - contradictions * 5);
   const decisionSharpness = clamp(58 + countTokens(text, ['i will', 'the decision', 'next step']) * 11 - switches * 10 - fillers * 4);
 
-  const tremor = clamp(24 + pressureFromLatency * 0.6 + micLevel * 0.35);
+  const frameStability = videoSignals?.frameStability ?? 58;
+  const gazeFocus = videoSignals?.gazeFocus ?? 56;
+  const faceCentering = videoSignals?.faceCentering ?? 60;
+  const blinkProxy = videoSignals?.blinkProxy ?? 42;
+  const jawTensionProxy = videoSignals?.jawTensionProxy ?? 40;
+  const postureStability = videoSignals?.postureStability ?? 58;
+
+  const tremor = clamp(20 + pressureFromLatency * 0.52 + micLevel * 0.28 + (100 - frameStability) * 0.24);
   const speakingVariance = clamp(20 + (words > 120 ? 45 : words > 80 ? 26 : 8) + pressureFromLatency * 0.35);
 
-  const emotionalStability = clamp(80 - pressureFromLatency * 0.55 - tremor * 0.22);
+  const emotionalStability = clamp(74 - pressureFromLatency * 0.4 - tremor * 0.22 + postureStability * 0.2 + gazeFocus * 0.12);
   const pressureResistance = clamp(74 - pressureFromLatency * 0.4 - contradictions * 5 + structureCoverage * 3);
 
-  const eyeContact = clamp(88 - pressureFromLatency * 0.45 - fillers * 4);
-  const blinkShift = clamp(18 + pressureFromLatency * 0.55);
-  const freezeResponse = clamp(20 + pressureFromLatency * 0.7 + contradictions * 4);
+  const eyeContact = clamp(30 + gazeFocus * 0.48 + faceCentering * 0.36 - pressureFromLatency * 0.25 - fillers * 3.5);
+  const blinkShift = clamp(12 + pressureFromLatency * 0.45 + blinkProxy * 0.58);
+  const freezeResponse = clamp(18 + pressureFromLatency * 0.5 + contradictions * 4 + (100 - frameStability) * 0.45);
 
   return {
     hesitationLatency: Number(latencySec.toFixed(2)),
@@ -231,14 +250,14 @@ const analyzeResponse = (text: string, latencySec: number, micLevel: number): Re
     confidenceDrift: clamp(36 + pressureFromLatency * 0.4 - structuredThinking * 0.18),
     eyeContactConsistency: eyeContact,
     blinkRateShift: blinkShift,
-    headMovementInstability: clamp(22 + pressureFromLatency * 0.4),
-    jawTension: clamp(24 + pressureFromLatency * 0.48),
-    lipCompression: clamp(18 + pressureFromLatency * 0.5),
+    headMovementInstability: clamp(16 + pressureFromLatency * 0.28 + (100 - frameStability) * 0.5),
+    jawTension: clamp(16 + pressureFromLatency * 0.22 + jawTensionProxy * 0.65),
+    lipCompression: clamp(14 + pressureFromLatency * 0.28 + jawTensionProxy * 0.45),
     microHesitation: clamp(28 + pressureFromLatency * 0.62),
-    facialAsymmetryStress: clamp(20 + pressureFromLatency * 0.47),
+    facialAsymmetryStress: clamp(16 + pressureFromLatency * 0.34 + (100 - faceCentering) * 0.4),
     freezeResponse,
-    nonVerbalStability: clamp((eyeContact + (100 - blinkShift) + (100 - freezeResponse)) / 3),
-    cognitiveOverload: clamp((verbosity + pressureFromLatency + switches * 10) / 2.4)
+    nonVerbalStability: clamp((eyeContact * 0.4 + (100 - blinkShift) * 0.2 + (100 - freezeResponse) * 0.2 + postureStability * 0.2)),
+    cognitiveOverload: clamp((verbosity + pressureFromLatency + switches * 10 + (100 - postureStability) * 0.6) / 2.8)
   };
 };
 
@@ -291,12 +310,22 @@ const MentalPerformanceCoachPage: React.FC = () => {
   const [consentPolicy, setConsentPolicy] = useState(false);
   const [deviceStatus, setDeviceStatus] = useState<'idle' | 'ready' | 'error'>('idle');
   const [micLevel, setMicLevel] = useState(0);
+  const [videoSignals, setVideoSignals] = useState<VideoFrameSignals>({
+    frameStability: 58,
+    faceCentering: 60,
+    gazeFocus: 56,
+    blinkProxy: 42,
+    jawTensionProxy: 40,
+    postureStability: 58
+  });
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previousFrameRef = useRef<Uint8ClampedArray | null>(null);
 
   const config = modeConfig[mode];
   const consentComplete = consentVideo && consentAudio && consentPolicy;
@@ -331,6 +360,74 @@ const MentalPerformanceCoachPage: React.FC = () => {
         analyser.getByteFrequencyData(data);
         const avg = data.reduce((sum, value) => sum + value, 0) / Math.max(data.length, 1);
         setMicLevel(clamp((avg / 255) * 100));
+
+        const videoEl = videoRef.current;
+        const canvas = canvasRef.current;
+        if (videoEl && canvas && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          if (context) {
+            const width = 64;
+            const height = 48;
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(videoEl, 0, 0, width, height);
+            const frame = context.getImageData(0, 0, width, height).data;
+
+            let brightnessTotal = 0;
+            let centerBrightness = 0;
+            let edgeBrightness = 0;
+            let highFreqContrast = 0;
+            let motion = 0;
+
+            for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+                const r = frame[idx];
+                const g = frame[idx + 1];
+                const b = frame[idx + 2];
+                const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                brightnessTotal += lum;
+
+                const isCenter = x > width * 0.28 && x < width * 0.72 && y > height * 0.2 && y < height * 0.8;
+                if (isCenter) {
+                  centerBrightness += lum;
+                } else {
+                  edgeBrightness += lum;
+                }
+
+                if (x > 0 && y > 0) {
+                  const leftIdx = idx - 4;
+                  const topIdx = idx - width * 4;
+                  const leftLum = 0.2126 * frame[leftIdx] + 0.7152 * frame[leftIdx + 1] + 0.0722 * frame[leftIdx + 2];
+                  const topLum = 0.2126 * frame[topIdx] + 0.7152 * frame[topIdx + 1] + 0.0722 * frame[topIdx + 2];
+                  highFreqContrast += Math.abs(lum - leftLum) + Math.abs(lum - topLum);
+                }
+
+                const previous = previousFrameRef.current;
+                if (previous) {
+                  const prevLum = 0.2126 * previous[idx] + 0.7152 * previous[idx + 1] + 0.0722 * previous[idx + 2];
+                  motion += Math.abs(lum - prevLum);
+                }
+              }
+            }
+
+            previousFrameRef.current = frame;
+            const pixels = width * height;
+            const avgBrightness = brightnessTotal / pixels;
+            const centerRatio = centerBrightness / Math.max(centerBrightness + edgeBrightness, 1);
+            const motionNorm = clamp((motion / pixels) * 0.55, 0, 100);
+            const contrastNorm = clamp((highFreqContrast / pixels) * 0.12, 0, 100);
+
+            setVideoSignals({
+              frameStability: clamp(92 - motionNorm),
+              faceCentering: clamp(20 + centerRatio * 120),
+              gazeFocus: clamp(44 + contrastNorm * 0.45 - motionNorm * 0.2),
+              blinkProxy: clamp(16 + Math.abs(avgBrightness - 105) * 0.55 + motionNorm * 0.2),
+              jawTensionProxy: clamp(22 + contrastNorm * 0.58 + motionNorm * 0.25),
+              postureStability: clamp(80 - motionNorm * 0.75 + centerRatio * 18)
+            });
+          }
+        }
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
@@ -368,10 +465,14 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
     const now = Date.now();
     const latencySec = (now - lastPromptAt) / 1000;
-    const signals = analyzeResponse(draft.trim(), latencySec, micLevel);
+    const snapshot = { ...videoSignals };
+    const signals = analyzeResponse(draft.trim(), latencySec, micLevel, snapshot);
     setLatestSignals(signals);
 
-    setTurns((prev) => [...prev, { id: `user-${now}`, role: 'user', text: draft.trim(), latencySec, timestamp: now }]);
+    setTurns((prev) => [
+      ...prev,
+      { id: `user-${now}`, role: 'user', text: draft.trim(), latencySec, micLevel, videoSnapshot: snapshot, signals, timestamp: now }
+    ]);
 
     const combinedStress = clamp(
       0.28 * signals.hesitationLatency * 20 +
@@ -401,7 +502,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
     const endedAt = Date.now();
     const userTurns = turns.filter((turn) => turn.role === 'user');
-    const userSignals = userTurns.map((turn) => analyzeResponse(turn.text, turn.latencySec || 0, micLevel));
+    const userSignals = userTurns.map((turn) => turn.signals || analyzeResponse(turn.text, turn.latencySec || 0, turn.micLevel || micLevel, turn.videoSnapshot));
 
     const avgLatency = average(userTurns.map((turn) => turn.latencySec || 0));
     const argumentStability = average(userSignals.map((signal) => signal.structuredThinking));
@@ -593,6 +694,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
           <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live camera feed</p>
             <video ref={videoRef} className="mt-2 h-52 w-full rounded-xl border border-slate-700 bg-black object-cover" muted playsInline />
+            <canvas ref={canvasRef} className="hidden" />
             <p className="mt-2 text-xs text-slate-400">Device status: {deviceStatus === 'ready' ? 'Connected' : deviceStatus === 'error' ? 'Unavailable (permission/device issue)' : 'Idle'}</p>
             <p className="mt-2 text-xs text-slate-500">Privacy: raw media stays in browser session for real-time coaching signals.</p>
           </div>
