@@ -318,6 +318,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
     jawTensionProxy: 40,
     postureStability: 58
   });
+  const [runtimeLatency, setRuntimeLatency] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -330,6 +331,12 @@ const MentalPerformanceCoachPage: React.FC = () => {
   const config = modeConfig[mode];
   const consentComplete = consentVideo && consentAudio && consentPolicy;
 
+  const liveRuntimeSignals = useMemo(() => {
+    if (!sessionActive || !lastPromptAt) return null;
+    const latencyNow = Math.max((Date.now() - lastPromptAt) / 1000, 0);
+    return analyzeResponse(draft.trim(), latencyNow, micLevel, videoSignals);
+  }, [sessionActive, lastPromptAt, draft, micLevel, videoSignals]);
+
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -337,6 +344,24 @@ const MentalPerformanceCoachPage: React.FC = () => {
       audioContextRef.current?.close();
     };
   }, []);
+
+  useEffect(() => {
+    if (!sessionActive || !lastPromptAt) return;
+
+    const timer = window.setInterval(() => {
+      const elapsedSec = (Date.now() - lastPromptAt) / 1000;
+      setRuntimeLatency(elapsedSec);
+
+      if (elapsedSec > 1.8) {
+        setStressScore((prev) => clamp(prev + 0.35, 24, 98));
+      }
+      if (elapsedSec > 2.4) {
+        setPressureScore((prev) => clamp(prev + 0.45, 22, 99));
+      }
+    }, 350);
+
+    return () => window.clearInterval(timer);
+  }, [sessionActive, lastPromptAt]);
 
   const beginDeviceCapture = async () => {
     try {
@@ -452,6 +477,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
     setTurns([{ id: `ai-${now}`, role: 'ai', text: config.seedQuestions[0], timestamp: now }]);
     setLatestSignals(null);
     setLastSummary(null);
+    setRuntimeLatency(0);
   };
 
   const pushAiTurn = (text: string) => {
@@ -502,9 +528,12 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
     const endedAt = Date.now();
     const userTurns = turns.filter((turn) => turn.role === 'user');
-    const userSignals = userTurns.map((turn) => turn.signals || analyzeResponse(turn.text, turn.latencySec || 0, turn.micLevel || micLevel, turn.videoSnapshot));
+    const fallbackSignal = latestSignals || analyzeResponse(draft.trim(), runtimeLatency || 0.8, micLevel, videoSignals);
+    const userSignals = userTurns.length
+      ? userTurns.map((turn) => turn.signals || analyzeResponse(turn.text, turn.latencySec || 0, turn.micLevel || micLevel, turn.videoSnapshot))
+      : [fallbackSignal];
 
-    const avgLatency = average(userTurns.map((turn) => turn.latencySec || 0));
+    const avgLatency = userTurns.length ? average(userTurns.map((turn) => turn.latencySec || 0)) : fallbackSignal.hesitationLatency;
     const argumentStability = average(userSignals.map((signal) => signal.structuredThinking));
     const interruptRecoverySpeed = clamp(100 - avgLatency * 25);
 
@@ -576,7 +605,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
       stressScore,
       argumentStability,
       interruptRecoverySpeed,
-      pressureDropPoint: userTurns.length > 2 ? 'Post-second interruption' : 'Needs more turns for stable detection',
+      pressureDropPoint: userTurns.length > 2 ? 'Post-second interruption' : 'In-progress calibration (add more turns for stable detection)',
       dominantStyle,
       weaknessPattern: argumentStability < 60 ? 'Structure collapse during escalation' : 'Over-detail under objections',
       stressGraph,
@@ -609,14 +638,16 @@ const MentalPerformanceCoachPage: React.FC = () => {
     const recent = history.slice(0, 8);
     const baseline = history[history.length - 1];
     const current = history[0];
+    const fallbackCoherence = latestSignals?.logicalCoherence || liveRuntimeSignals?.logicalCoherence || 0;
+    const fallbackLatency = latestSignals?.hesitationLatency || runtimeLatency || 0;
     return {
-      stressTrend: average(recent.map((session) => session.stressScore)),
-      latencyTrend: average(recent.map((session) => session.avgLatency)),
-      coherenceTrend: average(recent.map((session) => session.scores.logicalCoherence)),
-      baselineCoherence: baseline?.scores.logicalCoherence || 0,
-      currentCoherence: current?.scores.logicalCoherence || 0
+      stressTrend: recent.length ? average(recent.map((session) => session.stressScore)) : stressScore,
+      latencyTrend: recent.length ? average(recent.map((session) => session.avgLatency)) : fallbackLatency,
+      coherenceTrend: recent.length ? average(recent.map((session) => session.scores.logicalCoherence)) : fallbackCoherence,
+      baselineCoherence: baseline?.scores.logicalCoherence || fallbackCoherence,
+      currentCoherence: current?.scores.logicalCoherence || fallbackCoherence
     };
-  }, [history]);
+  }, [history, latestSignals, liveRuntimeSignals, runtimeLatency, stressScore]);
 
   return (
     <section className="pb-16 text-slate-100">
@@ -685,7 +716,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Latency Target</p>
-            <p className="mt-2 text-3xl font-extrabold text-emerald-300">&lt; 1.5s</p>
+            <p className="mt-2 text-3xl font-extrabold text-emerald-300">{sessionActive ? `${runtimeLatency.toFixed(1)}s` : '< 1.5s'}</p>
             <p className="mt-2 text-xs text-slate-300">System enforces high-tempo interview rhythm.</p>
           </div>
         </div>
@@ -729,37 +760,44 @@ const MentalPerformanceCoachPage: React.FC = () => {
           </div>
         </div>
 
-        {latestSignals && (
+        {(latestSignals || liveRuntimeSignals) && (
           <div className="mt-6 grid gap-4 lg:grid-cols-4">
+            {(() => {
+              const displaySignals = latestSignals || liveRuntimeSignals!;
+              return (
+                <>
             <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
               <h3 className="text-sm font-bold">Speech & Cognitive</h3>
-              <p className="mt-2">Logical Coherence Index: <b>{latestSignals.logicalCoherence.toFixed(0)}</b></p>
-              <p>Persuasion Strength Score: <b>{latestSignals.persuasionStrength.toFixed(0)}</b></p>
-              <p>Structured Thinking Index: <b>{latestSignals.structuredThinking.toFixed(0)}</b></p>
-              <p>Decision Sharpness: <b>{latestSignals.decisionSharpness.toFixed(0)}</b></p>
-              <p>Argument Depth: <b>{latestSignals.argumentDepth.toFixed(0)}</b></p>
+              <p className="mt-2">Logical Coherence Index: <b>{displaySignals.logicalCoherence.toFixed(0)}</b></p>
+              <p>Persuasion Strength Score: <b>{displaySignals.persuasionStrength.toFixed(0)}</b></p>
+              <p>Structured Thinking Index: <b>{displaySignals.structuredThinking.toFixed(0)}</b></p>
+              <p>Decision Sharpness: <b>{displaySignals.decisionSharpness.toFixed(0)}</b></p>
+              <p>Argument Depth: <b>{displaySignals.argumentDepth.toFixed(0)}</b></p>
             </div>
             <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
               <h3 className="text-sm font-bold">Voice Emotion & Stress</h3>
-              <p className="mt-2">Emotional Stability: <b>{latestSignals.emotionalStability.toFixed(0)}</b></p>
-              <p>Pressure Resistance: <b>{latestSignals.pressureResistance.toFixed(0)}</b></p>
-              <p>Confidence Drift Index: <b>{latestSignals.confidenceDrift.toFixed(0)}</b></p>
-              <p>Stress spike factors: tremor {latestSignals.voiceTremor.toFixed(0)} · pace {latestSignals.paceAcceleration.toFixed(0)}</p>
+              <p className="mt-2">Emotional Stability: <b>{displaySignals.emotionalStability.toFixed(0)}</b></p>
+              <p>Pressure Resistance: <b>{displaySignals.pressureResistance.toFixed(0)}</b></p>
+              <p>Confidence Drift Index: <b>{displaySignals.confidenceDrift.toFixed(0)}</b></p>
+              <p>Stress spike factors: tremor {displaySignals.voiceTremor.toFixed(0)} · pace {displaySignals.paceAcceleration.toFixed(0)}</p>
             </div>
             <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
               <h3 className="text-sm font-bold">Facial & Behavioral</h3>
-              <p className="mt-2">Eye contact consistency: <b>{latestSignals.eyeContactConsistency.toFixed(0)}</b></p>
-              <p>Non-verbal stability: <b>{latestSignals.nonVerbalStability.toFixed(0)}</b></p>
-              <p>Cognitive overload indicator: <b>{latestSignals.cognitiveOverload.toFixed(0)}</b></p>
-              <p>Freeze response marker: <b>{latestSignals.freezeResponse.toFixed(0)}</b></p>
+              <p className="mt-2">Eye contact consistency: <b>{displaySignals.eyeContactConsistency.toFixed(0)}</b></p>
+              <p>Non-verbal stability: <b>{displaySignals.nonVerbalStability.toFixed(0)}</b></p>
+              <p>Cognitive overload indicator: <b>{displaySignals.cognitiveOverload.toFixed(0)}</b></p>
+              <p>Freeze response marker: <b>{displaySignals.freezeResponse.toFixed(0)}</b></p>
             </div>
             <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
               <h3 className="text-sm font-bold">Adaptive Pressure Actions</h3>
               <p className="mt-2">Interrupt intensity: <b>{pressureScore > 75 ? 'High' : 'Moderate'}</b></p>
-              <p>Counter-argument injection: <b>{latestSignals.logicalCoherence < 60 ? 'Active' : 'Standby'}</b></p>
-              <p>Time constraints: <b>{latestSignals.hesitationLatency > 2.2 ? 'Tightened' : 'Normal'}</b></p>
-              <p>Escalation reason: latency {latestSignals.hesitationLatency.toFixed(2)}s · coherence {latestSignals.logicalCoherence.toFixed(0)}</p>
+              <p>Counter-argument injection: <b>{displaySignals.logicalCoherence < 60 ? 'Active' : 'Standby'}</b></p>
+              <p>Time constraints: <b>{displaySignals.hesitationLatency > 2.2 ? 'Tightened' : 'Normal'}</b></p>
+              <p>Escalation reason: latency {displaySignals.hesitationLatency.toFixed(2)}s · coherence {displaySignals.logicalCoherence.toFixed(0)}</p>
             </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
