@@ -1,5 +1,19 @@
 import { User } from '../types';
 
+const ENV_VALUES: Record<string, string | undefined> = {
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  SUPABASE_URL: import.meta.env.SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_URL: import.meta.env.NEXT_PUBLIC_SUPABASE_URL,
+  REACT_APP_SUPABASE_URL: import.meta.env.REACT_APP_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  SUPABASE_ANON_KEY: import.meta.env.SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  REACT_APP_SUPABASE_ANON_KEY: import.meta.env.REACT_APP_SUPABASE_ANON_KEY
+};
+
+const readEnvValue = (keys: string[]) => {
+  for (const key of keys) {
+    const value = ENV_VALUES[key];
 const readEnvValue = (keys: string[]) => {
   for (const key of keys) {
     const value = import.meta.env[key];
