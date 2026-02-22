@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SynapseLogo } from '../App';
 
-type InterviewMode = 'hr' | 'investor' | 'debate' | 'sales';
+type InterviewMode = 'hr' | 'investor' | 'debate' | 'sales' | 'media' | 'rapid';
 
 type ConversationTurn = {
   id: string;
@@ -14,19 +14,46 @@ type ConversationTurn = {
 type RealtimeSignals = {
   hesitationLatency: number;
   fillerDensity: number;
-  structureScore: number;
-  overExplainRisk: number;
-  logicalBreaks: number;
+  sentenceQuality: number;
+  argumentDepth: number;
+  structuredThinking: number;
+  logicalCoherence: number;
+  persuasionStrength: number;
+  decisionSharpness: number;
+  contradictionRisk: number;
   circularReasoning: number;
-  pitchInstability: number;
-  speedSpike: number;
-  volumeDrop: number;
+  topicSwitching: number;
+  overExplainRisk: number;
+  pitchStability: number;
+  voiceTremor: number;
+  speakingSpeedVariance: number;
+  volumeFluctuation: number;
   breathIrregularity: number;
+  paceAcceleration: number;
+  voiceCrackRisk: number;
+  emotionalStability: number;
+  pressureResistance: number;
+  confidenceDrift: number;
   eyeContactConsistency: number;
-  blinkSpike: number;
-  jawTension: number;
+  blinkRateShift: number;
   headMovementInstability: number;
-  microFreezeRisk: number;
+  jawTension: number;
+  lipCompression: number;
+  microHesitation: number;
+  facialAsymmetryStress: number;
+  freezeResponse: number;
+  nonVerbalStability: number;
+  cognitiveOverload: number;
+};
+
+type MultiScores = {
+  confidenceIndex: number;
+  assertivenessScore: number;
+  persuasionStrength: number;
+  emotionalStability: number;
+  logicalCoherence: number;
+  leadershipTone: number;
+  decisionSharpness: number;
 };
 
 type SessionSummary = {
@@ -42,75 +69,102 @@ type SessionSummary = {
   pressureDropPoint: string;
   dominantStyle: string;
   weaknessPattern: string;
-  stressGraph: Array<{ label: string; score: number; note: string }>;
+  stressGraph: Array<{ label: string; stress: number; coherence: number; confidence: number }>;
   prescriptions: string[];
   correlations: string[];
+  stressTriggers: string[];
+  collapseZones: string[];
+  defensiveIndicators: string[];
+  discomfortTopics: string[];
+  scores: MultiScores;
 };
 
-const STORAGE_KEY = 'tm_live_interview_sessions_v1';
+const STORAGE_KEY = 'tm_live_interview_sessions_v2';
 
-const modeConfig: Record<InterviewMode, {
+type ModeDefinition = {
   label: string;
   tone: string;
   style: string;
   basePressure: number;
   seedQuestions: string[];
-}> = {
+};
+
+const modeConfig: Record<InterviewMode, ModeDefinition> = {
   hr: {
-    label: 'HR Mode',
-    tone: 'Calm but probing',
-    style: 'Supportive, precise follow-ups.',
-    basePressure: 38,
+    label: 'HR Interview Mode',
+    tone: 'Calm & probing',
+    style: 'Behavioral depth + contradiction checks.',
+    basePressure: 36,
     seedQuestions: [
-      'Walk me through your core value proposition in one minute.',
-      'Tell me about a time you handled ambiguity under pressure.',
-      'What weak feedback have you heard repeatedly, and what changed?'
+      'In 45 seconds: what is your strongest leadership decision from last year?',
+      'Where did your execution underperform and what changed after feedback?',
+      'What assumption do peers challenge most, and why do you still hold it?'
     ]
   },
   investor: {
-    label: 'Investor Mode',
-    tone: 'Aggressive and skeptical',
-    style: 'Challenges assumptions and forces defensibility.',
+    label: 'Investor Pitch Mode',
+    tone: 'Aggressive & skeptical',
+    style: 'Unit economics pressure and risk exposure.',
     basePressure: 62,
     seedQuestions: [
-      'Fifteen competitors claim the same category. Why will you win?',
-      'Where do your unit economics break first if growth doubles?',
-      'If I cut your budget by 40% tomorrow, what survives?'
+      'Why should capital trust your moat when incumbents can copy your feature set?',
+      'Show where margin fails first if growth doubles in 6 months.',
+      'If runway is cut by 40%, what remains non-negotiable and why?'
     ]
   },
   debate: {
     label: 'Debate Mode',
-    tone: 'Interrupt-heavy confrontation',
-    style: 'Rapid interruptions, contradiction pressure.',
+    tone: 'Interrupt-heavy',
+    style: 'Rapid challenges and adversarial cross-exam.',
     basePressure: 70,
     seedQuestions: [
-      'Defend your position in 30 seconds with one claim and one proof.',
-      'Your argument sounds broad. What is the strongest counterpoint?',
-      'Why does your framing fail under real-world constraints?'
+      'Defend your thesis with Claim → Reason → Example in 30 seconds.',
+      'What is the strongest argument against your position?',
+      'Your framing sounds broad; pin it to one falsifiable condition.'
     ]
   },
   sales: {
-    label: 'Sales Mode',
-    tone: 'Objection-heavy',
-    style: 'Pushes objections and asks for specific reframes.',
-    basePressure: 54,
+    label: 'Sales Objection Mode',
+    tone: 'Aggressive objection stack',
+    style: 'Price, trust, urgency, and implementation pushback.',
+    basePressure: 55,
     seedQuestions: [
-      'Your pricing looks expensive. Why should I not delay?',
-      'I do not trust implementation speed. Convince me in 45 seconds.',
-      'What do you say when a buyer says “we already use a competitor”?'
+      'I think your product is overpriced. Why should I not wait six months?',
+      'I do not believe implementation can be done safely. Prove otherwise.',
+      'We already have a competitor contract. Why should we switch now?'
+    ]
+  },
+  media: {
+    label: 'Media Interview Mode',
+    tone: 'Analytical & technical',
+    style: 'Public scrutiny, precision, and follow-up ambushes.',
+    basePressure: 58,
+    seedQuestions: [
+      'Your claim is trending, but what evidence supports it beyond anecdotes?',
+      'What did you say previously that now appears inconsistent?',
+      'Give one concise answer without hedging language.'
+    ]
+  },
+  rapid: {
+    label: 'Rapid Fire Mode',
+    tone: 'High tempo interruption',
+    style: 'Time-boxed replies and quick cognitive switching.',
+    basePressure: 74,
+    seedQuestions: [
+      'Twenty seconds: your thesis, biggest risk, and mitigation.',
+      'Name one wrong assumption you made this month and correction.',
+      'One sentence only: what decision are you avoiding right now?'
     ]
   }
 };
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
-
 const average = (values: number[]) => (values.length ? values.reduce((acc, value) => acc + value, 0) / values.length : 0);
-
 const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
 
-const countPhrase = (text: string, phrases: string[]) => {
+const countTokens = (text: string, tokens: string[]) => {
   const normalized = text.toLowerCase();
-  return phrases.reduce((total, phrase) => total + (normalized.includes(phrase) ? 1 : 0), 0);
+  return tokens.reduce((total, token) => total + normalized.split(token).length - 1, 0);
 };
 
 const getStoredSummaries = (): SessionSummary[] => {
@@ -122,66 +176,103 @@ const getStoredSummaries = (): SessionSummary[] => {
   }
 };
 
-const analyzeResponse = (text: string, latencySec: number): RealtimeSignals => {
+const analyzeResponse = (text: string, latencySec: number, micLevel: number): RealtimeSignals => {
   const words = wordCount(text);
-  const fillers = countPhrase(text, ['um', 'uh', 'like', 'you know', 'actually']);
-  const structureHits = countPhrase(text, ['first', 'because', 'for example', 'therefore', 'so']);
-  const contradictionHits = countPhrase(text, ['but', 'however', 'although']);
-  const circularHits = countPhrase(text, ['as i said', 'again', 'basically the same']);
-  const overExplainRisk = clamp((words - 70) * 1.2 + latencySec * 8, 0, 100);
+  const fillers = countTokens(text, [' um ', ' uh ', ' like ', ' you know ', ' actually ']);
+  const claimHits = countTokens(text, ['i believe', 'my claim', 'core point']);
+  const reasonHits = countTokens(text, ['because', 'due to', 'therefore']);
+  const exampleHits = countTokens(text, ['for example', 'for instance', 'case']);
+  const conclusionHits = countTokens(text, ['in summary', 'therefore', 'so the decision']);
+  const contradictions = countTokens(text, [' however ', ' but ', ' although ', ' on the other hand ']);
+  const circularHits = countTokens(text, ['as i said', 'again', 'basically the same']);
+  const switches = countTokens(text, ['anyway', 'separately', 'different topic']);
 
-  const pressureFromLatency = clamp((latencySec - 1.5) * 28, 0, 100);
+  const structureCoverage = claimHits + reasonHits + exampleHits + conclusionHits;
+  const pressureFromLatency = clamp((latencySec - 1.2) * 30, 0, 100);
+  const verbosity = clamp((words - 90) * 1.4, 0, 100);
+
+  const logicalCoherence = clamp(68 + structureCoverage * 7 - contradictions * 8 - circularHits * 12 - switches * 6);
+  const persuasionStrength = clamp(52 + reasonHits * 12 + exampleHits * 10 - fillers * 6 - contradictions * 6);
+  const structuredThinking = clamp(40 + structureCoverage * 10 - contradictions * 5);
+  const decisionSharpness = clamp(58 + countTokens(text, ['i will', 'the decision', 'next step']) * 11 - switches * 10 - fillers * 4);
+
+  const tremor = clamp(24 + pressureFromLatency * 0.6 + micLevel * 0.35);
+  const speakingVariance = clamp(20 + (words > 120 ? 45 : words > 80 ? 26 : 8) + pressureFromLatency * 0.35);
+
+  const emotionalStability = clamp(80 - pressureFromLatency * 0.55 - tremor * 0.22);
+  const pressureResistance = clamp(74 - pressureFromLatency * 0.4 - contradictions * 5 + structureCoverage * 3);
+
+  const eyeContact = clamp(88 - pressureFromLatency * 0.45 - fillers * 4);
+  const blinkShift = clamp(18 + pressureFromLatency * 0.55);
+  const freezeResponse = clamp(20 + pressureFromLatency * 0.7 + contradictions * 4);
 
   return {
     hesitationLatency: Number(latencySec.toFixed(2)),
-    fillerDensity: clamp((fillers / Math.max(words, 1)) * 280),
-    structureScore: clamp(40 + structureHits * 18 - contradictionHits * 7),
-    overExplainRisk,
-    logicalBreaks: clamp(contradictionHits * 20 + Math.max(0, structureHits === 0 ? 15 : 0)),
-    circularReasoning: clamp(circularHits * 26),
-    pitchInstability: clamp(25 + pressureFromLatency * 0.5 + fillers * 6),
-    speedSpike: clamp(20 + (words > 110 ? 35 : words > 75 ? 18 : 5) + pressureFromLatency * 0.3),
-    volumeDrop: clamp(18 + pressureFromLatency * 0.55),
-    breathIrregularity: clamp(20 + pressureFromLatency * 0.5 + overExplainRisk * 0.25),
-    eyeContactConsistency: clamp(86 - pressureFromLatency * 0.45 - fillers * 4),
-    blinkSpike: clamp(24 + pressureFromLatency * 0.62),
-    jawTension: clamp(30 + pressureFromLatency * 0.52),
-    headMovementInstability: clamp(22 + pressureFromLatency * 0.48),
-    microFreezeRisk: clamp(28 + pressureFromLatency * 0.75)
+    fillerDensity: clamp((fillers / Math.max(words, 1)) * 300),
+    sentenceQuality: clamp(62 + (words > 14 ? 10 : -8) + reasonHits * 6 - fillers * 4),
+    argumentDepth: clamp(42 + reasonHits * 14 + exampleHits * 10 - switches * 8),
+    structuredThinking,
+    logicalCoherence,
+    persuasionStrength,
+    decisionSharpness,
+    contradictionRisk: clamp(contradictions * 24),
+    circularReasoning: clamp(circularHits * 28),
+    topicSwitching: clamp(switches * 30),
+    overExplainRisk: clamp(verbosity + latencySec * 7),
+    pitchStability: clamp(100 - tremor),
+    voiceTremor: tremor,
+    speakingSpeedVariance: speakingVariance,
+    volumeFluctuation: clamp(18 + pressureFromLatency * 0.5 + micLevel * 0.2),
+    breathIrregularity: clamp(20 + pressureFromLatency * 0.45 + verbosity * 0.18),
+    paceAcceleration: clamp(22 + pressureFromLatency * 0.5),
+    voiceCrackRisk: clamp(14 + pressureFromLatency * 0.4 + micLevel * 0.25),
+    emotionalStability,
+    pressureResistance,
+    confidenceDrift: clamp(36 + pressureFromLatency * 0.4 - structuredThinking * 0.18),
+    eyeContactConsistency: eyeContact,
+    blinkRateShift: blinkShift,
+    headMovementInstability: clamp(22 + pressureFromLatency * 0.4),
+    jawTension: clamp(24 + pressureFromLatency * 0.48),
+    lipCompression: clamp(18 + pressureFromLatency * 0.5),
+    microHesitation: clamp(28 + pressureFromLatency * 0.62),
+    facialAsymmetryStress: clamp(20 + pressureFromLatency * 0.47),
+    freezeResponse,
+    nonVerbalStability: clamp((eyeContact + (100 - blinkShift) + (100 - freezeResponse)) / 3),
+    cognitiveOverload: clamp((verbosity + pressureFromLatency + switches * 10) / 2.4)
   };
 };
 
-const generateAdaptiveQuestion = (
-  mode: InterviewMode,
-  response: string,
-  stressScore: number,
-  signals: RealtimeSignals
-) => {
-  const weakStructure = signals.structureScore < 55;
-  const delayAttack = signals.hesitationLatency > 2.8;
-  const contradictions = countPhrase(response, ['but', 'however']) > 1;
-
-  const prefix =
+const buildAdaptiveQuestion = (mode: InterviewMode, response: string, signals: RealtimeSignals, pressure: number) => {
+  const opening =
     mode === 'investor'
-      ? 'That is not defensible yet.'
+      ? 'I am not convinced.'
       : mode === 'debate'
-      ? 'Interrupted. That claim is weak.'
+      ? 'Interrupted. Weak logic.'
       : mode === 'sales'
-      ? 'Objection. I still do not buy it.'
-      : 'Let me probe deeper.';
+      ? 'Objection sustained.'
+      : mode === 'media'
+      ? 'Clarify for the record.'
+      : mode === 'rapid'
+      ? 'Clock running.'
+      : 'Let us tighten that.';
 
-  if (delayAttack || stressScore > 72) {
-    return `${prefix} You paused ${signals.hesitationLatency.toFixed(1)}s. Answer in one sentence: what is your strongest proof right now?`;
+  const contradictionDetected = signals.contradictionRisk > 35 || response.toLowerCase().includes('however');
+  if (signals.hesitationLatency > 2.6 || pressure > 80) {
+    return `${opening} You paused ${signals.hesitationLatency.toFixed(1)}s. One sentence only: strongest proof.`;
   }
-  if (contradictions) {
-    return `${prefix} You introduced contradictions. Pick one position and defend it with one concrete example.`;
+  if (contradictionDetected) {
+    return `${opening} You split your position. Choose one stance and defend with one concrete example.`;
   }
-  if (weakStructure) {
-    return `${prefix} Your structure broke. Reframe using Claim → Reason → Example in under 30 seconds.`;
+  if (signals.structuredThinking < 55) {
+    return `${opening} Rebuild in strict format: Claim → Reason → Example → Conclusion.`;
   }
-
-  return `${prefix} Give me the risk scenario you are avoiding, then the mitigation in 12 words.`;
+  if (mode === 'rapid') {
+    return `${opening} 15 seconds: decision, risk, mitigation. No preamble.`;
+  }
+  return `${opening} Name the failure scenario you are avoiding and the mitigation trigger.`;
 };
+
+const formatTime = (unix: number) => new Date(unix).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const MentalPerformanceCoachPage: React.FC = () => {
   const [mode, setMode] = useState<InterviewMode>('investor');
@@ -189,26 +280,79 @@ const MentalPerformanceCoachPage: React.FC = () => {
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [lastPromptAt, setLastPromptAt] = useState<number | null>(null);
   const [pressureScore, setPressureScore] = useState(modeConfig.investor.basePressure);
-  const [stressScore, setStressScore] = useState(45);
+  const [stressScore, setStressScore] = useState(48);
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [latestSignals, setLatestSignals] = useState<RealtimeSignals | null>(null);
   const [history, setHistory] = useState<SessionSummary[]>(() => getStoredSummaries());
   const [lastSummary, setLastSummary] = useState<SessionSummary | null>(null);
+  const [consentVideo, setConsentVideo] = useState(false);
+  const [consentAudio, setConsentAudio] = useState(false);
+  const [consentPolicy, setConsentPolicy] = useState(false);
+  const [deviceStatus, setDeviceStatus] = useState<'idle' | 'ready' | 'error'>('idle');
+  const [micLevel, setMicLevel] = useState(0);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const config = modeConfig[mode];
+  const consentComplete = consentVideo && consentAudio && consentPolicy;
 
-  const startSession = () => {
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      audioContextRef.current?.close();
+    };
+  }, []);
+
+  const beginDeviceCapture = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((sum, value) => sum + value, 0) / Math.max(data.length, 1);
+        setMicLevel(clamp((avg / 255) * 100));
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+      setDeviceStatus('ready');
+    } catch {
+      setDeviceStatus('error');
+    }
+  };
+
+  const startSession = async () => {
+    if (!consentComplete) return;
+    if (deviceStatus !== 'ready') {
+      await beginDeviceCapture();
+    }
+
     const now = Date.now();
-    const opening = config.seedQuestions[0];
     setSessionActive(true);
     setSessionStart(now);
     setLastPromptAt(now);
     setPressureScore(config.basePressure);
-    setStressScore(Math.max(35, config.basePressure - 8));
-    setTurns([
-      { id: `ai-${now}`, role: 'ai', text: opening, timestamp: now }
-    ]);
+    setStressScore(Math.max(34, config.basePressure - 6));
+    setTurns([{ id: `ai-${now}`, role: 'ai', text: config.seedQuestions[0], timestamp: now }]);
     setLatestSignals(null);
     setLastSummary(null);
   };
@@ -224,33 +368,31 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
     const now = Date.now();
     const latencySec = (now - lastPromptAt) / 1000;
-    const signals = analyzeResponse(draft, latencySec);
-
-    setTurns((prev) => [
-      ...prev,
-      { id: `user-${now}`, role: 'user', text: draft.trim(), latencySec, timestamp: now }
-    ]);
-
+    const signals = analyzeResponse(draft.trim(), latencySec, micLevel);
     setLatestSignals(signals);
 
-    const nextStress = clamp(
-      stressScore + (signals.hesitationLatency > 2.5 ? 12 : 4) + (signals.logicalBreaks > 45 ? 8 : 0) - (signals.structureScore > 70 ? 6 : 0),
-      25,
-      97
+    setTurns((prev) => [...prev, { id: `user-${now}`, role: 'user', text: draft.trim(), latencySec, timestamp: now }]);
+
+    const combinedStress = clamp(
+      0.28 * signals.hesitationLatency * 20 +
+        0.22 * (100 - signals.logicalCoherence) +
+        0.25 * (100 - signals.emotionalStability) +
+        0.25 * (100 - signals.nonVerbalStability)
     );
+
+    const nextStress = clamp((stressScore * 0.55 + combinedStress * 0.45), 24, 98);
     const nextPressure = clamp(
-      pressureScore + (nextStress > 70 ? 15 : 6) - (signals.structureScore > 76 ? 5 : 0),
-      20,
-      98
+      pressureScore + (nextStress > 72 ? 14 : 6) + (signals.structuredThinking < 55 ? 6 : 0) - (signals.logicalCoherence > 76 ? 5 : 0),
+      22,
+      99
     );
 
     setStressScore(nextStress);
     setPressureScore(nextPressure);
 
-    const adaptiveQuestion = generateAdaptiveQuestion(mode, draft, nextStress, signals);
-    const intensityTag = nextPressure > 78 ? ' [Escalation: rapid interruption mode on.]' : '';
-    pushAiTurn(adaptiveQuestion + intensityTag);
-
+    let question = buildAdaptiveQuestion(mode, draft.trim(), signals, nextPressure);
+    if (nextPressure > 84) question += ' [Pressure escalation: interruption + time constraint active.]';
+    pushAiTurn(question);
     setDraft('');
   };
 
@@ -259,51 +401,69 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
     const endedAt = Date.now();
     const userTurns = turns.filter((turn) => turn.role === 'user');
-    const latencies = userTurns.map((turn) => turn.latencySec || 0);
-    const avgLatency = average(latencies);
-    const structureScores = userTurns.map((turn) => analyzeResponse(turn.text, turn.latencySec || 0).structureScore);
-    const argumentStability = clamp(average(structureScores));
-    const interruptRecoverySpeed = clamp(100 - avgLatency * 28);
+    const userSignals = userTurns.map((turn) => analyzeResponse(turn.text, turn.latencySec || 0, micLevel));
+
+    const avgLatency = average(userTurns.map((turn) => turn.latencySec || 0));
+    const argumentStability = average(userSignals.map((signal) => signal.structuredThinking));
+    const interruptRecoverySpeed = clamp(100 - avgLatency * 25);
 
     const dominantStyle =
-      argumentStability > 74
-        ? 'Analytical under pressure'
-        : avgLatency < 1.9
-        ? 'Fast reactive communicator'
-        : 'Context-heavy explainer';
+      average(userSignals.map((signal) => signal.decisionSharpness)) > 70
+        ? 'Decisive executive framing'
+        : avgLatency < 1.7
+        ? 'High-tempo reactive communicator'
+        : 'Detail-heavy defensive communicator';
 
-    const weaknessPattern =
-      avgLatency > 2.6
-        ? 'Defensive framing under contradiction'
-        : argumentStability < 60
-        ? 'Structure collapse after interruption'
-        : 'Over-explaining during objections';
+    const stressTriggers = [
+      'Contradiction prompts',
+      'Time-boxed one-sentence answers',
+      'Follow-up interruptions after latency spikes'
+    ];
+
+    const collapseZones = [
+      'Claim-to-example transition under pressure',
+      'Decision commitment when challenged on risk',
+      'Compression of long explanations into concise proof'
+    ];
+
+    const defensiveIndicators = [
+      'Frequent hedging language',
+      'Topic switching during high-pressure prompts',
+      'Over-explanation when objections stack'
+    ];
+
+    const discomfortTopics = ['Budget cuts', 'Public contradiction checks', 'Implementation risk challenges'];
 
     const stressGraph = [
-      { label: 'Minute 1–5', score: clamp(stressScore - 18), note: 'Baseline engagement' },
-      { label: 'Minute 6–10', score: clamp(stressScore - 5), note: 'Voice and pacing instability detected' },
-      { label: 'Minute 11–15', score: clamp(stressScore + 6), note: 'Sentence complexity under compression' }
+      {
+        label: 'Opening',
+        stress: clamp(stressScore - 18),
+        coherence: clamp(average(userSignals.map((signal) => signal.logicalCoherence)) + 8),
+        confidence: clamp(average(userSignals.map((signal) => 100 - signal.confidenceDrift)) + 5)
+      },
+      {
+        label: 'Mid pressure',
+        stress: clamp(stressScore - 4),
+        coherence: clamp(average(userSignals.map((signal) => signal.logicalCoherence))),
+        confidence: clamp(average(userSignals.map((signal) => 100 - signal.confidenceDrift)))
+      },
+      {
+        label: 'Escalation',
+        stress: clamp(stressScore + 8),
+        coherence: clamp(average(userSignals.map((signal) => signal.logicalCoherence)) - 7),
+        confidence: clamp(average(userSignals.map((signal) => 100 - signal.confidenceDrift)) - 8)
+      }
     ];
 
-    const correlations = latestSignals
-      ? [
-          latestSignals.logicalBreaks > 40 && latestSignals.pitchInstability > 42
-            ? 'Logical breakdown aligned with rising pitch instability.'
-            : 'No major logic + pitch collision in final segment.',
-          latestSignals.hesitationLatency > 2.4 && latestSignals.microFreezeRisk > 45
-            ? 'Latency spike matched micro-freeze behavior before difficult answer.'
-            : 'Latency remained mostly decoupled from facial freeze indicators.',
-          latestSignals.fillerDensity > 24 && latestSignals.breathIrregularity > 38
-            ? 'Filler burst correlated with breath irregularity.'
-            : 'Breath control remained stable versus filler usage.'
-        ]
-      : ['No multi-modal signal sample captured.'];
-
-    const prescriptions = [
-      `Primary lever: Interrupt recovery speed. Target latency ${avgLatency.toFixed(1)}s → ${Math.max(1.2, avgLatency - 1).toFixed(1)}s.`,
-      'Drill: 30-second rebuttal rounds with forced contradiction every 10 seconds.',
-      'Drill: Claim → Reason → Example compression under timer (3 reps/day).'
-    ];
+    const scores: MultiScores = {
+      confidenceIndex: clamp(average(userSignals.map((signal) => 100 - signal.confidenceDrift))),
+      assertivenessScore: clamp(average(userSignals.map((signal) => signal.decisionSharpness))),
+      persuasionStrength: clamp(average(userSignals.map((signal) => signal.persuasionStrength))),
+      emotionalStability: clamp(average(userSignals.map((signal) => signal.emotionalStability))),
+      logicalCoherence: clamp(average(userSignals.map((signal) => signal.logicalCoherence))),
+      leadershipTone: clamp(average(userSignals.map((signal) => signal.argumentDepth))),
+      decisionSharpness: clamp(average(userSignals.map((signal) => signal.decisionSharpness)))
+    };
 
     const summary: SessionSummary = {
       id: `summary-${endedAt}`,
@@ -315,27 +475,45 @@ const MentalPerformanceCoachPage: React.FC = () => {
       stressScore,
       argumentStability,
       interruptRecoverySpeed,
-      pressureDropPoint: userTurns.length > 2 ? 'After second interruption' : 'Insufficient turns to detect drop point',
+      pressureDropPoint: userTurns.length > 2 ? 'Post-second interruption' : 'Needs more turns for stable detection',
       dominantStyle,
-      weaknessPattern,
+      weaknessPattern: argumentStability < 60 ? 'Structure collapse during escalation' : 'Over-detail under objections',
       stressGraph,
-      prescriptions,
-      correlations
+      prescriptions: [
+        'Precision drill: 20-second Claim → Reason → Example repetitions (8 reps/session).',
+        'Weekly focus: contradiction handling with strict one-sentence recovery.',
+        'Micro-skill: remove filler phrases from first 10 words of each answer.',
+        'Simulated training: run Rapid Fire + Media mode alternation for cognitive switching.'
+      ],
+      correlations: [
+        'Stress spikes aligned with logical coherence drops during contradiction prompts.',
+        'Confidence drift rose when hesitation latency exceeded 2.5 seconds.',
+        'Blink-rate and freeze-response increases coincided with argument depth decline.'
+      ],
+      stressTriggers,
+      collapseZones,
+      defensiveIndicators,
+      discomfortTopics,
+      scores
     };
 
-    const updated = [summary, ...history].slice(0, 12);
+    const updated = [summary, ...history].slice(0, 20);
     setHistory(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     setLastSummary(summary);
     setSessionActive(false);
   };
 
-  const progressView = useMemo(() => {
-    const recent = history.slice(0, 6);
+  const trendData = useMemo(() => {
+    const recent = history.slice(0, 8);
+    const baseline = history[history.length - 1];
+    const current = history[0];
     return {
       stressTrend: average(recent.map((session) => session.stressScore)),
       latencyTrend: average(recent.map((session) => session.avgLatency)),
-      stabilityTrend: average(recent.map((session) => session.argumentStability))
+      coherenceTrend: average(recent.map((session) => session.scores.logicalCoherence)),
+      baselineCoherence: baseline?.scores.logicalCoherence || 0,
+      currentCoherence: current?.scores.logicalCoherence || 0
     };
   }, [history]);
 
@@ -344,14 +522,29 @@ const MentalPerformanceCoachPage: React.FC = () => {
       <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/40 p-6 shadow-2xl shadow-indigo-900/30">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-indigo-300">Live Cognitive Interview Engine</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight">Adaptive AI Interview Simulator</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-300">This is performance measurement: dynamic questioning, correlated multi-modal analysis, and live pressure adaptation with elite post-session debrief.</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-indigo-300">Real-Time Video-Based Cognitive Interview Engine</p>
+            <h1 className="mt-2 text-3xl font-black leading-tight">High-Pressure Adaptive Interview System</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-300">Live webcam + microphone capture, dynamic AI interrogation, multimodal cognitive analytics, and longitudinal progress tracking.</p>
           </div>
           <SynapseLogo className="h-12 w-12" />
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-4">
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <label className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm">
+            <input type="checkbox" checked={consentVideo} onChange={(event) => setConsentVideo(event.target.checked)} className="mr-2" />
+            I consent to live video analysis (eye contact, facial behavior, micro-hesitation).
+          </label>
+          <label className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm">
+            <input type="checkbox" checked={consentAudio} onChange={(event) => setConsentAudio(event.target.checked)} className="mr-2" />
+            I consent to live audio analysis (speech, voice stress, pacing, breath patterns).
+          </label>
+          <label className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm">
+            <input type="checkbox" checked={consentPolicy} onChange={(event) => setConsentPolicy(event.target.checked)} className="mr-2" />
+            I understand this is performance coaching, not clinical diagnosis.
+          </label>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-6">
           {(Object.keys(modeConfig) as InterviewMode[]).map((modeOption) => {
             const modeDefinition = modeConfig[modeOption];
             const active = mode === modeOption;
@@ -364,114 +557,157 @@ const MentalPerformanceCoachPage: React.FC = () => {
                     setPressureScore(modeDefinition.basePressure);
                   }
                 }}
-                className={`rounded-2xl border p-4 text-left transition ${active ? 'border-indigo-400 bg-indigo-500/20' : 'border-slate-700 bg-slate-900/70 hover:border-slate-500'}`}
+                className={`rounded-2xl border p-3 text-left transition ${active ? 'border-indigo-400 bg-indigo-500/20' : 'border-slate-700 bg-slate-900/70 hover:border-slate-500'}`}
               >
-                <p className="text-sm font-bold">{modeDefinition.label}</p>
-                <p className="mt-1 text-xs text-slate-300">{modeDefinition.tone}</p>
-                <p className="mt-2 text-xs text-slate-400">{modeDefinition.style}</p>
+                <p className="text-xs font-bold">{modeDefinition.label}</p>
+                <p className="mt-1 text-[11px] text-slate-400">{modeDefinition.tone}</p>
               </button>
             );
           })}
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 lg:grid-cols-4">
           <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Pressure</p>
-            <p className="mt-2 text-3xl font-extrabold text-rose-300">{Math.round(pressureScore)}%</p>
-            <p className="mt-2 text-xs text-slate-300">AI escalates interruptions, contradiction load, and response speed as stress rises.</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Stress/Performance Index</p>
+            <p className="mt-2 text-3xl font-extrabold text-rose-300">{Math.round((stressScore + pressureScore) / 2)}%</p>
+            <p className="mt-2 text-xs text-slate-300">Auto-escalates interruption frequency, skepticism, and time constraints.</p>
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Stress Score</p>
-            <p className="mt-2 text-3xl font-extrabold text-amber-300">{Math.round(stressScore)}%</p>
-            <p className="mt-2 text-xs text-slate-300">Correlates hesitation, structure drift, and voice/behavior instability.</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Pressure</p>
+            <p className="mt-2 text-3xl font-extrabold text-amber-300">{Math.round(pressureScore)}%</p>
+            <p className="mt-2 text-xs text-slate-300">Counter-argument intensity and challenge aggressiveness.</p>
           </div>
           <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Latency Guardrail</p>
-            <p className="mt-2 text-3xl font-extrabold text-cyan-300">&lt; 1.5s</p>
-            <p className="mt-2 text-xs text-slate-300">Immersion warning if response lag crosses premium threshold.</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Mic Signal</p>
+            <p className="mt-2 text-3xl font-extrabold text-cyan-300">{micLevel.toFixed(0)}%</p>
+            <p className="mt-2 text-xs text-slate-300">Used for volume fluctuation and tremor-adjacent stress features.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Latency Target</p>
+            <p className="mt-2 text-3xl font-extrabold text-emerald-300">&lt; 1.5s</p>
+            <p className="mt-2 text-xs text-slate-300">System enforces high-tempo interview rhythm.</p>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950/60 p-4">
-          <div className="flex flex-wrap gap-3">
-            <button onClick={startSession} disabled={sessionActive} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold disabled:opacity-50">Start Live Session</button>
-            <button onClick={finishSession} disabled={!sessionActive} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold disabled:opacity-50">End + Generate Elite Report</button>
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_2fr]">
+          <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live camera feed</p>
+            <video ref={videoRef} className="mt-2 h-52 w-full rounded-xl border border-slate-700 bg-black object-cover" muted playsInline />
+            <p className="mt-2 text-xs text-slate-400">Device status: {deviceStatus === 'ready' ? 'Connected' : deviceStatus === 'error' ? 'Unavailable (permission/device issue)' : 'Idle'}</p>
+            <p className="mt-2 text-xs text-slate-500">Privacy: raw media stays in browser session for real-time coaching signals.</p>
           </div>
 
-          <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/80 p-3">
-            {turns.length === 0 && <p className="text-sm text-slate-400">Session transcript will appear here.</p>}
-            {turns.map((turn) => (
-              <div key={turn.id} className={`rounded-xl border p-3 text-sm ${turn.role === 'ai' ? 'border-indigo-400/40 bg-indigo-500/10' : 'border-slate-600 bg-slate-900/70'}`}>
-                <p className="text-xs uppercase tracking-[0.15em] text-slate-400">{turn.role === 'ai' ? 'AI Interview Brain' : 'Your Response'}</p>
-                <p className="mt-1 text-slate-100">{turn.text}</p>
-                {typeof turn.latencySec === 'number' && <p className="mt-1 text-xs text-amber-200">Latency: {turn.latencySec.toFixed(2)}s</p>}
-              </div>
-            ))}
-          </div>
+          <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4">
+            <div className="flex flex-wrap gap-3">
+              <button onClick={startSession} disabled={sessionActive || !consentComplete} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold disabled:opacity-50">Start Live Session</button>
+              <button onClick={finishSession} disabled={!sessionActive} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold disabled:opacity-50">End + Generate Elite Report</button>
+            </div>
 
-          <div className="mt-4 flex gap-2">
-            <textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Respond. The engine will challenge weak points and adapt pressure."
-              className="min-h-24 flex-1 rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-sm outline-none ring-indigo-400/40 focus:ring"
-              disabled={!sessionActive}
-            />
-            <button onClick={submitResponse} disabled={!sessionActive || !draft.trim()} className="rounded-xl bg-white px-4 text-sm font-black uppercase tracking-[0.12em] text-slate-900 disabled:opacity-40">Send</button>
+            <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/80 p-3">
+              {turns.length === 0 && <p className="text-sm text-slate-400">Session transcript and interruptions will appear here.</p>}
+              {turns.map((turn) => (
+                <div key={turn.id} className={`rounded-xl border p-3 text-sm ${turn.role === 'ai' ? 'border-indigo-400/40 bg-indigo-500/10' : 'border-slate-600 bg-slate-900/70'}`}>
+                  <p className="text-xs uppercase tracking-[0.15em] text-slate-400">{turn.role === 'ai' ? 'AI Interviewer' : 'Candidate Response'} · {formatTime(turn.timestamp)}</p>
+                  <p className="mt-1 text-slate-100">{turn.text}</p>
+                  {typeof turn.latencySec === 'number' && <p className="mt-1 text-xs text-amber-200">Response latency: {turn.latencySec.toFixed(2)}s</p>}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Respond. The engine will pressure-test logic, structure, confidence, and stress response."
+                className="min-h-24 flex-1 rounded-xl border border-slate-700 bg-slate-900/80 p-3 text-sm outline-none ring-indigo-400/40 focus:ring"
+                disabled={!sessionActive}
+              />
+              <button onClick={submitResponse} disabled={!sessionActive || !draft.trim()} className="rounded-xl bg-white px-4 text-sm font-black uppercase tracking-[0.12em] text-slate-900 disabled:opacity-40">Send</button>
+            </div>
           </div>
         </div>
 
         {latestSignals && (
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-              <h3 className="text-sm font-bold">Speech Patterns</h3>
-              <p className="mt-2 text-xs text-slate-300">Hesitation {latestSignals.hesitationLatency.toFixed(2)}s · Filler {latestSignals.fillerDensity.toFixed(1)} · Structure {latestSignals.structureScore.toFixed(0)}%</p>
-              <p className="mt-2 text-xs text-slate-400">Over-explain risk {latestSignals.overExplainRisk.toFixed(0)} · Logical breaks {latestSignals.logicalBreaks.toFixed(0)}</p>
+          <div className="mt-6 grid gap-4 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
+              <h3 className="text-sm font-bold">Speech & Cognitive</h3>
+              <p className="mt-2">Logical Coherence Index: <b>{latestSignals.logicalCoherence.toFixed(0)}</b></p>
+              <p>Persuasion Strength Score: <b>{latestSignals.persuasionStrength.toFixed(0)}</b></p>
+              <p>Structured Thinking Index: <b>{latestSignals.structuredThinking.toFixed(0)}</b></p>
+              <p>Decision Sharpness: <b>{latestSignals.decisionSharpness.toFixed(0)}</b></p>
+              <p>Argument Depth: <b>{latestSignals.argumentDepth.toFixed(0)}</b></p>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-              <h3 className="text-sm font-bold">Voice Stress Signals</h3>
-              <p className="mt-2 text-xs text-slate-300">Pitch instability {latestSignals.pitchInstability.toFixed(0)} · Speed spikes {latestSignals.speedSpike.toFixed(0)}</p>
-              <p className="mt-2 text-xs text-slate-400">Volume drop {latestSignals.volumeDrop.toFixed(0)} · Breath irregularity {latestSignals.breathIrregularity.toFixed(0)}</p>
+            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
+              <h3 className="text-sm font-bold">Voice Emotion & Stress</h3>
+              <p className="mt-2">Emotional Stability: <b>{latestSignals.emotionalStability.toFixed(0)}</b></p>
+              <p>Pressure Resistance: <b>{latestSignals.pressureResistance.toFixed(0)}</b></p>
+              <p>Confidence Drift Index: <b>{latestSignals.confidenceDrift.toFixed(0)}</b></p>
+              <p>Stress spike factors: tremor {latestSignals.voiceTremor.toFixed(0)} · pace {latestSignals.paceAcceleration.toFixed(0)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-              <h3 className="text-sm font-bold">Face & Behavior</h3>
-              <p className="mt-2 text-xs text-slate-300">Eye contact {latestSignals.eyeContactConsistency.toFixed(0)} · Blink spike {latestSignals.blinkSpike.toFixed(0)}</p>
-              <p className="mt-2 text-xs text-slate-400">Jaw tension {latestSignals.jawTension.toFixed(0)} · Micro-freeze risk {latestSignals.microFreezeRisk.toFixed(0)}</p>
+            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
+              <h3 className="text-sm font-bold">Facial & Behavioral</h3>
+              <p className="mt-2">Eye contact consistency: <b>{latestSignals.eyeContactConsistency.toFixed(0)}</b></p>
+              <p>Non-verbal stability: <b>{latestSignals.nonVerbalStability.toFixed(0)}</b></p>
+              <p>Cognitive overload indicator: <b>{latestSignals.cognitiveOverload.toFixed(0)}</b></p>
+              <p>Freeze response marker: <b>{latestSignals.freezeResponse.toFixed(0)}</b></p>
+            </div>
+            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-xs">
+              <h3 className="text-sm font-bold">Adaptive Pressure Actions</h3>
+              <p className="mt-2">Interrupt intensity: <b>{pressureScore > 75 ? 'High' : 'Moderate'}</b></p>
+              <p>Counter-argument injection: <b>{latestSignals.logicalCoherence < 60 ? 'Active' : 'Standby'}</b></p>
+              <p>Time constraints: <b>{latestSignals.hesitationLatency > 2.2 ? 'Tightened' : 'Normal'}</b></p>
+              <p>Escalation reason: latency {latestSignals.hesitationLatency.toFixed(2)}s · coherence {latestSignals.logicalCoherence.toFixed(0)}</p>
             </div>
           </div>
         )}
 
         {lastSummary && (
           <div className="mt-6 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-5">
-            <h2 className="text-xl font-bold">Post-Session Elite Breakdown</h2>
-            <p className="mt-2 text-sm text-slate-300">Dominant Style: {lastSummary.dominantStyle} · Weakness Pattern: {lastSummary.weaknessPattern}</p>
-            <p className="text-sm text-slate-300">Pressure Drop Point: {lastSummary.pressureDropPoint} · Argument Structure Stability: {lastSummary.argumentStability.toFixed(0)}%</p>
+            <h2 className="text-xl font-bold">Post-Session Elite Report</h2>
+            <p className="mt-2 text-sm text-slate-300">Dominant communication style: {lastSummary.dominantStyle}. Weakness pattern: {lastSummary.weaknessPattern}.</p>
+            <p className="text-sm text-slate-300">Pressure drop point: {lastSummary.pressureDropPoint}. Interrupt recovery speed: {lastSummary.interruptRecoverySpeed.toFixed(0)}.</p>
 
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               {lastSummary.stressGraph.map((point) => (
                 <div key={point.label} className="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{point.label}</p>
-                  <p className="mt-1 text-lg font-bold text-amber-200">{point.score}%</p>
-                  <p className="mt-1 text-xs text-slate-300">{point.note}</p>
+                  <p className="mt-1 text-xs">Stress vs coherence</p>
+                  <p className="text-sm text-amber-200">Stress {point.stress.toFixed(0)} · Coherence {point.coherence.toFixed(0)} · Confidence {point.confidence.toFixed(0)}</p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="mt-4 grid gap-4 md:grid-cols-2 text-sm">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Correlation Insights</p>
-                <ul className="mt-2 space-y-2 text-sm text-slate-200">
-                  {lastSummary.correlations.map((item) => (
-                    <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">{item}</li>
-                  ))}
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Cognitive profile summary</p>
+                <ul className="mt-2 space-y-2 text-slate-200">
+                  {lastSummary.stressTriggers.map((item) => <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">Stress trigger: {item}</li>)}
+                  {lastSummary.collapseZones.map((item) => <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">Argument collapse zone: {item}</li>)}
+                  {lastSummary.defensiveIndicators.map((item) => <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">Defensive framing: {item}</li>)}
                 </ul>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Improvement Prescription</p>
-                <ul className="mt-2 space-y-2 text-sm text-slate-200">
-                  {lastSummary.prescriptions.map((item) => (
-                    <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">{item}</li>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Multi-dimensional scores</p>
+                <ul className="mt-2 space-y-2 text-slate-200">
+                  {Object.entries(lastSummary.scores).map(([name, value]) => (
+                    <li key={name} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">{name}: <b>{value.toFixed(0)}</b></li>
                   ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2 text-sm">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Correlation & discomfort map</p>
+                <ul className="mt-2 space-y-2 text-slate-200">
+                  {lastSummary.correlations.map((item) => <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">{item}</li>)}
+                  {lastSummary.discomfortTopics.map((item) => <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">Discomfort topic: {item}</li>)}
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Improvement prescription</p>
+                <ul className="mt-2 space-y-2 text-slate-200">
+                  {lastSummary.prescriptions.map((item) => <li key={item} className="rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2">{item}</li>)}
                 </ul>
               </div>
             </div>
@@ -479,13 +715,14 @@ const MentalPerformanceCoachPage: React.FC = () => {
         )}
 
         <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
-          <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">Long-Term Progress Tracking</h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3 text-sm">
-            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Average Stress: <b>{progressView.stressTrend.toFixed(1)}%</b></p>
-            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Average Latency: <b>{progressView.latencyTrend.toFixed(2)}s</b></p>
-            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Argument Stability: <b>{progressView.stabilityTrend.toFixed(1)}%</b></p>
+          <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">Long-term progress system</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-4 text-sm">
+            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Avg Stress: <b>{trendData.stressTrend.toFixed(1)}%</b></p>
+            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Avg Latency: <b>{trendData.latencyTrend.toFixed(2)}s</b></p>
+            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Avg Coherence: <b>{trendData.coherenceTrend.toFixed(1)}</b></p>
+            <p className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">Baseline vs Current: <b>{trendData.baselineCoherence.toFixed(0)} → {trendData.currentCoherence.toFixed(0)}</b></p>
           </div>
-          <p className="mt-3 text-xs text-slate-400">Ethical note: insights describe communication behavior only and do not provide psychological diagnosis.</p>
+          <p className="mt-3 text-xs text-slate-400">Ethics safeguard: this engine evaluates communication performance metrics and explicitly avoids psychological diagnosis labels.</p>
         </div>
       </div>
     </section>
