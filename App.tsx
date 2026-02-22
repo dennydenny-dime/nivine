@@ -7,6 +7,8 @@ import ConversationRoom from './components/ConversationRoom';
 import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
+import AuthPage from './components/AuthPage';
+import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -31,24 +33,57 @@ enum View {
 }
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User>(() => {
-    const storedUser = localStorage.getItem('tm_current_user');
-    if (storedUser) {
-      return JSON.parse(storedUser);
-    }
-
-    return {
-      id: `local-${Date.now()}`,
-      email: 'guest@synapse.local',
-      name: 'Guest User',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest'
-    };
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      setIsFullScreen(!!doc.fullscreenElement || !!doc.webkitFullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      const urlSession = readSessionFromUrlHash();
+      const session = urlSession || getStoredSession();
+
+      if (!session) {
+        setAuthReady(true);
+        return;
+      }
+
+      if (urlSession) {
+        saveSession(urlSession);
+      }
+
+      try {
+        const supabaseUser = await fetchUserWithAccessToken(session.access_token);
+        setCurrentUser(mapSupabaseUser(supabaseUser));
+      } catch {
+        clearStoredSession();
+        setCurrentUser(null);
+      } finally {
+        setAuthReady(true);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
     localStorage.setItem('tm_current_user', JSON.stringify(currentUser));
 
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
@@ -68,19 +103,7 @@ const App: React.FC = () => {
       };
     }
     localStorage.setItem('tm_leaderboard_pool', JSON.stringify(pool));
-
-    const handleFullscreenChange = () => {
-      const doc = document as Document & { webkitFullscreenElement?: Element | null };
-      setIsFullScreen(!!doc.fullscreenElement || !!doc.webkitFullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
-    };
-  }, []);
+  }, [currentUser]);
 
   const enterFullScreen = useCallback(() => {
     const doc = document as Document & {
@@ -155,6 +178,39 @@ const App: React.FC = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
   };
+
+  const handleLogout = async () => {
+    const session = getStoredSession();
+    if (session?.access_token) {
+      try {
+        await signOutSession(session.access_token);
+      } catch {
+        // Ignore logout API errors and clear local session anyway.
+      }
+    }
+
+    clearStoredSession();
+    localStorage.removeItem('tm_current_user');
+    setCurrentUser(null);
+    setCurrentView(View.LANDING);
+    setSelectedPersona(null);
+  };
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 px-4">
+        <AuthPage onLogin={setCurrentUser} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
@@ -236,6 +292,12 @@ const App: React.FC = () => {
               <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
               <span className="text-xs font-bold hidden sm:inline">{currentUser.name}</span>
             </div>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium hover:bg-slate-800 transition-all text-slate-300"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </nav>

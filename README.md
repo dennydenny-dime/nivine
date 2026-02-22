@@ -17,6 +17,9 @@ View your app in AI Studio: https://ai.studio/apps/drive/1ubcYEKoruC1u0ihSS6ovuh
    `npm install`
 2. Create a `.env.local` file and set:
    - `VITE_API_KEY` (or `GEMINI_API_KEY`) to your Gemini API key
-3. Restart the dev server after updating env vars so Vite picks up the new values.
-4. Run the app:
+   - `VITE_SUPABASE_URL` to your Supabase project URL or project ref
+   - `VITE_SUPABASE_ANON_KEY` to your Supabase anon key
+3. In Supabase Auth settings, add your local URL (for example `http://localhost:5173`) to allowed redirect URLs when using Google OAuth.
+4. Restart the dev server after updating env vars so Vite picks up the new values.
+5. Run the app:
    `npm run dev`
