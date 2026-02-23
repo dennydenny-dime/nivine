@@ -4,7 +4,7 @@ import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
 import { COMMON_LANGUAGES, getSystemApiKey, VOICE_MAP } from '../constants';
 import { setUserConversationHistory, getUserConversationHistory } from '../lib/userStorage';
-import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
+import { decode, decodeAudioData, blobToBase64 } from '../utils/audioUtils';
 
 interface ConversationRoomProps {
   persona: Persona;
@@ -146,6 +146,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const audioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const outputNodeRef = useRef<GainNode | null>(null);
+  const inputStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const nextStartTimeRef = useRef(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionRef = useRef<any>(null);
@@ -161,6 +163,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       try { source.stop(); } catch(e) {}
     });
     sourcesRef.current.clear();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch(e) {}
+    }
+    mediaRecorderRef.current = null;
+    if (inputStreamRef.current) {
+      inputStreamRef.current.getTracks().forEach(track => track.stop());
+      inputStreamRef.current = null;
+    }
     if (audioContextRef.current) audioContextRef.current.close();
     if (outputAudioContextRef.current) outputAudioContextRef.current.close();
   }, []);
@@ -248,7 +258,16 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         outputNodeRef.current = outputAudioContextRef.current.createGain();
         outputNodeRef.current.connect(outputAudioContextRef.current.destination);
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        inputStreamRef.current = stream;
 
         await audioContextRef.current.resume();
         await outputAudioContextRef.current.resume();
@@ -303,7 +322,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             
             COACHING FOCUS:
             1. Monitor fillers (um, ah, like), weak vocabulary, and tone inconsistencies.
-            2. Session language starts in ${currentLanguage}. Detect language switches quickly and adapt immediately.
+            2. Session language starts in ${currentLanguage}. Keep responses in the active session language unless the user explicitly asks you to switch languages.
             3. Start immediately with: "Neural link established at Intensity Level ${hardness}. I am ${persona.name}. Let's begin."
             4. Point out communication mistakes directly during conversation; do not wait for the end.
             5. LATENCY PRIORITY: Respond quickly with concise, high-impact responses. No simulated thinking delays.
@@ -314,23 +333,41 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           callbacks: {
             onopen: () => {
               setIsConnecting(false);
-              const source = audioContextRef.current!.createMediaStreamSource(stream);
-              // Reduced buffer size from 4096 to 2048 to lower input latency (approx 128ms at 16kHz)
-              const scriptProcessor = audioContextRef.current!.createScriptProcessor(2048, 1, 1);
-              
-              scriptProcessor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
-                const pcmBlob = createBlob(inputData);
-                // Rely on sessionPromise resolving to send input
-                sessionPromise.then(s => {
-                  try { s.sendRealtimeInput({ media: pcmBlob }); } catch(err) {
-                    console.warn("Input dropped:", err);
+
+              const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+
+              if (!preferredMimeType) {
+                setError('This browser does not support WebM/Opus recording required for low-latency neural STT.');
+                return;
+              }
+
+              const recorder = new MediaRecorder(stream, {
+                mimeType: preferredMimeType,
+                audioBitsPerSecond: 24000,
+              });
+              mediaRecorderRef.current = recorder;
+
+              recorder.ondataavailable = (event) => {
+                if (!event.data || event.data.size === 0) return;
+                sessionPromise.then(async (s) => {
+                  try {
+                    const base64 = await blobToBase64(event.data);
+                    s.sendRealtimeInput({
+                      media: {
+                        data: base64,
+                        mimeType: preferredMimeType,
+                      },
+                    });
+                  } catch (err) {
+                    console.warn('Input chunk dropped:', err);
                   }
                 });
               };
 
-              source.connect(scriptProcessor);
-              scriptProcessor.connect(audioContextRef.current!.destination);
+              // Send compact 1-second chunks for faster STT turnaround.
+              recorder.start(1000);
             },
             onmessage: async (message: LiveServerMessage) => {
               if (message.serverContent?.outputTranscription) {

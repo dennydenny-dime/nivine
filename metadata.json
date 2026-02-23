@@ -1,5 +1,5 @@
 {
-  "name": "Synapse AI-1",
+  "name": "NODE AI",
   "description": "An advanced AI-powered communication and presentation coach. Practice one-on-one conversations with customizable personas, receive real-time feedback on your speech, and take daily verbal communication quizzes.",
   "requestFramePermissions": [
     "microphone"
