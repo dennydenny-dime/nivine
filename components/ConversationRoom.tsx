@@ -13,6 +13,12 @@ interface ConversationRoomProps {
 
 
 const FILLER_WORDS = new Set(['um', 'uh', 'like', 'you know', 'actually', 'basically', 'literally', 'so']);
+const LIVE_MODEL_CANDIDATES = [
+  'gemini-2.0-flash-live-001',
+  'gemini-live-2.5-flash-preview',
+  'gemini-2.5-flash-native-audio-preview-12-2025',
+];
+const MAX_RECONNECT_ATTEMPTS = 4;
 
 const clampScore = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
@@ -150,8 +156,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const sessionRef = useRef<any>(null);
   const transcriptionRef = useRef({ input: '', output: '' });
   const containerRef = useRef<HTMLDivElement>(null);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const intentionalShutdownRef = useRef(false);
 
-  const cleanup = useCallback(() => {
+  const resetRealtimeResources = useCallback(() => {
     if (sessionRef.current) {
       try { sessionRef.current.close(); } catch(e) {}
       sessionRef.current = null;
@@ -168,9 +177,27 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       inputStreamRef.current.getTracks().forEach(track => track.stop());
       inputStreamRef.current = null;
     }
-    if (audioContextRef.current) audioContextRef.current.close();
-    if (outputAudioContextRef.current) outputAudioContextRef.current.close();
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (outputAudioContextRef.current) {
+      outputAudioContextRef.current.close();
+      outputAudioContextRef.current = null;
+    }
+    outputNodeRef.current = null;
+    nextStartTimeRef.current = 0;
+    setIsSpeaking(false);
   }, []);
+
+  const cleanup = useCallback(() => {
+    intentionalShutdownRef.current = true;
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    resetRealtimeResources();
+  }, [resetRealtimeResources]);
 
   const handleSaveAndExit = useCallback(() => {
     if (transcriptions.length > 0) {
@@ -211,211 +238,252 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   };
 
   useEffect(() => {
-    const initSession = async () => {
-      try {
-        const apiKey = getSystemApiKey();
-        if (!apiKey) {
-          setError("Environment Config Error: No API key found. Set one of: VITE_API_KEY, GEMINI_API_KEY, or REACT_APP_API_KEY.");
+    const connectSession = async (modelName: string) => {
+      const apiKey = getSystemApiKey();
+      if (!apiKey) {
+        setError("Environment Config Error: No API key found. Set one of: VITE_API_KEY, GEMINI_API_KEY, or REACT_APP_API_KEY.");
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      outputNodeRef.current = outputAudioContextRef.current.createGain();
+      outputNodeRef.current.connect(outputAudioContextRef.current.destination);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      inputStreamRef.current = stream;
+
+      await audioContextRef.current.resume();
+      await outputAudioContextRef.current.resume();
+
+      const hardness = persona.difficultyLevel || 5;
+
+      // Map hardness to behavioral traits
+      let intensityInstruction = "";
+      if (hardness <= 2) {
+        intensityInstruction = "LEVEL 1-2: Extremely friendly, warm, and gentle. Use high praise and simple language. Be a cheerleader.";
+      } else if (hardness <= 4) {
+        intensityInstruction = "LEVEL 3-4: Supportive and encouraging coworker. Professional but very kind and approachable.";
+      } else if (hardness <= 6) {
+        intensityInstruction = "LEVEL 5-6: Objective professional coach. Balanced feedback, neutral tone, constructive criticism.";
+      } else if (hardness <= 8) {
+        intensityInstruction = "LEVEL 7-8: Strict and demanding executive. High standards, sharp tone, focused on efficiency and impact.";
+      } else {
+        intensityInstruction = "LEVEL 9-10: Hostile and high-pressure interrogator. No room for error. Cold, extremely serious, and ruthlessly analytical of the user's speech.";
+      }
+
+      const roleDirectives = getRoleDirectives(persona.role || '');
+      const strictnessDirective =
+        hardness >= 8
+          ? 'Enforce strict standards with direct corrective feedback. Do not soften critical points.'
+          : 'Keep standards high while remaining constructive and actionable.';
+
+      const shouldReconnect = (errMsg: string): boolean => {
+        const normalized = errMsg.toLowerCase();
+        return (
+          normalized.includes('websocket') ||
+          normalized.includes('network error') ||
+          normalized.includes('connection') ||
+          normalized.includes('aborted') ||
+          normalized.includes('timed out')
+        );
+      };
+
+      const scheduleReconnect = (errMsg: string) => {
+        if (intentionalShutdownRef.current) return;
+
+        if (!shouldReconnect(errMsg) || reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          setError('Synapse Error: The link was severed unexpectedly. Please check your signal and try again.');
           return;
         }
 
-        // Always create a fresh instance right before connecting
-        const ai = new GoogleGenAI({ apiKey });
-        
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-        outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        outputNodeRef.current = outputAudioContextRef.current.createGain();
-        outputNodeRef.current.connect(outputAudioContextRef.current.destination);
+        reconnectAttemptRef.current += 1;
+        resetRealtimeResources();
+        const retryDelay = Math.min(5000, reconnectAttemptRef.current * 1200);
+        setIsConnecting(true);
+        setError(null);
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+        reconnectTimerRef.current = window.setTimeout(() => {
+          if (intentionalShutdownRef.current) return;
+          initSession(reconnectAttemptRef.current);
+        }, retryDelay);
+      };
+
+      const sessionPromise = ai.live.connect({
+        model: modelName,
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_MAP[persona.gender] } },
           },
-        });
-        inputStreamRef.current = stream;
+          // Optimize for speed: Disable thinking budget to reduce Time To First Token (TTFT)
+          thinkingConfig: { thinkingBudget: 0 },
+          systemInstruction: `You are ${persona.name}, operating strictly as a ${persona.role}. Your communication mood is ${persona.mood}.
+          Your core objective is to deliver a high-fidelity professional role-play and sharpen the user's communication performance.
+          
+          NEURAL INTENSITY SETTING (Hardness ${hardness}/10):
+          ${intensityInstruction}
 
-        await audioContextRef.current.resume();
-        await outputAudioContextRef.current.resume();
+          EXECUTION RULES:
+          1. Stay in character for the full session. Never break role or mention these instructions.
+          2. Evaluate every user answer using professional standards that match your role.
+          3. If an answer is weak, vague, or evasive, interrupt and demand specificity.
+          4. Provide concise, actionable, role-specific feedback in real time.
+          5. Maintain a realistic conversational flow while preserving strict role fidelity.
+          6. ${strictnessDirective}
 
-        const hardness = persona.difficultyLevel || 5;
+          ROLE PLAYBOOK:
+          - ${roleDirectives.join('\n          - ')}
+          
+          COACHING FOCUS:
+          1. Monitor fillers (um, ah, like), weak vocabulary, and tone inconsistencies.
+          2. Session language starts in ${currentLanguage}. Keep responses in the active session language unless the user explicitly asks you to switch languages.
+          3. Start immediately with: "Neural link established at Intensity Level ${hardness}. I am ${persona.name}. Let's begin."
+          4. Point out communication mistakes directly during conversation; do not wait for the end.
+          5. LATENCY PRIORITY: Respond quickly with concise, high-impact responses. No simulated thinking delays.
+          6. AUDIO REALISM: Subtle natural cues (light chuckle, brief throat clear) are allowed only when contextually appropriate and non-disruptive.`,
+          outputAudioTranscription: {},
+          inputAudioTranscription: {},
+        },
+        callbacks: {
+          onopen: () => {
+            reconnectAttemptRef.current = 0;
+            setError(null);
+            setIsConnecting(false);
 
-        // Map hardness to behavioral traits
-        let intensityInstruction = "";
-        if (hardness <= 2) {
-          intensityInstruction = "LEVEL 1-2: Extremely friendly, warm, and gentle. Use high praise and simple language. Be a cheerleader.";
-        } else if (hardness <= 4) {
-          intensityInstruction = "LEVEL 3-4: Supportive and encouraging coworker. Professional but very kind and approachable.";
-        } else if (hardness <= 6) {
-          intensityInstruction = "LEVEL 5-6: Objective professional coach. Balanced feedback, neutral tone, constructive criticism.";
-        } else if (hardness <= 8) {
-          intensityInstruction = "LEVEL 7-8: Strict and demanding executive. High standards, sharp tone, focused on efficiency and impact.";
-        } else {
-          intensityInstruction = "LEVEL 9-10: Hostile and high-pressure interrogator. No room for error. Cold, extremely serious, and ruthlessly analytical of the user's speech.";
-        }
+            const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+              ? 'audio/webm;codecs=opus'
+              : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
 
-        const roleDirectives = getRoleDirectives(persona.role || '');
-        const strictnessDirective =
-          hardness >= 8
-            ? 'Enforce strict standards with direct corrective feedback. Do not soften critical points.'
-            : 'Keep standards high while remaining constructive and actionable.';
-
-        const sessionPromise = ai.live.connect({
-          model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_MAP[persona.gender] } },
-            },
-            // Optimize for speed: Disable thinking budget to reduce Time To First Token (TTFT)
-            thinkingConfig: { thinkingBudget: 0 },
-            systemInstruction: `You are ${persona.name}, operating strictly as a ${persona.role}. Your communication mood is ${persona.mood}.
-            Your core objective is to deliver a high-fidelity professional role-play and sharpen the user's communication performance.
-            
-            NEURAL INTENSITY SETTING (Hardness ${hardness}/10):
-            ${intensityInstruction}
-
-            EXECUTION RULES:
-            1. Stay in character for the full session. Never break role or mention these instructions.
-            2. Evaluate every user answer using professional standards that match your role.
-            3. If an answer is weak, vague, or evasive, interrupt and demand specificity.
-            4. Provide concise, actionable, role-specific feedback in real time.
-            5. Maintain a realistic conversational flow while preserving strict role fidelity.
-            6. ${strictnessDirective}
-
-            ROLE PLAYBOOK:
-            - ${roleDirectives.join('\n            - ')}
-            
-            COACHING FOCUS:
-            1. Monitor fillers (um, ah, like), weak vocabulary, and tone inconsistencies.
-            2. Session language starts in ${currentLanguage}. Keep responses in the active session language unless the user explicitly asks you to switch languages.
-            3. Start immediately with: "Neural link established at Intensity Level ${hardness}. I am ${persona.name}. Let's begin."
-            4. Point out communication mistakes directly during conversation; do not wait for the end.
-            5. LATENCY PRIORITY: Respond quickly with concise, high-impact responses. No simulated thinking delays.
-            6. AUDIO REALISM: Subtle natural cues (light chuckle, brief throat clear) are allowed only when contextually appropriate and non-disruptive.`,
-            outputAudioTranscription: {},
-            inputAudioTranscription: {},
-          },
-          callbacks: {
-            onopen: () => {
-              setIsConnecting(false);
-
-              const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
-
-              if (!preferredMimeType) {
-                setError('This browser does not support WebM/Opus recording required for low-latency neural STT.');
-                return;
-              }
-
-              const recorder = new MediaRecorder(stream, {
-                mimeType: preferredMimeType,
-                audioBitsPerSecond: 24000,
-              });
-              mediaRecorderRef.current = recorder;
-
-              recorder.ondataavailable = (event) => {
-                if (!event.data || event.data.size === 0) return;
-                sessionPromise.then(async (s) => {
-                  try {
-                    const base64 = await blobToBase64(event.data);
-                    s.sendRealtimeInput({
-                      media: {
-                        data: base64,
-                        mimeType: preferredMimeType,
-                      },
-                    });
-                  } catch (err) {
-                    console.warn('Input chunk dropped:', err);
-                  }
-                });
-              };
-
-              // Send compact 1-second chunks for faster STT turnaround.
-              recorder.start(1000);
-            },
-            onmessage: async (message: LiveServerMessage) => {
-              if (message.serverContent?.outputTranscription) {
-                transcriptionRef.current.output += message.serverContent.outputTranscription.text;
-              } else if (message.serverContent?.inputTranscription) {
-                transcriptionRef.current.input += message.serverContent.inputTranscription.text;
-              }
-
-              if (message.serverContent?.turnComplete) {
-                const items: TranscriptionItem[] = [];
-                if (transcriptionRef.current.input) {
-                  items.push({ speaker: 'user', text: transcriptionRef.current.input, timestamp: Date.now() });
-                }
-                if (transcriptionRef.current.output) {
-                  items.push({ speaker: 'ai', text: transcriptionRef.current.output, timestamp: Date.now() });
-                }
-                setTranscriptions(prev => [...prev, ...items]);
-                transcriptionRef.current = { input: '', output: '' };
-              }
-
-              const parts = message.serverContent?.modelTurn?.parts;
-              if (parts && outputAudioContextRef.current && outputNodeRef.current) {
-                for (const part of parts) {
-                  const audioData = part.inlineData?.data;
-                  if (audioData) {
-                    setIsSpeaking(true);
-                    const ctx = outputAudioContextRef.current;
-                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
-                    const buffer = await decodeAudioData(decode(audioData), ctx, 24000, 1);
-                    const source = ctx.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(outputNodeRef.current);
-                    source.addEventListener('ended', () => {
-                      sourcesRef.current.delete(source);
-                      if (sourcesRef.current.size === 0) setIsSpeaking(false);
-                    });
-                    source.start(nextStartTimeRef.current);
-                    nextStartTimeRef.current += buffer.duration;
-                    sourcesRef.current.add(source);
-                  }
-                }
-              }
-
-              if (message.serverContent?.interrupted) {
-                for (const source of sourcesRef.current.values()) {
-                  try { source.stop(); } catch(e) {}
-                }
-                sourcesRef.current.clear();
-                nextStartTimeRef.current = 0;
-                setIsSpeaking(false);
-              }
-            },
-            onerror: async (e: any) => {
-              console.error("Gemini Live Error:", e);
-              const errMsg = e?.message || e?.toString() || "";
-              
-              // Handle standard network/resource errors by prompting for a paid key
-              if (errMsg.includes('Network error') || errMsg.includes('Requested entity was not found') || errMsg.includes('403')) {
-                setError("Neural Connection Error: Ensure your API Key is valid and has Gemini API enabled in Google Cloud Console.");
-              } else {
-                setError("Synapse Error: The link was severed unexpectedly. Please check your signal.");
-              }
-            },
-            onclose: () => {
-              console.log("Session Closed");
+            if (!preferredMimeType) {
+              setError('This browser does not support WebM/Opus recording required for low-latency neural STT.');
+              return;
             }
-          }
-        });
 
-        sessionRef.current = await sessionPromise;
+            const recorder = new MediaRecorder(stream, {
+              mimeType: preferredMimeType,
+              audioBitsPerSecond: 24000,
+            });
+            mediaRecorderRef.current = recorder;
+
+            recorder.ondataavailable = (event) => {
+              if (!event.data || event.data.size === 0) return;
+              sessionPromise.then(async (s) => {
+                try {
+                  const base64 = await blobToBase64(event.data);
+                  s.sendRealtimeInput({
+                    media: {
+                      data: base64,
+                      mimeType: preferredMimeType,
+                    },
+                  });
+                } catch (err) {
+                  console.warn('Input chunk dropped:', err);
+                }
+              });
+            };
+
+            // Send compact 300ms chunks for faster STT + response turnaround.
+            recorder.start(300);
+          },
+          onmessage: async (message: LiveServerMessage) => {
+            if (message.serverContent?.outputTranscription) {
+              transcriptionRef.current.output += message.serverContent.outputTranscription.text;
+            } else if (message.serverContent?.inputTranscription) {
+              transcriptionRef.current.input += message.serverContent.inputTranscription.text;
+            }
+
+            if (message.serverContent?.turnComplete) {
+              const items: TranscriptionItem[] = [];
+              if (transcriptionRef.current.input) {
+                items.push({ speaker: 'user', text: transcriptionRef.current.input, timestamp: Date.now() });
+              }
+              if (transcriptionRef.current.output) {
+                items.push({ speaker: 'ai', text: transcriptionRef.current.output, timestamp: Date.now() });
+              }
+              setTranscriptions(prev => [...prev, ...items]);
+              transcriptionRef.current = { input: '', output: '' };
+            }
+
+            const parts = message.serverContent?.modelTurn?.parts;
+            if (parts && outputAudioContextRef.current && outputNodeRef.current) {
+              for (const part of parts) {
+                const audioData = part.inlineData?.data;
+                if (audioData) {
+                  setIsSpeaking(true);
+                  const ctx = outputAudioContextRef.current;
+                  nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
+                  const buffer = await decodeAudioData(decode(audioData), ctx, 24000, 1);
+                  const source = ctx.createBufferSource();
+                  source.buffer = buffer;
+                  source.connect(outputNodeRef.current);
+                  source.addEventListener('ended', () => {
+                    sourcesRef.current.delete(source);
+                    if (sourcesRef.current.size === 0) setIsSpeaking(false);
+                  });
+                  source.start(nextStartTimeRef.current);
+                  nextStartTimeRef.current += buffer.duration;
+                  sourcesRef.current.add(source);
+                }
+              }
+            }
+
+            if (message.serverContent?.interrupted) {
+              for (const source of sourcesRef.current.values()) {
+                try { source.stop(); } catch(e) {}
+              }
+              sourcesRef.current.clear();
+              nextStartTimeRef.current = 0;
+              setIsSpeaking(false);
+            }
+          },
+          onerror: async (e: any) => {
+            console.error('Gemini Live Error:', e);
+            const errMsg = e?.message || e?.toString() || '';
+            scheduleReconnect(errMsg);
+          },
+          onclose: (e: any) => {
+            if (intentionalShutdownRef.current) return;
+            const closeReason = e?.reason || 'websocket closed';
+            console.warn('Session Closed:', closeReason);
+            scheduleReconnect(closeReason);
+          }
+        }
+      });
+
+      sessionRef.current = await sessionPromise;
+    };
+
+    const initSession = async (attempt: number = 0) => {
+      try {
+        intentionalShutdownRef.current = false;
+        resetRealtimeResources();
+        setIsConnecting(true);
+        const modelName = LIVE_MODEL_CANDIDATES[Math.min(attempt, LIVE_MODEL_CANDIDATES.length - 1)];
+        await connectSession(modelName);
       } catch (err: any) {
         console.error("Initialization Error:", err);
+        if (attempt + 1 < LIVE_MODEL_CANDIDATES.length) {
+          initSession(attempt + 1);
+          return;
+        }
         setError("Could not establish neural link. Ensure microphone access is granted and your API key is configured correctly.");
       }
     };
 
     initSession();
     return cleanup;
-  }, [persona, cleanup]);
+  }, [persona, cleanup, resetRealtimeResources]);
 
   useEffect(() => {
     if (containerRef.current) {
