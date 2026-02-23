@@ -69,7 +69,10 @@ const teamPlans: Plan[] = [
 ];
 
 const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
-  const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+  const razorpayKeyId =
+    import.meta.env.VITE_RAZORPAY_KEY_ID ||
+    import.meta.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+    import.meta.env.RAZORPAY_KEY_ID;
 
   const loadRazorpayScript = async () => {
     if (window.Razorpay) {
