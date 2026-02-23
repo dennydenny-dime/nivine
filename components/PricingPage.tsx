@@ -4,19 +4,35 @@ interface PricingPageProps {
   onBack: () => void;
 }
 
-const individualPlans = [
-  { label: 'Free', value: '3 sessions/mo' },
-  { label: 'Pro — $19/mo', value: 'Unlimited sessions' },
-  { label: 'Premium — $39/mo', value: 'All scenarios + analytics' },
+type Plan = {
+  label: string;
+  value: string;
+  cta: string;
+  href: string;
+};
+
+const individualPlans: Plan[] = [
+  { label: 'Free', value: '3 sessions/mo', cta: 'Start Free', href: '/#app' },
+  { label: 'Pro — $19/mo', value: 'Unlimited sessions', cta: 'Buy Pro', href: 'mailto:sales@synapseai.app?subject=Buy%20Pro%20Plan' },
+  { label: 'Premium — $39/mo', value: 'All scenarios + analytics', cta: 'Buy Premium', href: 'mailto:sales@synapseai.app?subject=Buy%20Premium%20Plan' },
 ];
 
-const teamPlans = [
-  { label: 'Starter — $299/mo', value: 'Up to 25 seats' },
-  { label: 'Growth — $799/mo', value: 'Up to 100 seats' },
-  { label: 'Enterprise', value: 'Custom pricing' },
+const teamPlans: Plan[] = [
+  { label: 'Starter — $299/mo', value: 'Up to 25 seats', cta: 'Buy Starter', href: 'mailto:sales@synapseai.app?subject=Buy%20Starter%20Plan' },
+  { label: 'Growth — $799/mo', value: 'Up to 100 seats', cta: 'Buy Growth', href: 'mailto:sales@synapseai.app?subject=Buy%20Growth%20Plan' },
+  { label: 'Enterprise', value: 'Custom pricing', cta: 'Contact Sales', href: 'mailto:sales@synapseai.app?subject=Enterprise%20Plan%20Inquiry' },
 ];
 
 const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
+  const handleBuyClick = (href: string) => {
+    if (href.startsWith('mailto:')) {
+      window.location.href = href;
+      return;
+    }
+
+    window.location.assign(href);
+  };
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-6xl mx-auto py-12">
       <div className="text-center mb-14">
@@ -39,9 +55,15 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
           <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
             {individualPlans.map((plan) => (
-              <div key={plan.label} className="grid grid-cols-[1fr_auto] gap-4 items-start py-5">
+              <div key={plan.label} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start py-5">
                 <span className="text-slate-200 font-semibold text-2xl leading-tight">{plan.label}</span>
-                <span className="text-slate-300 text-2xl leading-tight text-right">{plan.value}</span>
+                <span className="text-slate-300 text-2xl leading-tight md:text-right">{plan.value}</span>
+                <button
+                  onClick={() => handleBuyClick(plan.href)}
+                  className="justify-self-start md:justify-self-end px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-colors"
+                >
+                  {plan.cta}
+                </button>
               </div>
             ))}
           </div>
@@ -56,9 +78,15 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
           <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
             {teamPlans.map((plan) => (
-              <div key={plan.label} className="grid grid-cols-[1fr_auto] gap-4 items-start py-5">
+              <div key={plan.label} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start py-5">
                 <span className="text-slate-200 font-semibold text-2xl leading-tight">{plan.label}</span>
-                <span className="text-slate-300 text-2xl leading-tight text-right">{plan.value}</span>
+                <span className="text-slate-300 text-2xl leading-tight md:text-right">{plan.value}</span>
+                <button
+                  onClick={() => handleBuyClick(plan.href)}
+                  className="justify-self-start md:justify-self-end px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-colors"
+                >
+                  {plan.cta}
+                </button>
               </div>
             ))}
           </div>
