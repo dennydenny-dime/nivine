@@ -18,7 +18,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         <div className="relative max-w-4xl space-y-6">
           <p className="text-xs font-black tracking-[0.18em] text-cyan-300 uppercase">Executive Summary</p>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black leading-tight">
-            Synapse AI is an <span className="text-cyan-300">AI coach for high-stakes communication</span>
+            NODE AI is an <span className="text-cyan-300">AI coach for high-stakes communication</span>
           </h1>
           <p className="text-slate-300 text-base sm:text-lg leading-relaxed">
             Helping people master job interviews, investor pitches, and presentations through realistic, personalized practice simulations.
@@ -78,13 +78,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       <section className="space-y-6">
-        <SectionTitle title="Our Solution" subtitle="What Synapse AI actually does" />
+        <SectionTitle title="Our Solution" subtitle="What NODE AI actually does" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div className="md:col-span-2 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-6">
             <p className="text-xs font-black text-cyan-300 uppercase tracking-[0.16em] mb-3">Core Product</p>
             <h3 className="text-2xl sm:text-3xl font-bold mb-3">AI-Powered Communication Simulator</h3>
             <p className="text-slate-300 leading-relaxed">
-              Synapse AI creates realistic, interactive simulations of high-stakes communication scenarios. The AI plays the other party and responds dynamically, just like in real life.
+              NODE AI creates realistic, interactive simulations of high-stakes communication scenarios. The AI plays the other party and responds dynamically, just like in real life.
             </p>
           </div>
           {[

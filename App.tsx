@@ -283,7 +283,7 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={goBack}>
             <SynapseLogo className="w-8 h-8 shadow-lg shadow-white/5" />
-            <span className="text-lg md:text-xl font-bold tracking-tight">Synapse <span className="text-indigo-400">AI</span></span>
+            <span className="text-lg md:text-xl font-bold tracking-tight">NODE <span className="text-indigo-400">AI</span></span>
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
@@ -378,7 +378,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-900 mt-auto">
-        &copy; 2026 Synapse AI. All rights reserved.
+        &copy; 2026 NODE AI. All rights reserved.
       </footer>
     </div>
   );
