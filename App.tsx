@@ -42,7 +42,13 @@ type NavItem = {
   onClick: () => void;
   icon?: React.ReactNode;
   className?: string;
+  locked?: boolean;
 };
+
+const ADMIN_EMAILS = new Set([
+  'aryancode192@gmail.com',
+  'work.of.god02@gmail.com'
+]);
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -50,6 +56,10 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const normalizedEmail = currentUser?.email.trim().toLowerCase();
+  const isAdmin = normalizedEmail ? ADMIN_EMAILS.has(normalizedEmail) : false;
+  const hasFullAccess = isAdmin;
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -171,6 +181,10 @@ const App: React.FC = () => {
   };
 
   const openQuiz = () => {
+    if (!hasFullAccess) {
+      setCurrentView(View.PRICING);
+      return;
+    }
     setCurrentView(View.QUIZ);
   };
 
@@ -179,14 +193,26 @@ const App: React.FC = () => {
   };
 
   const openLeaderboard = () => {
+    if (!hasFullAccess) {
+      setCurrentView(View.PRICING);
+      return;
+    }
     setCurrentView(View.LEADERBOARD);
   };
 
   const openCustomCoach = () => {
+    if (!hasFullAccess) {
+      setCurrentView(View.PRICING);
+      return;
+    }
     setCurrentView(View.CUSTOM_COACH);
   };
 
   const openMentalPerformance = () => {
+    if (!hasFullAccess) {
+      setCurrentView(View.PRICING);
+      return;
+    }
     setCurrentView(View.MENTAL_PERFORMANCE);
   };
 
@@ -219,17 +245,18 @@ const App: React.FC = () => {
   const navItems: NavItem[] = [
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
-    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach },
-    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance },
+    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: !hasFullAccess },
+    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: !hasFullAccess },
     {
       key: View.LEADERBOARD,
       label: 'Leaderboard',
       onClick: openLeaderboard,
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
-      className: 'shadow-lg shadow-indigo-500/20'
+      className: 'shadow-lg shadow-indigo-500/20',
+      locked: !hasFullAccess
     },
     { key: View.PRICING, label: 'Plans', onClick: openPricing },
-    { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz }
+    { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz, locked: !hasFullAccess }
   ];
 
   if (!authReady) {
@@ -295,14 +322,20 @@ const App: React.FC = () => {
                 <button
                   key={item.key}
                   onClick={item.onClick}
-                  className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                  className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-slate-800 hover:text-white'} ${item.locked ? 'relative' : ''}`}
                 >
                   {item.icon}
                   {item.label}
+                  {item.locked && <span className="text-[10px] text-amber-300">🔒</span>}
                 </button>
               ))}
             </div>
           </div>
+          {!hasFullAccess && (
+            <p className="text-xs text-amber-300 px-1">
+              Subscription required for Custom Coach, Mental Performance Coach, Leaderboard, and Quizzes.
+            </p>
+          )}
         </div>
       </nav>
 
