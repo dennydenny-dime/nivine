@@ -38,8 +38,8 @@ enum View {
   LEADERBOARD = 'leaderboard',
   CUSTOM_COACH = 'custom_coach',
   MENTAL_PERFORMANCE = 'mental_performance',
-  PERSONAL_DASHBOARD = 'personal_dashboard'
-}
+  PERSONAL_DASHBOARD = 'personal_dashboard',
+};
 
 type NavItem = {
   key: View;
