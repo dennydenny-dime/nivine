@@ -22,21 +22,13 @@ type Plan = {
   razorpayDescription?: string;
 };
 
-type RazorpayPaymentOption = 'paypal' | 'upi' | 'netbanking';
-
-const RAZORPAY_PAYMENT_OPTIONS: Record<RazorpayPaymentOption, { label: string; method: Record<string, boolean> }> = {
-  paypal: {
-    label: 'PayPal (international cards through Razorpay)',
-    method: { card: true },
-  },
-  upi: {
-    label: 'UPI / BHIM',
-    method: { upi: true },
-  },
-  netbanking: {
-    label: 'Net Banking',
-    method: { netbanking: true },
-  },
+const RAZORPAY_PAYMENT_METHODS: Record<string, boolean> = {
+  card: true,
+  netbanking: true,
+  upi: true,
+  wallet: true,
+  emi: true,
+  paylater: true,
 };
 
 const individualPlans: Plan[] = [
@@ -98,32 +90,12 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     });
   };
 
-  const getSelectedPaymentOption = (): RazorpayPaymentOption | null => {
-    const selectedMethod = window.prompt(
-      'Choose Razorpay payment option: paypal, upi, or netbanking',
-      'upi'
-    )?.trim().toLowerCase();
-
-    if (!selectedMethod) {
-      return null;
-    }
-
-    if (selectedMethod === 'paypal' || selectedMethod === 'upi' || selectedMethod === 'netbanking') {
-      return selectedMethod;
-    }
-
-    window.alert('Please select one of: paypal, upi, netbanking.');
-    return null;
-  };
-
-  const openRazorpayCheckout = async (plan: Plan, paymentOption: RazorpayPaymentOption) => {
+  const openRazorpayCheckout = async (plan: Plan) => {
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded || !window.Razorpay || !plan.razorpayAmount || !razorpayKeyId) {
       window.alert('Unable to load payment gateway right now. Please try again.');
       return;
     }
-
-    const selectedOptionConfig = RAZORPAY_PAYMENT_OPTIONS[paymentOption];
 
     const razorpay = new window.Razorpay({
       key: razorpayKeyId,
@@ -131,9 +103,9 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
       currency: plan.razorpayCurrency ?? 'USD',
       name: 'Synapse AI',
       description: plan.razorpayDescription ?? plan.label,
-      method: selectedOptionConfig.method,
+      method: RAZORPAY_PAYMENT_METHODS,
       notes: {
-        selectedPaymentOption: selectedOptionConfig.label,
+        availablePaymentOptions: 'Cards, Netbanking, UPI, Wallet, EMI, Pay Later (PayPal via supported cards)',
       },
       handler: () => {
         window.alert('Payment successful! We will activate your plan shortly.');
@@ -148,12 +120,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
   const handleBuyClick = async (plan: Plan) => {
     if (plan.razorpayAmount) {
-      const paymentOption = getSelectedPaymentOption();
-      if (!paymentOption) {
-        return;
-      }
-
-      await openRazorpayCheckout(plan, paymentOption);
+      await openRazorpayCheckout(plan);
       return;
     }
 
