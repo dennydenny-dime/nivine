@@ -1,8 +1,22 @@
 import React from 'react';
 
+type RazorpayCheckoutOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  method: Record<string, boolean>;
+  notes?: Record<string, string>;
+  handler: () => void;
+  theme?: {
+    color?: string;
+  };
+};
+
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => {
+    Razorpay?: new (options: RazorpayCheckoutOptions) => {
       open: () => void;
     };
   }
@@ -69,10 +83,12 @@ const teamPlans: Plan[] = [
 ];
 
 const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
+  const defaultRazorpayKeyId = 'rzp_live_SJfxhwyl0mfTHg';
   const razorpayKeyId =
     import.meta.env.VITE_RAZORPAY_KEY_ID ||
     import.meta.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
-    import.meta.env.RAZORPAY_KEY_ID;
+    import.meta.env.RAZORPAY_KEY_ID ||
+    defaultRazorpayKeyId;
 
   const loadRazorpayScript = async () => {
     if (window.Razorpay) {
