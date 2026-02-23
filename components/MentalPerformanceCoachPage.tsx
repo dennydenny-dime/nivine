@@ -173,10 +173,21 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 const average = (values: number[]) => (values.length ? values.reduce((acc, value) => acc + value, 0) / values.length : 0);
 const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const countTokens = (text: string, tokens: string[]) => {
   const normalized = text.toLowerCase();
-  return tokens.reduce((total, token) => total + normalized.split(token).length - 1, 0);
+  return tokens.reduce((total, token) => {
+    const phrase = token.trim().toLowerCase();
+    if (!phrase) return total;
+
+    const pattern = phrase.includes(' ')
+      ? `(^|[^a-z0-9])${escapeRegExp(phrase)}(?=$|[^a-z0-9])`
+      : `\\b${escapeRegExp(phrase)}\\b`;
+
+    const matches = normalized.match(new RegExp(pattern, 'g'));
+    return total + (matches?.length || 0);
+  }, 0);
 };
 
 const getStoredSummaries = (): SessionSummary[] => {
@@ -188,7 +199,13 @@ const getStoredSummaries = (): SessionSummary[] => {
   }
 };
 
-const analyzeResponse = (text: string, latencySec: number, micLevel: number, videoSignals?: VideoFrameSignals | null): RealtimeSignals => {
+const analyzeResponse = (
+  text: string,
+  latencySec: number,
+  micLevel: number,
+  modeBasePressure: number,
+  videoSignals?: VideoFrameSignals | null
+): RealtimeSignals => {
   const words = wordCount(text);
   const fillers = countTokens(text, [' um ', ' uh ', ' like ', ' you know ', ' actually ']);
   const claimHits = countTokens(text, ['i believe', 'my claim', 'core point']);
@@ -201,6 +218,8 @@ const analyzeResponse = (text: string, latencySec: number, micLevel: number, vid
 
   const structureCoverage = claimHits + reasonHits + exampleHits + conclusionHits;
   const pressureFromLatency = clamp((latencySec - 1.2) * 30, 0, 100);
+  const pressureBaseline = clamp(modeBasePressure * 0.85, 0, 100);
+  const totalPressure = clamp((pressureFromLatency * 0.65) + (pressureBaseline * 0.35));
   const verbosity = clamp((words - 90) * 1.4, 0, 100);
 
   const logicalCoherence = clamp(68 + structureCoverage * 7 - contradictions * 8 - circularHits * 12 - switches * 6);
@@ -215,15 +234,15 @@ const analyzeResponse = (text: string, latencySec: number, micLevel: number, vid
   const jawTensionProxy = videoSignals?.jawTensionProxy ?? 40;
   const postureStability = videoSignals?.postureStability ?? 58;
 
-  const tremor = clamp(20 + pressureFromLatency * 0.52 + micLevel * 0.28 + (100 - frameStability) * 0.24);
-  const speakingVariance = clamp(20 + (words > 120 ? 45 : words > 80 ? 26 : 8) + pressureFromLatency * 0.35);
+  const tremor = clamp(18 + totalPressure * 0.52 + micLevel * 0.28 + (100 - frameStability) * 0.24);
+  const speakingVariance = clamp(20 + (words > 120 ? 45 : words > 80 ? 26 : 8) + totalPressure * 0.35);
 
-  const emotionalStability = clamp(74 - pressureFromLatency * 0.4 - tremor * 0.22 + postureStability * 0.2 + gazeFocus * 0.12);
-  const pressureResistance = clamp(74 - pressureFromLatency * 0.4 - contradictions * 5 + structureCoverage * 3);
+  const emotionalStability = clamp(74 - totalPressure * 0.4 - tremor * 0.22 + postureStability * 0.2 + gazeFocus * 0.12);
+  const pressureResistance = clamp(74 - totalPressure * 0.4 - contradictions * 5 + structureCoverage * 3);
 
-  const eyeContact = clamp(30 + gazeFocus * 0.48 + faceCentering * 0.36 - pressureFromLatency * 0.25 - fillers * 3.5);
-  const blinkShift = clamp(12 + pressureFromLatency * 0.45 + blinkProxy * 0.58);
-  const freezeResponse = clamp(18 + pressureFromLatency * 0.5 + contradictions * 4 + (100 - frameStability) * 0.45);
+  const eyeContact = clamp(30 + gazeFocus * 0.48 + faceCentering * 0.36 - totalPressure * 0.25 - fillers * 3.5);
+  const blinkShift = clamp(12 + totalPressure * 0.45 + blinkProxy * 0.58);
+  const freezeResponse = clamp(18 + totalPressure * 0.5 + contradictions * 4 + (100 - frameStability) * 0.45);
 
   return {
     hesitationLatency: Number(latencySec.toFixed(2)),
@@ -241,23 +260,23 @@ const analyzeResponse = (text: string, latencySec: number, micLevel: number, vid
     pitchStability: clamp(100 - tremor),
     voiceTremor: tremor,
     speakingSpeedVariance: speakingVariance,
-    volumeFluctuation: clamp(18 + pressureFromLatency * 0.5 + micLevel * 0.2),
-    breathIrregularity: clamp(20 + pressureFromLatency * 0.45 + verbosity * 0.18),
-    paceAcceleration: clamp(22 + pressureFromLatency * 0.5),
-    voiceCrackRisk: clamp(14 + pressureFromLatency * 0.4 + micLevel * 0.25),
+    volumeFluctuation: clamp(18 + totalPressure * 0.5 + micLevel * 0.2),
+    breathIrregularity: clamp(20 + totalPressure * 0.45 + verbosity * 0.18),
+    paceAcceleration: clamp(22 + totalPressure * 0.5),
+    voiceCrackRisk: clamp(14 + totalPressure * 0.4 + micLevel * 0.25),
     emotionalStability,
     pressureResistance,
-    confidenceDrift: clamp(36 + pressureFromLatency * 0.4 - structuredThinking * 0.18),
+    confidenceDrift: clamp(36 + totalPressure * 0.4 - structuredThinking * 0.18),
     eyeContactConsistency: eyeContact,
     blinkRateShift: blinkShift,
-    headMovementInstability: clamp(16 + pressureFromLatency * 0.28 + (100 - frameStability) * 0.5),
-    jawTension: clamp(16 + pressureFromLatency * 0.22 + jawTensionProxy * 0.65),
-    lipCompression: clamp(14 + pressureFromLatency * 0.28 + jawTensionProxy * 0.45),
-    microHesitation: clamp(28 + pressureFromLatency * 0.62),
-    facialAsymmetryStress: clamp(16 + pressureFromLatency * 0.34 + (100 - faceCentering) * 0.4),
+    headMovementInstability: clamp(16 + totalPressure * 0.28 + (100 - frameStability) * 0.5),
+    jawTension: clamp(16 + totalPressure * 0.22 + jawTensionProxy * 0.65),
+    lipCompression: clamp(14 + totalPressure * 0.28 + jawTensionProxy * 0.45),
+    microHesitation: clamp(28 + totalPressure * 0.62),
+    facialAsymmetryStress: clamp(16 + totalPressure * 0.34 + (100 - faceCentering) * 0.4),
     freezeResponse,
     nonVerbalStability: clamp((eyeContact * 0.4 + (100 - blinkShift) * 0.2 + (100 - freezeResponse) * 0.2 + postureStability * 0.2)),
-    cognitiveOverload: clamp((verbosity + pressureFromLatency + switches * 10 + (100 - postureStability) * 0.6) / 2.8)
+    cognitiveOverload: clamp((verbosity + totalPressure + switches * 10 + (100 - postureStability) * 0.6) / 2.8)
   };
 };
 
@@ -334,8 +353,8 @@ const MentalPerformanceCoachPage: React.FC = () => {
   const liveRuntimeSignals = useMemo(() => {
     if (!sessionActive || !lastPromptAt) return null;
     const latencyNow = Math.max((Date.now() - lastPromptAt) / 1000, 0);
-    return analyzeResponse(draft.trim(), latencyNow, micLevel, videoSignals);
-  }, [sessionActive, lastPromptAt, draft, micLevel, videoSignals]);
+    return analyzeResponse(draft.trim(), latencyNow, micLevel, config.basePressure, videoSignals);
+  }, [sessionActive, lastPromptAt, draft, micLevel, videoSignals, config.basePressure]);
 
   useEffect(() => {
     return () => {
@@ -492,7 +511,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
     const now = Date.now();
     const latencySec = (now - lastPromptAt) / 1000;
     const snapshot = { ...videoSignals };
-    const signals = analyzeResponse(draft.trim(), latencySec, micLevel, snapshot);
+    const signals = analyzeResponse(draft.trim(), latencySec, micLevel, config.basePressure, snapshot);
     setLatestSignals(signals);
 
     setTurns((prev) => [
@@ -528,9 +547,9 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
     const endedAt = Date.now();
     const userTurns = turns.filter((turn) => turn.role === 'user');
-    const fallbackSignal = latestSignals || analyzeResponse(draft.trim(), runtimeLatency || 0.8, micLevel, videoSignals);
+    const fallbackSignal = latestSignals || analyzeResponse(draft.trim(), runtimeLatency || 0.8, micLevel, config.basePressure, videoSignals);
     const userSignals = userTurns.length
-      ? userTurns.map((turn) => turn.signals || analyzeResponse(turn.text, turn.latencySec || 0, turn.micLevel || micLevel, turn.videoSnapshot))
+      ? userTurns.map((turn) => turn.signals || analyzeResponse(turn.text, turn.latencySec || 0, turn.micLevel || micLevel, config.basePressure, turn.videoSnapshot))
       : [fallbackSignal];
 
     const avgLatency = userTurns.length ? average(userTurns.map((turn) => turn.latencySec || 0)) : fallbackSignal.hesitationLatency;
