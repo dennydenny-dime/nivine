@@ -345,7 +345,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-900 mt-auto">
-        &copy; 2024 Synapse AI. All rights reserved.
+        &copy; 2026 Synapse AI. All rights reserved.
       </footer>
     </div>
   );
