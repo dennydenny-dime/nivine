@@ -9,6 +9,8 @@ import { decode, decodeAudioData, blobToBase64 } from '../utils/audioUtils';
 interface ConversationRoomProps {
   persona: Persona;
   onExit: () => void;
+  maxDurationMinutes?: number;
+  onSessionLimitReached?: () => void;
 }
 
 
@@ -133,12 +135,13 @@ const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechSco
   };
 };
 
-const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) => {
+const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, maxDurationMinutes = 3, onSessionLimitReached }) => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
+  const [remainingSeconds, setRemainingSeconds] = useState(maxDurationMinutes * 60);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -208,6 +211,34 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         console.error("Language switch failed", e);
       }
     }
+  };
+
+  useEffect(() => {
+    setRemainingSeconds(maxDurationMinutes * 60);
+  }, [maxDurationMinutes]);
+
+  useEffect(() => {
+    if (isConnecting) return;
+
+    const timer = window.setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          onSessionLimitReached?.();
+          handleSaveAndExit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isConnecting, handleSaveAndExit, onSessionLimitReached]);
+
+  const formatTimeRemaining = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
   };
 
   useEffect(() => {
@@ -453,6 +484,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             <div className="flex flex-wrap gap-2 mt-1">
               <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-black uppercase tracking-widest">Neural Feed: Active</span>
               <span className="text-[8px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-black uppercase">Intensity: {persona.difficultyLevel}/10</span>
+              <span className="text-[8px] bg-indigo-500/10 text-indigo-200 px-2 py-0.5 rounded border border-indigo-500/30 font-black uppercase">Time Left: {formatTimeRemaining(remainingSeconds)}</span>
             </div>
           </div>
         </div>
