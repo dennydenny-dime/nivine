@@ -17,6 +17,7 @@ type Plan = {
   value: string;
   cta: string;
   href?: string;
+  fallbackHref?: string;
   razorpayAmount?: number;
   razorpayCurrency?: string;
   razorpayDescription?: string;
@@ -45,6 +46,7 @@ const individualPlans: Plan[] = [
     razorpayAmount: 2000,
     razorpayCurrency: 'USD',
     razorpayDescription: 'Premium monthly subscription',
+    fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Premium%20Plan',
   },
   {
     label: 'Elite — $25/mo',
@@ -53,6 +55,7 @@ const individualPlans: Plan[] = [
     razorpayAmount: 2500,
     razorpayCurrency: 'USD',
     razorpayDescription: 'Elite monthly subscription',
+    fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Elite%20Plan',
   },
 ];
 
@@ -93,8 +96,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
   const openRazorpayCheckout = async (plan: Plan) => {
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded || !window.Razorpay || !plan.razorpayAmount || !razorpayKeyId) {
-      window.alert('Unable to load payment gateway right now. Please try again.');
-      return;
+      return false;
     }
 
     const razorpay = new window.Razorpay({
@@ -116,11 +118,17 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     });
 
     razorpay.open();
+    return true;
   };
 
   const handleBuyClick = async (plan: Plan) => {
     if (plan.razorpayAmount) {
-      await openRazorpayCheckout(plan);
+      const checkoutOpened = await openRazorpayCheckout(plan);
+      if (!checkoutOpened) {
+        const fallbackHref = plan.fallbackHref ?? 'mailto:sales@synapseai.app?subject=Payment%20Support';
+        window.alert('Online checkout is temporarily unavailable. You will be redirected so we can help you complete your purchase.');
+        window.location.href = fallbackHref;
+      }
       return;
     }
 
