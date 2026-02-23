@@ -22,6 +22,8 @@ type Plan = {
   razorpayDescription?: string;
 };
 
+type PaymentMethod = 'paypal' | 'upi' | 'netbanking';
+
 const individualPlans: Plan[] = [
   {
     label: 'Free',
@@ -79,7 +81,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     });
   };
 
-  const openRazorpayCheckout = async (plan: Plan) => {
+  const openRazorpayCheckout = async (plan: Plan, method: Exclude<PaymentMethod, 'paypal'>) => {
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded || !window.Razorpay || !plan.razorpayAmount) {
       window.alert('Unable to load payment gateway right now. Please try again.');
@@ -87,11 +89,17 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     }
 
     const razorpay = new window.Razorpay({
-      key: 'rzp_live_SJfxhwyl0mfTHg',
+      key: 'AzRJvcvr2tEyuRMZS31RFKjZ',
       amount: plan.razorpayAmount,
       currency: plan.razorpayCurrency ?? 'USD',
       name: 'Synapse AI',
       description: plan.razorpayDescription ?? plan.label,
+      method: {
+        card: false,
+        upi: method === 'upi',
+        netbanking: method === 'netbanking',
+        wallet: false,
+      },
       handler: () => {
         window.alert('Payment successful! We will activate your plan shortly.');
       },
@@ -103,9 +111,24 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     razorpay.open();
   };
 
-  const handleBuyClick = async (plan: Plan) => {
+  const openPayPalCheckout = (plan: Plan) => {
+    if (!plan.razorpayAmount) {
+      return;
+    }
+
+    const amountInUsd = (plan.razorpayAmount / 100).toFixed(2);
+    const paypalCheckoutUrl = `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=sales@synapseai.app&item_name=${encodeURIComponent(plan.label)}&amount=${amountInUsd}&currency_code=USD`;
+    window.open(paypalCheckoutUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleBuyClick = async (plan: Plan, method?: PaymentMethod) => {
+    if (method === 'paypal') {
+      openPayPalCheckout(plan);
+      return;
+    }
+
     if (plan.razorpayAmount) {
-      await openRazorpayCheckout(plan);
+      await openRazorpayCheckout(plan, method ?? 'upi');
       return;
     }
 
@@ -152,6 +175,29 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                 >
                   {plan.cta}
                 </button>
+
+                {plan.razorpayAmount && (
+                  <div className="md:col-span-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => void handleBuyClick(plan, 'paypal')}
+                      className="px-3 py-1.5 rounded-md border border-sky-400/50 text-sky-300 hover:bg-sky-500/10 transition-colors text-sm font-medium"
+                    >
+                      Pay with PayPal
+                    </button>
+                    <button
+                      onClick={() => void handleBuyClick(plan, 'upi')}
+                      className="px-3 py-1.5 rounded-md border border-cyan-400/50 text-cyan-300 hover:bg-cyan-500/10 transition-colors text-sm font-medium"
+                    >
+                      Pay with UPI/BHIM
+                    </button>
+                    <button
+                      onClick={() => void handleBuyClick(plan, 'netbanking')}
+                      className="px-3 py-1.5 rounded-md border border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/10 transition-colors text-sm font-medium"
+                    >
+                      Pay with Net Banking
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
