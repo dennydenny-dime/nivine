@@ -10,6 +10,7 @@ import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
 import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
+import PersonalDashboard from './components/PersonalDashboard';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -31,7 +32,8 @@ enum View {
   PRICING = 'pricing',
   LEADERBOARD = 'leaderboard',
   CUSTOM_COACH = 'custom_coach',
-  MENTAL_PERFORMANCE = 'mental_performance'
+  MENTAL_PERFORMANCE = 'mental_performance',
+  PERSONAL_DASHBOARD = 'personal_dashboard'
 }
 
 type NavItem = {
@@ -188,6 +190,10 @@ const App: React.FC = () => {
     setCurrentView(View.MENTAL_PERFORMANCE);
   };
 
+  const openPersonalDashboard = () => {
+    setCurrentView(View.PERSONAL_DASHBOARD);
+  };
+
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
@@ -266,10 +272,14 @@ const App: React.FC = () => {
                 )}
               </button>
 
-              <div className="flex items-center gap-2 bg-slate-900 rounded-full pl-1 pr-3 py-1 border border-slate-800">
+              <button
+                onClick={openPersonalDashboard}
+                className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border transition ${currentView === View.PERSONAL_DASHBOARD ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800'}`}
+                title="Open personal dashboard"
+              >
                 <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
                 <span className="text-xs font-bold hidden sm:inline">{currentUser.name}</span>
-              </div>
+              </button>
 
               <button
                 onClick={handleLogout}
@@ -298,7 +308,11 @@ const App: React.FC = () => {
 
       <main className={`pt-40 md:pt-36 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
         {currentView === View.LANDING && (
-          <LandingPage onEnterApp={openApp} currentUser={currentUser} />
+          <LandingPage onEnterApp={openApp} />
+        )}
+
+        {currentView === View.PERSONAL_DASHBOARD && (
+          <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />
         )}
 
         {currentView === View.APP && (
