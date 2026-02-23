@@ -14,6 +14,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
 
   const syncToLeaderboardPool = (user: User) => {
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
@@ -38,18 +39,25 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
     setLoading(true);
     setAuthError(null);
+    setAuthMessage(null);
 
     try {
-      const session = isLogin
+      const response = isLogin
         ? await signInWithEmail(email, password)
         : await signUpWithEmail(email, password, name);
 
-      if (!session.user) {
+      if (!response.user) {
         throw new Error('Unable to fetch user details from Supabase.');
       }
 
-      saveSession(session);
-      const user = mapSupabaseUser(session.user);
+      if (!response.access_token || !response.refresh_token) {
+        setAuthMessage('Sign-up succeeded. Please verify your email, then sign in.');
+        setIsLogin(true);
+        return;
+      }
+
+      saveSession(response);
+      const user = mapSupabaseUser(response.user);
       syncToLeaderboardPool(user);
       onLogin(user);
     } catch (error) {
@@ -61,6 +69,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   const handleGoogleSignIn = async () => {
     setAuthError(null);
+    setAuthMessage(null);
     try {
       window.location.href = getGoogleOAuthUrl();
     } catch (error) {
@@ -132,6 +141,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
               placeholder="••••••••"
             />
           </div>
+
+          {authMessage && (
+            <p className="text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">{authMessage}</p>
+          )}
 
           {authError && (
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{authError}</p>
