@@ -27,9 +27,6 @@ const RAZORPAY_PAYMENT_METHODS: Record<string, boolean> = {
   card: true,
   netbanking: true,
   upi: true,
-  wallet: true,
-  emi: true,
-  paylater: true,
 };
 
 const individualPlans: Plan[] = [
@@ -44,7 +41,7 @@ const individualPlans: Plan[] = [
     value: '30 calls · 10 mins each · All neural modules + quizzes + unlimited custom coaches',
     cta: 'Buy Premium',
     razorpayAmount: 2000,
-    razorpayCurrency: 'USD',
+    razorpayCurrency: 'INR',
     razorpayDescription: 'Premium monthly subscription',
     fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Premium%20Plan',
   },
@@ -53,7 +50,7 @@ const individualPlans: Plan[] = [
     value: 'All features included',
     cta: 'Buy Elite',
     razorpayAmount: 2500,
-    razorpayCurrency: 'USD',
+    razorpayCurrency: 'INR',
     razorpayDescription: 'Elite monthly subscription',
     fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Elite%20Plan',
   },
@@ -64,7 +61,10 @@ const teamPlans: Plan[] = [
     label: 'Team — $299/mo',
     value: '25 members · 150 calls · 15 mins each · All features included',
     cta: 'Buy Team',
-    href: 'mailto:sales@synapseai.app?subject=Buy%20Team%20Plan',
+    razorpayAmount: 29900,
+    razorpayCurrency: 'INR',
+    razorpayDescription: 'Team monthly subscription',
+    fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Team%20Plan',
   },
 ];
 
@@ -110,7 +110,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
       description: plan.razorpayDescription ?? plan.label,
       method: RAZORPAY_PAYMENT_METHODS,
       notes: {
-        availablePaymentOptions: 'Cards, Netbanking, UPI, Wallet, EMI, Pay Later (PayPal via supported cards)',
+        availablePaymentOptions: 'Cards, Net Banking, and BHIM/UPI',
       },
       handler: () => {
         window.alert('Payment successful! We will activate your plan shortly.');
