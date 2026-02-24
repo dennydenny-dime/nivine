@@ -23,3 +23,13 @@ View your app in AI Studio: https://ai.studio/apps/drive/1ubcYEKoruC1u0ihSS6ovuh
 4. Restart the dev server after updating env vars so Vite picks up the new values.
 5. Run the app:
    `npm run dev`
+
+## Voice workflow for neural modules
+
+All neural training modules now follow this loop:
+
+`User Voice → Browser STT (Web Speech API) → Frontend sends transcript to Backend → Backend calls Gemini REST API → Backend returns AI text → Frontend TTS speaks response → Listening restarts`
+
+To use your own backend, set `VITE_BACKEND_API_URL` (example: `http://localhost:3000/api`).
+The frontend posts to `<VITE_BACKEND_API_URL>/chat` (or `/api/chat` when the env var is omitted) with transcript + persona metadata.
+
