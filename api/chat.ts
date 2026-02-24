@@ -50,6 +50,7 @@ const buildPrompt = (body: any): string => {
     '',
     'Hard constraints:',
     '- Stay in character for the assigned persona role.',
+    '- Keep a professional, fluent speaking style with confident pacing and no filler phrasing.',
     '- Respond with natural spoken-language coaching, not markdown.',
     '- Keep response to 2-5 concise sentences.',
     '- If user response is weak/vague, ask one pointed follow-up question.',
