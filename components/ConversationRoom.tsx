@@ -178,7 +178,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1;
+      utterance.rate = 1.12;
       utterance.pitch = 1;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => {
