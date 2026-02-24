@@ -20,6 +20,24 @@ const LIVE_MODEL_CANDIDATES = [
 ];
 const MAX_RECONNECT_ATTEMPTS = 4;
 
+const formatConnectionError = (errMsg: string): string => {
+  const normalized = errMsg.toLowerCase();
+
+  if (normalized.includes('permission') || normalized.includes('notallowederror') || normalized.includes('microphone')) {
+    return 'Microphone access is blocked. Please allow microphone permissions and retry the neural link.';
+  }
+
+  if (normalized.includes('api key') || normalized.includes('unauthorized') || normalized.includes('authentication')) {
+    return 'Authentication failed. Verify your Gemini API key in environment configuration and try again.';
+  }
+
+  if (normalized.includes('model') && (normalized.includes('not found') || normalized.includes('unsupported'))) {
+    return 'The selected live model is unavailable for this project. Please retry to connect using a fallback model.';
+  }
+
+  return 'Synapse Error: The link was severed unexpectedly. Please check your signal and try again.';
+};
+
 const clampScore = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
 interface RolePlaybook {
@@ -141,6 +159,7 @@ const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechSco
 
 const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) => {
   const [isConnecting, setIsConnecting] = useState(true);
+  const [sessionSeed, setSessionSeed] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -303,7 +322,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         if (intentionalShutdownRef.current) return;
 
         if (!shouldReconnect(errMsg) || reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
-          setError('Synapse Error: The link was severed unexpectedly. Please check your signal and try again.');
+          setError(formatConnectionError(errMsg));
           return;
         }
 
@@ -477,13 +496,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           initSession(attempt + 1);
           return;
         }
-        setError("Could not establish neural link. Ensure microphone access is granted and your API key is configured correctly.");
+        setError(formatConnectionError(err?.message || err?.toString() || ''));
       }
     };
 
     initSession();
     return cleanup;
-  }, [persona, cleanup, resetRealtimeResources]);
+  }, [persona, cleanup, resetRealtimeResources, sessionSeed]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -499,6 +518,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           <h3 className="text-xl font-bold text-white mb-2">Neural Link Failed</h3>
           <p className="text-slate-400 text-sm mb-6 leading-relaxed">{error}</p>
           <div className="flex flex-col gap-3">
+            <button
+              onClick={() => {
+                setError(null);
+                setSessionSeed((value) => value + 1);
+              }}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all shadow-lg text-white"
+            >
+              Retry Connection
+            </button>
             <button onClick={onExit} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all shadow-lg text-white">
               Return to Labs
             </button>
