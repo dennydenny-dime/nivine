@@ -373,6 +373,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         }, retryDelay);
       };
 
+      const preferredMimeType = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+
+      if (!preferredMimeType) {
+        setError('This browser does not support WebM/Opus recording required for low-latency neural STT.');
+        return;
+      }
+
       const sessionPromise = ai.live.connect({
         model: modelName,
         config: {
@@ -410,47 +419,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           inputAudioTranscription: {},
         },
         callbacks: {
-          onopen: () => {
-            reconnectAttemptRef.current = 0;
-            modelAttemptRef.current = 0;
-            setError(null);
-            setIsConnecting(false);
-
-            const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-              ? 'audio/webm;codecs=opus'
-              : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
-
-            if (!preferredMimeType) {
-              setError('This browser does not support WebM/Opus recording required for low-latency neural STT.');
-              return;
-            }
-
-            const recorder = new MediaRecorder(stream, {
-              mimeType: preferredMimeType,
-              audioBitsPerSecond: 24000,
-            });
-            mediaRecorderRef.current = recorder;
-
-            recorder.ondataavailable = (event) => {
-              if (!event.data || event.data.size === 0) return;
-              sessionPromise.then(async (s) => {
-                try {
-                  const base64 = await blobToBase64(event.data);
-                  s.sendRealtimeInput({
-                    media: {
-                      data: base64,
-                      mimeType: preferredMimeType,
-                    },
-                  });
-                } catch (err) {
-                  console.warn('Input chunk dropped:', err);
-                }
-              });
-            };
-
-            // Send compact 300ms chunks for faster STT + response turnaround.
-            recorder.start(300);
-          },
           onmessage: async (message: LiveServerMessage) => {
             if (message.serverContent?.outputTranscription) {
               transcriptionRef.current.output += message.serverContent.outputTranscription.text;
@@ -516,7 +484,36 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         }
       });
 
-      sessionRef.current = await sessionPromise;
+      const session = await sessionPromise;
+      sessionRef.current = session;
+      reconnectAttemptRef.current = 0;
+      modelAttemptRef.current = 0;
+      setError(null);
+      setIsConnecting(false);
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: preferredMimeType,
+        audioBitsPerSecond: 24000,
+      });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = async (event) => {
+        if (!event.data || event.data.size === 0) return;
+        try {
+          const base64 = await blobToBase64(event.data);
+          session.sendRealtimeInput({
+            media: {
+              data: base64,
+              mimeType: preferredMimeType,
+            },
+          });
+        } catch (err) {
+          console.warn('Input chunk dropped:', err);
+        }
+      };
+
+      // Send compact 300ms chunks for faster STT + response turnaround.
+      recorder.start(300);
     };
     modelAttemptRef.current = 0;
     initSession();
