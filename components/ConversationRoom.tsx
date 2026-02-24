@@ -180,8 +180,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const modelAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const intentionalShutdownRef = useRef(false);
+  const isRealtimeSessionActiveRef = useRef(false);
+  const isReconnectScheduledRef = useRef(false);
 
   const resetRealtimeResources = useCallback(() => {
+    isRealtimeSessionActiveRef.current = false;
     if (sessionRef.current) {
       try { sessionRef.current.close(); } catch(e) {}
       sessionRef.current = null;
@@ -217,6 +220,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
+    isReconnectScheduledRef.current = false;
     resetRealtimeResources();
   }, [resetRealtimeResources]);
 
@@ -270,6 +274,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     async function initSession(attempt: number = modelAttemptRef.current) {
       try {
         intentionalShutdownRef.current = false;
+        isReconnectScheduledRef.current = false;
         resetRealtimeResources();
         setIsConnecting(true);
         modelAttemptRef.current = Math.min(attempt, LIVE_MODEL_CANDIDATES.length - 1);
@@ -355,8 +360,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       const scheduleReconnect = (errMsg: string) => {
         if (intentionalShutdownRef.current) return;
+        if (isReconnectScheduledRef.current) return;
+
+        isRealtimeSessionActiveRef.current = false;
 
         if (isModelUnavailableError(errMsg) && modelAttemptRef.current + 1 < LIVE_MODEL_CANDIDATES.length) {
+          isReconnectScheduledRef.current = true;
           modelAttemptRef.current += 1;
           reconnectAttemptRef.current = 0;
           setError(null);
@@ -370,6 +379,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         }
 
         reconnectAttemptRef.current += 1;
+        isReconnectScheduledRef.current = true;
         resetRealtimeResources();
         const retryDelay = Math.min(5000, reconnectAttemptRef.current * 1200);
         setIsConnecting(true);
@@ -377,6 +387,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         reconnectTimerRef.current = window.setTimeout(() => {
           if (intentionalShutdownRef.current) return;
+          isReconnectScheduledRef.current = false;
           initSession(modelAttemptRef.current);
         }, retryDelay);
       };
@@ -496,6 +507,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       const session = await sessionPromise;
       sessionRef.current = session;
+      isRealtimeSessionActiveRef.current = true;
       reconnectAttemptRef.current = 0;
       setError(null);
       setIsConnecting(false);
@@ -508,9 +520,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       recorder.ondataavailable = async (event) => {
         if (!event.data || event.data.size === 0) return;
+        if (!isRealtimeSessionActiveRef.current || !sessionRef.current) return;
+
         try {
           const base64 = await blobToBase64(event.data);
-          session.sendRealtimeInput({
+          if (!isRealtimeSessionActiveRef.current || !sessionRef.current) return;
+
+          sessionRef.current.sendRealtimeInput({
             media: {
               data: base64,
               mimeType: preferredMimeType,
