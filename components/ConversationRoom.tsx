@@ -19,6 +19,7 @@ const LIVE_MODEL_CANDIDATES = [
   'gemini-2.5-flash-native-audio-preview-12-2025',
 ];
 const MAX_RECONNECT_ATTEMPTS = 4;
+const MIME_TYPE_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
 
 const formatConnectionError = (errMsg: string): string => {
   const normalized = errMsg.toLowerCase();
@@ -288,6 +289,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       const apiKey = getSystemApiKey();
       if (!apiKey) {
         setError("Environment Config Error: No API key found. Set one of: VITE_API_KEY, GEMINI_API_KEY, or REACT_APP_API_KEY.");
+        setIsConnecting(false);
         return;
       }
 
@@ -297,6 +299,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       outputNodeRef.current = outputAudioContextRef.current.createGain();
       outputNodeRef.current.connect(outputAudioContextRef.current.destination);
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('This browser cannot access microphone input required for neural training modules.');
+        setIsConnecting(false);
+        return;
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -369,16 +377,18 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         reconnectTimerRef.current = window.setTimeout(() => {
           if (intentionalShutdownRef.current) return;
-          initSession(reconnectAttemptRef.current);
+          initSession(modelAttemptRef.current);
         }, retryDelay);
       };
 
-      const preferredMimeType = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+      const preferredMimeType =
+        typeof MediaRecorder !== 'undefined'
+          ? MIME_TYPE_CANDIDATES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || ''
+          : '';
 
       if (!preferredMimeType) {
-        setError('This browser does not support WebM/Opus recording required for low-latency neural STT.');
+        setError('This browser does not support live microphone capture (WebM/MP4) required for neural STT.');
+        setIsConnecting(false);
         return;
       }
 
@@ -487,7 +497,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       const session = await sessionPromise;
       sessionRef.current = session;
       reconnectAttemptRef.current = 0;
-      modelAttemptRef.current = 0;
       setError(null);
       setIsConnecting(false);
 
