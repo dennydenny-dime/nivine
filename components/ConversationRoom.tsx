@@ -1,94 +1,40 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
-import { COMMON_LANGUAGES, getBackendApiBaseUrl } from '../constants';
 import { setUserConversationHistory, getUserConversationHistory } from '../lib/userStorage';
+import { hasPaidSubscription, isAdminEmail } from '../lib/subscription';
 
 interface ConversationRoomProps {
   persona: Persona;
   onExit: () => void;
 }
 
-type SpeechRecognitionCtor = new () => SpeechRecognition;
+type SessionState = 'Idle' | 'Listening' | 'Thinking' | 'Speaking' | 'Ended';
 
-declare global {
-  interface Window {
-    webkitSpeechRecognition?: SpeechRecognitionCtor;
-    SpeechRecognition?: SpeechRecognitionCtor;
-  }
+type RoleOption =
+  | 'Executive Recruiter'
+  | 'Angel Investor'
+  | 'Salesman'
+  | 'Strict Academic Supervisor'
+  | 'Company Manager';
 
-  interface SpeechRecognitionEvent extends Event {
-    readonly resultIndex: number;
-    readonly results: SpeechRecognitionResultList;
-  }
+const ROLE_INSTRUCTIONS: Record<RoleOption, string> = {
+  'Executive Recruiter': 'You are an Executive Recruiter. Be formal, professional, and concise. Ask competency-based interview questions and require measurable examples.',
+  'Angel Investor': 'You are an Angel Investor. Be challenging, analytical, and probing. Pressure-test assumptions, traction, market size, and unit economics.',
+  Salesman: 'You are a Salesman. Be energetic, persuasive, and conversational. Push for strong value articulation, objection handling, and clear closes.',
+  'Strict Academic Supervisor': 'You are a Strict Academic Supervisor. Be serious, critical, and analytical. Challenge weak arguments and require precise evidence.',
+  'Company Manager': 'You are a Company Manager. Be practical, professional, and structured. Focus on prioritization, accountability, and execution clarity.',
+};
 
-  interface SpeechRecognitionErrorEvent extends Event {
-    readonly error: string;
-    readonly message: string;
-  }
-}
+const ROLE_QUESTION_LIMIT: Record<RoleOption, number> = {
+  'Executive Recruiter': 6,
+  'Angel Investor': 8,
+  Salesman: 7,
+  'Strict Academic Supervisor': 6,
+  'Company Manager': 6,
+};
 
 const FILLER_WORDS = new Set(['um', 'uh', 'like', 'you know', 'actually', 'basically', 'literally', 'so']);
-
-interface RolePlaybook {
-  keywords: string[];
-  directives: string[];
-}
-
-const ROLE_PLAYBOOKS: RolePlaybook[] = [
-  {
-    keywords: ['executive recruiter', 'recruiter', 'talent acquisition', 'headhunter'],
-    directives: [
-      'Run the conversation like a structured interview with competency-based questions and targeted follow-ups.',
-      'Evaluate evidence for ownership, leadership, execution quality, and impact using concrete examples.',
-      'Challenge vague claims and request measurable outcomes, scope, and personal contribution.',
-    ],
-  },
-  {
-    keywords: ['angel investor', 'investor', 'venture capitalist', 'vc'],
-    directives: [
-      'Evaluate startup fundamentals: problem clarity, market size, business model, moat, and go-to-market strategy.',
-      'Pressure-test assumptions around traction, unit economics, burn runway, and scalability risks.',
-      'Demand concise, data-backed answers and explicit prioritization of milestones and funding use.',
-    ],
-  },
-  {
-    keywords: ['salesman', 'sales', 'account executive', 'business development'],
-    directives: [
-      'Operate as a high-performing sales professional focused on discovery, qualification, and clear next-step commitments.',
-      'Surface objections directly, test value articulation, and enforce clarity on ROI, pricing, and implementation risk.',
-      'Coach on consultative selling behaviors: active listening, pain quantification, and confident closes.',
-    ],
-  },
-  {
-    keywords: ['strict academic supervisor', 'academic', 'professor', 'supervisor'],
-    directives: [
-      'Assess argument quality with academic rigor: thesis clarity, logical structure, evidence quality, and citation discipline.',
-      'Challenge unsupported statements immediately and require precise terminology and methodological consistency.',
-      'Provide strict, standards-based feedback that distinguishes between acceptable, strong, and publication-level responses.',
-    ],
-  },
-  {
-    keywords: ['company manager', 'manager', 'team lead', 'director'],
-    directives: [
-      'Focus on managerial excellence: prioritization, delegation, accountability, and stakeholder alignment.',
-      'Require clear trade-off reasoning, timeline ownership, and decision quality under constraints.',
-      'Coach for executive communication: concise updates, risk visibility, and measurable outcomes.',
-    ],
-  },
-];
-
-const getRoleDirectives = (role: string): string[] => {
-  const normalizedRole = role.toLowerCase();
-  const matchedPlaybook = ROLE_PLAYBOOKS.find(({ keywords }) =>
-    keywords.some((keyword) => normalizedRole.includes(keyword)),
-  );
-
-  return matchedPlaybook?.directives || [
-    'Stay strictly aligned with your stated profession and evaluate communication through that professional lens.',
-    'Use domain-appropriate standards, vocabulary, and decision criteria in every response.',
-    'If user responses are generic, request specifics and concrete evidence before giving credit.',
-  ];
-};
+const GEMINI_WS_ENDPOINT = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
 
 const clampScore = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
@@ -109,15 +55,8 @@ const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechSco
     }
   }
 
-  const averageWordsPerSentence = (() => {
-    const sentences = userTurns
-      .flatMap((turn) => turn.text.split(/[.!?]+/))
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (!sentences.length || !totalWords) return totalWords;
-    return totalWords / sentences.length;
-  })();
-
+  const sentences = userTurns.flatMap((turn) => turn.text.split(/[.!?]+/)).map((part) => part.trim()).filter(Boolean);
+  const averageWordsPerSentence = !sentences.length || !totalWords ? totalWords : totalWords / sentences.length;
   const avgWordsPerTurn = userTurns.length ? totalWords / userTurns.length : 0;
   const fillerDensity = totalWords ? (fillerCount / totalWords) * 100 : 0;
 
@@ -125,15 +64,6 @@ const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechSco
   const clarityScore = clampScore(100 - Math.abs(averageWordsPerSentence - 16) * 4);
   const concisenessScore = clampScore(100 - Math.max(avgWordsPerTurn - 28, 0) * 3);
   const overallScore = clampScore(confidenceScore * 0.35 + clarityScore * 0.35 + concisenessScore * 0.3);
-
-  const summary =
-    overallScore >= 85
-      ? 'High-performance communication. Your delivery was sharp, clear, and confident.'
-      : overallScore >= 70
-        ? 'Strong communication baseline. Tighten filler words and keep responses more concise for elite performance.'
-        : overallScore >= 55
-          ? 'Developing communication skill. Focus on clearer structure and reducing filler habits.'
-          : 'Needs improvement. Practice slower, structured responses with fewer fillers to build confidence.';
 
   return {
     overallScore,
@@ -144,332 +74,351 @@ const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechSco
     confidenceScore,
     clarityScore,
     concisenessScore,
-    summary,
+    summary: overallScore >= 70 ? 'Strong communication baseline.' : 'Continue structured speaking drills.',
   };
 };
 
+const downsampleTo16kPcm16 = (input: Float32Array, inputSampleRate: number): Int16Array => {
+  if (inputSampleRate === 16000) {
+    const pcm16 = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i += 1) {
+      const s = Math.max(-1, Math.min(1, input[i]));
+      pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return pcm16;
+  }
+
+  const ratio = inputSampleRate / 16000;
+  const newLength = Math.round(input.length / ratio);
+  const result = new Int16Array(newLength);
+
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+    let accum = 0;
+    let count = 0;
+
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < input.length; i += 1) {
+      accum += input[i];
+      count += 1;
+    }
+
+    const sample = count ? accum / count : 0;
+    const clamped = Math.max(-1, Math.min(1, sample));
+    result[offsetResult] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+    offsetResult += 1;
+    offsetBuffer = nextOffsetBuffer;
+  }
+
+  return result;
+};
+
+const base64FromInt16 = (pcm16: Int16Array): string => {
+  const bytes = new Uint8Array(pcm16.buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+};
+
 const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) => {
-  const [isConnecting, setIsConnecting] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [role, setRole] = useState<RoleOption>((Object.keys(ROLE_INSTRUCTIONS).includes(persona.role) ? persona.role : 'Executive Recruiter') as RoleOption);
+  const [sessionState, setSessionState] = useState<SessionState>('Idle');
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
+  const [sessionActive, setSessionActive] = useState(false);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const shouldListenRef = useRef(false);
-  const isHandlingTurnRef = useRef(false);
-  const restartTimeoutRef = useRef<number | null>(null);
-  const transcriptionsRef = useRef<TranscriptionItem[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const forcedStopRef = useRef(false);
+  const sessionTimerRef = useRef<number | null>(null);
+  const transcriptRef = useRef<TranscriptionItem[]>([]);
+  const questionCountRef = useRef(0);
+  const nextPlaybackAtRef = useRef(0);
 
-  const backendUrl = useMemo(() => {
-    const base = getBackendApiBaseUrl();
-    if (!base) return '/api/chat';
-    return `${base.replace(/\/$/, '')}/chat`;
+  const apiKey = useMemo(() => import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '', []);
+
+  const pushTranscript = useCallback((speaker: 'user' | 'ai', text: string) => {
+    const item: TranscriptionItem = { speaker, text, timestamp: Date.now() };
+    transcriptRef.current = [...transcriptRef.current, item];
+    setTranscriptions(transcriptRef.current);
   }, []);
 
-  const speak = useCallback((text: string) => {
-    return new Promise<void>((resolve) => {
-      if (!('speechSynthesis' in window)) {
-        resolve();
-        return;
-      }
-
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.12;
-      utterance.pitch = 1;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-      utterance.onerror = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-
-      window.speechSynthesis.speak(utterance);
-    });
+  const stopAudioPipeline = useCallback(() => {
+    processorRef.current?.disconnect();
+    sourceNodeRef.current?.disconnect();
+    processorRef.current = null;
+    sourceNodeRef.current = null;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      void audioCtxRef.current.close();
+    }
+    audioCtxRef.current = null;
   }, []);
 
-  const sendToBackend = useCallback(async (transcript: string): Promise<string> => {
-    const roleDirectives = getRoleDirectives(persona.role || '');
-    const payload = {
-      transcript,
-      language: currentLanguage,
-      persona,
-      roleDirectives,
-      history: transcriptionsRef.current.slice(-12),
-      workflow: 'voice-stt-backend-gemini-tts-relisten',
+  const closeSession = useCallback((state: SessionState = 'Ended') => {
+    forcedStopRef.current = true;
+    if (sessionTimerRef.current) {
+      window.clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+    wsRef.current?.close();
+    wsRef.current = null;
+    stopAudioPipeline();
+    setSessionActive(false);
+    setSessionState(state);
+  }, [stopAudioPipeline]);
+
+  const persistSession = useCallback(() => {
+    if (!transcriptRef.current.length) return;
+    const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
+    const historyItem: ConversationHistoryItem = {
+      id: Date.now().toString(),
+      date: new Date().toISOString(),
+      persona: { ...persona, role },
+      transcriptions: transcriptRef.current,
+      scoreCard: buildNeuralSpeechScoreCard(transcriptRef.current),
     };
+    const history = getUserConversationHistory(currentUser.id);
+    setUserConversationHistory(currentUser.id, [historyItem, ...history].slice(0, 50));
+  }, [persona, role]);
 
-    const response = await fetch(backendUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  const playPcmChunk = useCallback((base64Data: string, sampleRate: number) => {
+    const audioCtx = audioCtxRef.current;
+    if (!audioCtx) return;
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(body || `Backend call failed (${response.status})`);
-    }
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
 
-    const data = await response.json();
-    if (!data?.text || typeof data.text !== 'string') {
-      throw new Error('Backend response is missing `text`.');
-    }
+    const pcm16 = new Int16Array(bytes.buffer);
+    const float32 = new Float32Array(pcm16.length);
+    for (let i = 0; i < pcm16.length; i += 1) float32[i] = pcm16[i] / 0x8000;
 
-    return data.text;
-  }, [backendUrl, currentLanguage, persona]);
+    const buffer = audioCtx.createBuffer(1, float32.length, sampleRate);
+    buffer.copyToChannel(float32, 0);
 
-  const startListening = useCallback(() => {
-    if (!recognitionRef.current || isHandlingTurnRef.current) return;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+    const startAt = Math.max(now + 0.02, nextPlaybackAtRef.current || now + 0.02);
+    source.start(startAt);
+    nextPlaybackAtRef.current = startAt + buffer.duration;
+    setSessionState('Speaking');
+    source.onended = () => {
+      if (sessionActive) setSessionState('Listening');
+    };
+  }, [sessionActive]);
+
+  const handleSocketMessage = useCallback((event: MessageEvent) => {
+    let payload: any;
     try {
-      setIsConnecting(true);
-      recognitionRef.current.start();
-    } catch (e) {
-      // Ignore duplicate start race.
-    }
-  }, []);
-
-  const stopListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-    try {
-      if (restartTimeoutRef.current) {
-        window.clearTimeout(restartTimeoutRef.current);
-        restartTimeoutRef.current = null;
-      }
-      recognitionRef.current.stop();
-    } catch (e) {
-      // noop
-    }
-  }, []);
-
-  const handleSaveAndExit = useCallback(() => {
-    if (transcriptions.length > 0) {
-      try {
-        const currentScoreCard = buildNeuralSpeechScoreCard(transcriptions);
-        const historyItem: ConversationHistoryItem = {
-          id: Date.now().toString(),
-          date: new Date().toISOString(),
-          persona,
-          transcriptions,
-          scoreCard: currentScoreCard,
-        };
-
-        const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
-        const history: ConversationHistoryItem[] = getUserConversationHistory(currentUser.id);
-        const updatedHistory = [historyItem, ...history].slice(0, 50);
-
-        setUserConversationHistory(currentUser.id, updatedHistory);
-      } catch (e) {
-        console.error('Failed to save conversation history', e);
-      }
-    }
-
-    shouldListenRef.current = false;
-    stopListening();
-    window.speechSynthesis?.cancel();
-    onExit();
-  }, [onExit, persona, stopListening, transcriptions]);
-
-  useEffect(() => {
-    transcriptionsRef.current = transcriptions;
-  }, [transcriptions]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.scrollTop = containerRef.current.scrollHeight;
-  }, [transcriptions]);
-
-  useEffect(() => {
-    const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionApi) {
-      setError('Speech recognition is not supported in this browser. Use a Chromium-based browser for STT modules.');
-      setIsConnecting(false);
+      payload = JSON.parse(event.data);
+    } catch {
       return;
     }
 
-    const recognition = new SpeechRecognitionApi();
-    recognition.lang = currentLanguage === 'English' ? 'en-US' : currentLanguage;
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setIsConnecting(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      if (shouldListenRef.current && !isHandlingTurnRef.current) {
-        startListening();
-      }
-    };
-
-    recognition.onerror = (event: Event) => {
-      const speechError = event as SpeechRecognitionErrorEvent;
-      const errorCode = speechError.error || 'unknown';
-
-      if (errorCode === 'no-speech' || errorCode === 'aborted') return;
-
-      if (errorCode === 'network') {
-        setIsListening(false);
-        setIsConnecting(true);
-
-        if (restartTimeoutRef.current) {
-          window.clearTimeout(restartTimeoutRef.current);
+    if (payload?.serverContent?.modelTurn?.parts) {
+      const parts = payload.serverContent.modelTurn.parts as any[];
+      parts.forEach((part) => {
+        if (part?.text) {
+          pushTranscript('ai', part.text);
+          questionCountRef.current += 1;
+          if (questionCountRef.current >= ROLE_QUESTION_LIMIT[role]) {
+            closeSession();
+          }
         }
 
-        restartTimeoutRef.current = window.setTimeout(() => {
-          restartTimeoutRef.current = null;
-          if (!shouldListenRef.current || isHandlingTurnRef.current) return;
-          startListening();
-        }, 1200);
+        const audio = part?.inlineData;
+        if (audio?.data && typeof audio.data === 'string') {
+          const mime = audio.mimeType || 'audio/pcm;rate=24000';
+          const rateMatch = /rate=(\d+)/.exec(mime);
+          const sampleRate = rateMatch ? Number(rateMatch[1]) : 24000;
+          playPcmChunk(audio.data, sampleRate);
+        }
+      });
+    }
+
+    if (payload?.serverContent?.generationComplete) {
+      setSessionState('Listening');
+    }
+  }, [closeSession, playPcmChunk, pushTranscript, role]);
+
+  // Generic live session opener required for all role variants.
+  const openLiveSession = useCallback(async (selectedRole: RoleOption) => {
+    const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
+    const adminUser = isAdminEmail(currentUser?.email);
+    if (!adminUser && !hasPaidSubscription()) {
+      throw new Error('Paid subscription is required for live Gemini audio sessions.');
+    }
+
+    if (!apiKey) {
+      throw new Error('Missing Gemini API key. Set VITE_GEMINI_API_KEY.');
+    }
+
+    const instructionText = ROLE_INSTRUCTIONS[selectedRole];
+    const ws = new WebSocket(`${GEMINI_WS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`);
+    wsRef.current = ws;
+
+    ws.onopen = async () => {
+      reconnectAttemptsRef.current = 0;
+      setSessionState('Thinking');
+      ws.send(
+        JSON.stringify({
+          setup: {
+            model: 'models/gemini-2.0-flash-exp',
+            systemInstruction: {
+              parts: [{ text: instructionText }],
+            },
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+            },
+          },
+        }),
+      );
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const audioCtx = new AudioContext();
+      audioCtxRef.current = audioCtx;
+      nextPlaybackAtRef.current = audioCtx.currentTime;
+
+      const sourceNode = audioCtx.createMediaStreamSource(stream);
+      sourceNodeRef.current = sourceNode;
+
+      // ScriptProcessor keeps vanilla Web API compatibility for real-time PCM capture.
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+      sourceNode.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      processor.onaudioprocess = (audioEvent) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        const channelData = audioEvent.inputBuffer.getChannelData(0);
+        const pcm16 = downsampleTo16kPcm16(channelData, audioCtx.sampleRate);
+        const b64 = base64FromInt16(pcm16);
+        wsRef.current.send(
+          JSON.stringify({
+            realtimeInput: {
+              mediaChunks: [
+                {
+                  mimeType: 'audio/pcm;rate=16000',
+                  data: b64,
+                },
+              ],
+            },
+          }),
+        );
+      };
+
+      setSessionState('Listening');
+      setSessionActive(true);
+      sessionTimerRef.current = window.setTimeout(() => closeSession(), 60_000);
+    };
+
+    ws.onmessage = handleSocketMessage;
+
+    ws.onerror = () => {
+      setError('Live socket error occurred. Reconnecting...');
+    };
+
+    ws.onclose = () => {
+      if (forcedStopRef.current) return;
+
+      if (reconnectAttemptsRef.current >= 3) {
+        setError('Connection closed after retries. Please start again.');
+        closeSession('Ended');
         return;
       }
 
-      if (errorCode === 'audio-capture') {
-        setError('Microphone not detected. Connect a microphone, allow browser access, and retry.');
-        return;
-      }
-
-      if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
-        setError('Microphone permission denied. Allow mic access in browser settings and retry.');
-        return;
-      }
-
-      setError(`STT error: ${errorCode}`);
+      reconnectAttemptsRef.current += 1;
+      setSessionState('Thinking');
+      window.setTimeout(() => {
+        void openLiveSession(selectedRole).catch((err) => {
+          setError(err instanceof Error ? err.message : 'Reconnect failed.');
+          closeSession('Ended');
+        });
+      }, 800 * reconnectAttemptsRef.current);
     };
+  }, [apiKey, closeSession, handleSocketMessage]);
 
-    recognition.onresult = async (event: Event) => {
-      const speechEvent = event as SpeechRecognitionEvent;
-      const result = speechEvent.results[speechEvent.resultIndex];
-      const transcript = result?.[0]?.transcript?.trim();
-      if (!transcript) return;
+  const startInterview = useCallback(() => {
+    setError(null);
+    setTranscriptions([]);
+    transcriptRef.current = [];
+    questionCountRef.current = 0;
+    forcedStopRef.current = false;
+    void openLiveSession(role).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Unable to start live session.');
+      closeSession('Ended');
+    });
+  }, [closeSession, openLiveSession, role]);
 
-      isHandlingTurnRef.current = true;
-      setError(null);
-      setTranscriptions((prev) => [...prev, { speaker: 'user', text: transcript, timestamp: Date.now() }]);
+  const stopInterview = useCallback(() => {
+    persistSession();
+    closeSession('Ended');
+  }, [closeSession, persistSession]);
 
-      try {
-        const aiText = await sendToBackend(transcript);
-        setTranscriptions((prev) => [...prev, { speaker: 'ai', text: aiText, timestamp: Date.now() }]);
-        await speak(aiText);
-      } catch (e: any) {
-        const message = e?.message || 'Backend request failed.';
-        setError(message);
-      } finally {
-        isHandlingTurnRef.current = false;
-        if (shouldListenRef.current) startListening();
-      }
-    };
-
-    recognitionRef.current = recognition;
-    shouldListenRef.current = true;
-
-    startListening();
-
-    return () => {
-      shouldListenRef.current = false;
-      if (restartTimeoutRef.current) {
-        window.clearTimeout(restartTimeoutRef.current);
-        restartTimeoutRef.current = null;
-      }
-      recognition.stop();
-      recognitionRef.current = null;
-      window.speechSynthesis?.cancel();
-    };
-  }, [currentLanguage, sendToBackend, speak, startListening]);
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
-        <div className="p-8 bg-slate-900 border border-red-500/30 rounded-3xl text-center max-w-md shadow-2xl">
-          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⚠️</div>
-          <h3 className="text-xl font-bold text-white mb-2">Neural Link Failed</h3>
-          <p className="text-slate-400 text-sm mb-6 leading-relaxed">{error}</p>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => {
-                setError(null);
-                shouldListenRef.current = true;
-                startListening();
-              }}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all shadow-lg text-white"
-            >
-              Retry Listening
-            </button>
-            <button onClick={onExit} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all shadow-lg text-white">
-              Return to Labs
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => () => {
+    persistSession();
+    closeSession('Ended');
+  }, [closeSession, persistSession]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto px-4 lg:px-8">
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4 animate-in fade-in duration-700">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 to-blue-500 flex items-center justify-center text-3xl shadow-lg ring-4 ring-blue-500/10 flex-shrink-0 animate-pulse">
-            {persona.gender === 'Male' ? '🧠' : '🧬'}
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">{persona.name}</h2>
-            <p className="text-blue-400 font-bold text-[10px] uppercase tracking-widest line-clamp-1 max-w-[250px]">{persona.role}</p>
-            <div className="flex flex-wrap gap-2 mt-1">
-              <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-black uppercase tracking-widest">Pipeline: Voice→Backend→Gemini</span>
-              <span className="text-[8px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-black uppercase">Status: {isListening ? 'Listening' : isSpeaking ? 'Speaking' : 'Processing'}</span>
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto px-4 lg:px-8 gap-5">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+        <h2 className="text-lg font-bold text-white">Live Neural Interview</h2>
+        <p className="text-xs text-slate-400 mt-1">Live Gemini bidi stream with microphone PCM16@16kHz uplink and real-time audio playback.</p>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none group">
-            <select
-              value={currentLanguage}
-              onChange={(e) => setCurrentLanguage(e.target.value)}
-              className="w-full sm:w-32 bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider rounded-full px-4 py-2 appearance-none outline-none focus:border-blue-500/50 hover:bg-slate-800 transition-all cursor-pointer text-center"
-            >
-              {COMMON_LANGUAGES.map((lang) => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={handleSaveAndExit}
-            className="flex-1 sm:flex-none px-6 py-2 bg-slate-900 border border-slate-800 rounded-full hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as RoleOption)}
+            disabled={sessionActive}
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
           >
-            Exit Session
-          </button>
+            {(Object.keys(ROLE_INSTRUCTIONS) as RoleOption[]).map((roleName) => (
+              <option key={roleName} value={roleName}>{roleName}</option>
+            ))}
+          </select>
+
+          {!sessionActive ? (
+            <button onClick={startInterview} className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-bold">
+              Start Interview
+            </button>
+          ) : (
+            <button onClick={stopInterview} className="rounded-lg bg-rose-600 hover:bg-rose-500 px-4 py-2 text-sm font-bold">
+              Stop Interview
+            </button>
+          )}
+
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs">State: {sessionState}</span>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs">Question Limit: {ROLE_QUESTION_LIMIT[role]}</span>
+          <button onClick={onExit} className="rounded-lg border border-slate-700 px-4 py-2 text-xs">Exit</button>
         </div>
+
+        {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
       </div>
 
-      <div
-        ref={containerRef}
-        className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6 scroll-smooth bg-slate-900/40 border border-slate-800 rounded-3xl"
-      >
-        {transcriptions.length === 0 && !isConnecting && (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-12">
-            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-blue-400 animate-pulse border border-slate-700">⚡</div>
-            <div>
-              <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Neural Workflow Ready</p>
-              <p className="text-slate-600 italic text-sm mt-1">Speak, wait for Gemini response, TTS will play, then listening resumes.</p>
-            </div>
-          </div>
-        )}
-        {transcriptions.map((t, idx) => (
-          <div key={idx} className={`flex flex-col ${t.speaker === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`max-w-[90%] sm:max-w-[75%] p-4 sm:p-5 rounded-2xl shadow-xl leading-relaxed ${
-              t.speaker === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
-            }`}>
-              <p className="text-sm md:text-base">{t.text}</p>
+      <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-900/40 border border-slate-800 rounded-3xl">
+        {transcriptions.length === 0 ? (
+          <p className="text-slate-500 text-sm">No transcript yet. Start interview to begin real-time streaming.</p>
+        ) : transcriptions.map((t, idx) => (
+          <div key={`${t.timestamp}-${idx}`} className={`flex ${t.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm ${t.speaker === 'user' ? 'bg-blue-600' : 'bg-slate-800 border border-slate-700'}`}>
+              {t.text}
             </div>
           </div>
         ))}
