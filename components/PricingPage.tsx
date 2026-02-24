@@ -1,4 +1,5 @@
 import React from 'react';
+import { setSubscriptionTier } from '../lib/subscription';
 
 type RazorpayCheckoutOptions = {
   key: string;
@@ -129,7 +130,11 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
         availablePaymentOptions: 'Cards, Net Banking, and BHIM/UPI',
       },
       handler: () => {
-        window.alert('Payment successful! We will activate your plan shortly.');
+        const label = plan.label.toLowerCase();
+        if (label.includes('premium')) setSubscriptionTier('premium');
+        else if (label.includes('elite')) setSubscriptionTier('elite');
+        else if (label.includes('team')) setSubscriptionTier('team');
+        window.alert('Payment successful! Your subscription has been activated.');
       },
       theme: {
         color: '#06b6d4',
@@ -154,6 +159,10 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     const href = plan.href;
     if (!href) {
       return;
+    }
+
+    if (plan.label.toLowerCase() === 'free') {
+      setSubscriptionTier('free');
     }
 
     if (href.startsWith('mailto:')) {

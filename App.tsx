@@ -11,6 +11,7 @@ import AuthPage from './components/AuthPage';
 import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
+import { hasPaidSubscription, isAdminEmail } from './lib/subscription';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -50,11 +51,6 @@ type NavItem = {
   locked?: boolean;
 };
 
-const ADMIN_EMAILS = new Set([
-  'aryancode192@gmail.com',
-  'work.of.god02@gmail.com',
-  'admin@gmail.com'
-]);
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -64,8 +60,8 @@ const App: React.FC = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
-  const isAdmin = normalizedEmail ? ADMIN_EMAILS.has(normalizedEmail) : false;
-  const hasFullAccess = isAdmin;
+  const isAdmin = isAdminEmail(normalizedEmail);
+  const hasFullAccess = isAdmin || hasPaidSubscription();
 
   useEffect(() => {
     const handleFullscreenChange = () => {
