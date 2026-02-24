@@ -298,7 +298,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       const ai = new GoogleGenAI({
         apiKey,
-        httpOptions: { apiVersion: 'v1beta' },
+        httpOptions: { apiVersion: 'v1' },
       });
 
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
