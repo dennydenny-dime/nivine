@@ -1,0 +1,4 @@
+/* Local stylesheet to prevent missing asset 404s and host shared app-level overrides. */
+:root {
+  color-scheme: dark;
+}
