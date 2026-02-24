@@ -52,7 +52,8 @@ type NavItem = {
 
 const ADMIN_EMAILS = new Set([
   'aryancode192@gmail.com',
-  'work.of.god02@gmail.com'
+  'work.of.god02@gmail.com',
+  'admin@gmail.com'
 ]);
 
 const App: React.FC = () => {
