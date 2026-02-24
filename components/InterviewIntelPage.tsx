@@ -193,18 +193,6 @@ const InterviewIntelPage: React.FC = () => {
           <p className="mt-3 text-slate-300 max-w-3xl">
             Built for backend-first architecture: News API ingestion via CRON, curated interview-question database, and role-based learning modules served fast from your own data layer.
           </p>
-          <div className="grid sm:grid-cols-3 gap-3 mt-6">
-            {[
-              { title: 'News refresh', value: 'Every 3–6h (CRON)' },
-              { title: 'Question source', value: 'Curated + community reviewed' },
-              { title: 'Learning delivery', value: 'Static modules from DB' },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-slate-700/80 bg-slate-900/80 p-4">
-                <p className="text-xs text-slate-400">{item.title}</p>
-                <p className="text-sm font-bold text-white mt-1">{item.value}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
