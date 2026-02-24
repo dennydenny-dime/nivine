@@ -11,6 +11,7 @@ import AuthPage from './components/AuthPage';
 import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
+import InterviewIntelPage from './components/InterviewIntelPage';
 import { hasPaidSubscription, isAdminEmail } from './lib/subscription';
 import { Persona, User } from './types';
 
@@ -40,6 +41,7 @@ enum View {
   CUSTOM_COACH = 'custom_coach',
   MENTAL_PERFORMANCE = 'mental_performance',
   PERSONAL_DASHBOARD = 'personal_dashboard',
+  INTERVIEW_INTEL = 'interview_intel',
 };
 
 type NavItem = {
@@ -222,6 +224,10 @@ const App: React.FC = () => {
     setCurrentView(View.PERSONAL_DASHBOARD);
   };
 
+  const openInterviewIntel = () => {
+    setCurrentView(View.INTERVIEW_INTEL);
+  };
+
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
@@ -247,6 +253,7 @@ const App: React.FC = () => {
   const navItems: NavItem[] = [
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
+    { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: !hasFullAccess },
     { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: !hasFullAccess },
     {
@@ -352,6 +359,10 @@ const App: React.FC = () => {
 
         {currentView === View.APP && (
           <MainAppPage onStart={startConversation} />
+        )}
+
+        {currentView === View.INTERVIEW_INTEL && (
+          <InterviewIntelPage />
         )}
 
         {currentView === View.CUSTOM_COACH && (
