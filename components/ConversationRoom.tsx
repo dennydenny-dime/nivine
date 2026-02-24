@@ -159,6 +159,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const shouldListenRef = useRef(false);
   const isHandlingTurnRef = useRef(false);
+  const restartTimeoutRef = useRef<number | null>(null);
   const transcriptionsRef = useRef<TranscriptionItem[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -226,6 +227,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const startListening = useCallback(() => {
     if (!recognitionRef.current || isHandlingTurnRef.current) return;
     try {
+      setIsConnecting(true);
       recognitionRef.current.start();
     } catch (e) {
       // Ignore duplicate start race.
@@ -235,6 +237,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const stopListening = useCallback(() => {
     if (!recognitionRef.current) return;
     try {
+      if (restartTimeoutRef.current) {
+        window.clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
       recognitionRef.current.stop();
     } catch (e) {
       // noop
@@ -306,8 +312,37 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
     recognition.onerror = (event: Event) => {
       const speechError = event as SpeechRecognitionErrorEvent;
-      if (speechError.error === 'no-speech') return;
-      setError(`STT error: ${speechError.error || 'unknown'}`);
+      const errorCode = speechError.error || 'unknown';
+
+      if (errorCode === 'no-speech' || errorCode === 'aborted') return;
+
+      if (errorCode === 'network') {
+        setIsListening(false);
+        setIsConnecting(true);
+
+        if (restartTimeoutRef.current) {
+          window.clearTimeout(restartTimeoutRef.current);
+        }
+
+        restartTimeoutRef.current = window.setTimeout(() => {
+          restartTimeoutRef.current = null;
+          if (!shouldListenRef.current || isHandlingTurnRef.current) return;
+          startListening();
+        }, 1200);
+        return;
+      }
+
+      if (errorCode === 'audio-capture') {
+        setError('Microphone not detected. Connect a microphone, allow browser access, and retry.');
+        return;
+      }
+
+      if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+        setError('Microphone permission denied. Allow mic access in browser settings and retry.');
+        return;
+      }
+
+      setError(`STT error: ${errorCode}`);
     };
 
     recognition.onresult = async (event: Event) => {
@@ -340,6 +375,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
     return () => {
       shouldListenRef.current = false;
+      if (restartTimeoutRef.current) {
+        window.clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
       recognition.stop();
       recognitionRef.current = null;
       window.speechSynthesis?.cancel();
