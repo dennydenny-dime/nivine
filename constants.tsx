@@ -71,3 +71,17 @@ export const getSystemApiKey = (): string | undefined => {
   
   return key;
 };
+
+export const getBackendApiBaseUrl = (): string | undefined => {
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // @ts-ignore
+    return import.meta.env.VITE_BACKEND_API_URL || import.meta.env.BACKEND_API_URL;
+  }
+
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.VITE_BACKEND_API_URL || process.env.BACKEND_API_URL;
+  }
+
+  return undefined;
+};
