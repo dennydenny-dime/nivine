@@ -33,3 +33,9 @@ All neural training modules now follow this loop:
 To use your own backend, set `VITE_BACKEND_API_URL` (example: `http://localhost:3000/api`).
 The frontend posts to `<VITE_BACKEND_API_URL>/chat` (or `/api/chat` when the env var is omitted) with transcript + persona metadata.
 
+
+
+### Vercel deployment note (fixes `/api/chat` 404)
+
+This repo now includes a built-in Vercel Serverless Function at `api/chat.ts`.
+If you deploy to Vercel, add `GEMINI_API_KEY` (or `API_KEY`) in your project Environment Variables so `/api/chat` can generate responses.
