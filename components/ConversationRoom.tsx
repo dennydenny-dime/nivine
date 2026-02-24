@@ -14,8 +14,7 @@ interface ConversationRoomProps {
 
 const FILLER_WORDS = new Set(['um', 'uh', 'like', 'you know', 'actually', 'basically', 'literally', 'so']);
 const LIVE_MODEL_CANDIDATES = [
-  'gemini-2.0-flash-live-001',
-  'gemini-live-2.5-flash-preview',
+  'gemini-1.5-flash',
 ];
 const MAX_RECONNECT_ATTEMPTS = 4;
 const MIME_TYPE_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
@@ -299,7 +298,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       const ai = new GoogleGenAI({
         apiKey,
-        httpOptions: { apiVersion: 'v1alpha' },
+        httpOptions: { apiVersion: 'v1beta' },
       });
 
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
