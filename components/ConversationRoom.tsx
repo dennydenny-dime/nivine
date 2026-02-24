@@ -176,6 +176,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const transcriptionRef = useRef({ input: '', output: '' });
   const containerRef = useRef<HTMLDivElement>(null);
   const reconnectAttemptRef = useRef(0);
+  const modelAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const intentionalShutdownRef = useRef(false);
 
@@ -257,6 +258,32 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   };
 
   useEffect(() => {
+    const isModelUnavailableError = (errMsg: string): boolean => {
+      const normalized = errMsg.toLowerCase();
+      return (
+        normalized.includes('model') &&
+        (normalized.includes('not found') || normalized.includes('unsupported') || normalized.includes('unavailable'))
+      );
+    };
+
+    async function initSession(attempt: number = modelAttemptRef.current) {
+      try {
+        intentionalShutdownRef.current = false;
+        resetRealtimeResources();
+        setIsConnecting(true);
+        modelAttemptRef.current = Math.min(attempt, LIVE_MODEL_CANDIDATES.length - 1);
+        const modelName = LIVE_MODEL_CANDIDATES[modelAttemptRef.current];
+        await connectSession(modelName);
+      } catch (err: any) {
+        console.error('Initialization Error:', err);
+        if (attempt + 1 < LIVE_MODEL_CANDIDATES.length) {
+          initSession(attempt + 1);
+          return;
+        }
+        setError(formatConnectionError(err?.message || err?.toString() || ''));
+      }
+    }
+
     const connectSession = async (modelName: string) => {
       const apiKey = getSystemApiKey();
       if (!apiKey) {
@@ -321,6 +348,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       const scheduleReconnect = (errMsg: string) => {
         if (intentionalShutdownRef.current) return;
 
+        if (isModelUnavailableError(errMsg) && modelAttemptRef.current + 1 < LIVE_MODEL_CANDIDATES.length) {
+          modelAttemptRef.current += 1;
+          reconnectAttemptRef.current = 0;
+          setError(null);
+          initSession(modelAttemptRef.current);
+          return;
+        }
+
         if (!shouldReconnect(errMsg) || reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
           setError(formatConnectionError(errMsg));
           return;
@@ -377,6 +412,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         callbacks: {
           onopen: () => {
             reconnectAttemptRef.current = 0;
+            modelAttemptRef.current = 0;
             setError(null);
             setIsConnecting(false);
 
@@ -482,24 +518,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       sessionRef.current = await sessionPromise;
     };
-
-    const initSession = async (attempt: number = 0) => {
-      try {
-        intentionalShutdownRef.current = false;
-        resetRealtimeResources();
-        setIsConnecting(true);
-        const modelName = LIVE_MODEL_CANDIDATES[Math.min(attempt, LIVE_MODEL_CANDIDATES.length - 1)];
-        await connectSession(modelName);
-      } catch (err: any) {
-        console.error("Initialization Error:", err);
-        if (attempt + 1 < LIVE_MODEL_CANDIDATES.length) {
-          initSession(attempt + 1);
-          return;
-        }
-        setError(formatConnectionError(err?.message || err?.toString() || ''));
-      }
-    };
-
+    modelAttemptRef.current = 0;
     initSession();
     return cleanup;
   }, [persona, cleanup, resetRealtimeResources, sessionSeed]);
