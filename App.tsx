@@ -53,6 +53,19 @@ type NavItem = {
   locked?: boolean;
 };
 
+const FREE_TRIAL_DURATION_MS = 60_000;
+const FREE_TRIAL_STORAGE_KEY = 'tm_free_feature_trial_expires_at';
+
+const FREE_TRIAL_VIEWS = new Set<View>([
+  View.APP,
+  View.QUIZ,
+  View.INTERVIEW_INTEL,
+  View.CUSTOM_COACH,
+  View.MENTAL_PERFORMANCE,
+]);
+
+const isFreeTrialView = (view: View) => FREE_TRIAL_VIEWS.has(view);
+
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -60,10 +73,49 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [freeTrialExpiresAt, setFreeTrialExpiresAt] = useState<number | null>(null);
+  const [trialExpiredNotice, setTrialExpiredNotice] = useState<string | null>(null);
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
   const isAdmin = isAdminEmail(normalizedEmail);
   const hasFullAccess = isAdmin || hasPaidSubscription();
+
+  useEffect(() => {
+    if (hasFullAccess) {
+      setFreeTrialExpiresAt(null);
+      localStorage.removeItem(FREE_TRIAL_STORAGE_KEY);
+      return;
+    }
+
+    const storedExpiryRaw = localStorage.getItem(FREE_TRIAL_STORAGE_KEY);
+    const storedExpiry = storedExpiryRaw ? Number(storedExpiryRaw) : NaN;
+    if (!Number.isFinite(storedExpiry) || storedExpiry <= 0) {
+      setFreeTrialExpiresAt(null);
+      return;
+    }
+
+    setFreeTrialExpiresAt(storedExpiry);
+  }, [hasFullAccess]);
+
+  useEffect(() => {
+    if (hasFullAccess || !freeTrialExpiresAt || !isFreeTrialView(currentView)) {
+      return;
+    }
+
+    const remaining = freeTrialExpiresAt - Date.now();
+    if (remaining <= 0) {
+      setTrialExpiredNotice('Your 1-minute free workflow has ended. Tap here to choose a plan and continue.');
+      setCurrentView(View.PRICING);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setTrialExpiredNotice('Your 1-minute free workflow has ended. Tap here to choose a plan and continue.');
+      setCurrentView(View.PRICING);
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [currentView, freeTrialExpiresAt, hasFullAccess]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -181,15 +233,36 @@ const App: React.FC = () => {
   };
 
   const openApp = () => {
-    setCurrentView(View.APP);
+    openViewWithTrial(View.APP, 'Neural Training Modules');
   };
 
-  const openQuiz = () => {
-    if (!hasFullAccess) {
+  const openViewWithTrial = (view: View, featureName: string) => {
+    if (hasFullAccess || !isFreeTrialView(view)) {
+      setCurrentView(view);
+      return;
+    }
+
+    const now = Date.now();
+    let expiresAt = freeTrialExpiresAt;
+
+    if (!expiresAt) {
+      expiresAt = now + FREE_TRIAL_DURATION_MS;
+      localStorage.setItem(FREE_TRIAL_STORAGE_KEY, String(expiresAt));
+      setFreeTrialExpiresAt(expiresAt);
+      setTrialExpiredNotice(null);
+    }
+
+    if (expiresAt <= now) {
+      setTrialExpiredNotice(`Your 1-minute free ${featureName} workflow ended. Tap here to view plans.`);
       setCurrentView(View.PRICING);
       return;
     }
-    setCurrentView(View.QUIZ);
+
+    setCurrentView(view);
+  };
+
+  const openQuiz = () => {
+    openViewWithTrial(View.QUIZ, 'Quiz + Interview Intel');
   };
 
   const openPricing = () => {
@@ -205,19 +278,11 @@ const App: React.FC = () => {
   };
 
   const openCustomCoach = () => {
-    if (!hasFullAccess) {
-      setCurrentView(View.PRICING);
-      return;
-    }
-    setCurrentView(View.CUSTOM_COACH);
+    openViewWithTrial(View.CUSTOM_COACH, 'Custom Coach');
   };
 
   const openMentalPerformance = () => {
-    if (!hasFullAccess) {
-      setCurrentView(View.PRICING);
-      return;
-    }
-    setCurrentView(View.MENTAL_PERFORMANCE);
+    openViewWithTrial(View.MENTAL_PERFORMANCE, 'Neural Module');
   };
 
   const openPersonalDashboard = () => {
@@ -225,7 +290,7 @@ const App: React.FC = () => {
   };
 
   const openInterviewIntel = () => {
-    setCurrentView(View.INTERVIEW_INTEL);
+    openViewWithTrial(View.INTERVIEW_INTEL, 'Interview Intel');
   };
 
   const goBack = () => {
@@ -248,14 +313,17 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
+    setFreeTrialExpiresAt(null);
+    setTrialExpiredNotice(null);
+    localStorage.removeItem(FREE_TRIAL_STORAGE_KEY);
   };
 
   const navItems: NavItem[] = [
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
-    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: !hasFullAccess },
-    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: !hasFullAccess },
+    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach },
+    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance },
     {
       key: View.LEADERBOARD,
       label: 'Leaderboard',
@@ -265,7 +333,7 @@ const App: React.FC = () => {
       locked: !hasFullAccess
     },
     { key: View.PRICING, label: 'Plans', onClick: openPricing },
-    { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz, locked: !hasFullAccess }
+    { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz }
   ];
 
   if (!authReady) {
@@ -342,8 +410,16 @@ const App: React.FC = () => {
           </div>
           {!hasFullAccess && (
             <p className="text-xs text-amber-300 px-1">
-              Subscription required for Custom Coach, Mental Performance Coach, Leaderboard, and Quizzes.
+              Free users can try Quizzes, Interview Intel, Neural Modules, and Custom Coach for 1 minute. After that, choose a plan to continue.
             </p>
+          )}
+          {trialExpiredNotice && (
+            <button
+              onClick={openPricing}
+              className="text-left text-xs font-semibold text-rose-200 bg-rose-500/15 border border-rose-500/40 rounded-xl px-3 py-2 hover:bg-rose-500/25 transition-colors"
+            >
+              {trialExpiredNotice}
+            </button>
           )}
         </div>
       </nav>
