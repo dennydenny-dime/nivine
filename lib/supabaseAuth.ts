@@ -75,8 +75,27 @@ const buildHeaders = () => {
   };
 };
 
+const buildFallbackAvatar = (supabaseUser: SupabaseUser) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${supabaseUser.email || supabaseUser.id}`;
+
 const getAvatarForUser = (supabaseUser: SupabaseUser) => {
-  return supabaseUser.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${supabaseUser.email || supabaseUser.id}`;
+  const avatarUrl = supabaseUser.user_metadata?.avatar_url;
+
+  if (!avatarUrl) {
+    return buildFallbackAvatar(supabaseUser);
+  }
+
+  try {
+    const parsedUrl = new URL(avatarUrl);
+    const isGoogleHostedAvatar = parsedUrl.hostname.endsWith('googleusercontent.com');
+
+    if (isGoogleHostedAvatar) {
+      return buildFallbackAvatar(supabaseUser);
+    }
+  } catch {
+    return buildFallbackAvatar(supabaseUser);
+  }
+
+  return avatarUrl;
 };
 
 export const mapSupabaseUser = (supabaseUser: SupabaseUser): User => ({
