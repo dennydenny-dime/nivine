@@ -122,6 +122,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isHumanSpeaking, setIsHumanSpeaking] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -130,6 +131,21 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const streamingBufferRef = useRef('');
   const aiSpeakingTimeoutRef = useRef<number | null>(null);
   const humanSpeakingTimeoutRef = useRef<number | null>(null);
+  const sessionStateRef = useRef<SessionState>('Idle');
+  const sessionActiveRef = useRef(false);
+  const isMicMutedRef = useRef(false);
+
+  useEffect(() => {
+    sessionStateRef.current = sessionState;
+  }, [sessionState]);
+
+  useEffect(() => {
+    sessionActiveRef.current = sessionActive;
+  }, [sessionActive]);
+
+  useEffect(() => {
+    isMicMutedRef.current = isMicMuted;
+  }, [isMicMuted]);
 
   const pushTranscript = useCallback((speaker: 'user' | 'ai', text: string) => {
     const item: TranscriptionItem = { speaker, text, timestamp: Date.now() };
@@ -181,10 +197,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     abortControllerRef.current = null;
     recognitionRef.current?.stop();
     recognitionRef.current = null;
+    sessionActiveRef.current = false;
     setSessionActive(false);
     setSessionState(state);
+    sessionStateRef.current = state;
     setIsAiSpeaking(false);
     setIsHumanSpeaking(false);
+    setLiveTranscript('');
   }, []);
 
   const parseSseBlock = (block: string): StreamEvent | null => {
@@ -276,10 +295,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   }, [isMicMuted, markAiSpeaking, persona, pushTranscript, role, stopSession, updateLastAiTurn]);
 
   const startInterview = useCallback(() => {
+    if (sessionActiveRef.current) return;
+
     setError(null);
     setTranscriptions([]);
     transcriptRef.current = [];
     questionCountRef.current = 0;
+    setLiveTranscript('');
 
     const SpeechRecognitionCtor = getSpeechRecognition();
     if (!SpeechRecognitionCtor) {
@@ -289,27 +311,39 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
     const recognition = new SpeechRecognitionCtor();
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = persona.language || 'en-US';
 
     recognition.onresult = (event) => {
-      if (sessionState !== 'Listening') return;
-      if (isMicMuted) return;
+      if (sessionStateRef.current !== 'Listening') return;
+      if (isMicMutedRef.current) return;
+
+      let interimTranscript = '';
+      let finalTranscript = '';
 
       for (let i = event.results.length - 1; i >= 0; i -= 1) {
         const result = event.results[i];
-        if (!result.isFinal) continue;
         const transcript = result[0]?.transcript?.trim();
         if (!transcript) continue;
 
-        pushTranscript('user', transcript);
-        markHumanSpeaking();
-        void streamAssistantReply(transcript).catch((err) => {
-          setError(err instanceof Error ? err.message : 'Stream failed.');
-          stopSession('Ended');
-        });
-        break;
+        if (result.isFinal) {
+          finalTranscript = transcript;
+          break;
+        }
+
+        interimTranscript = transcript;
       }
+
+      setLiveTranscript(interimTranscript);
+      if (!finalTranscript) return;
+
+      pushTranscript('user', finalTranscript);
+      setLiveTranscript('');
+      markHumanSpeaking();
+      void streamAssistantReply(finalTranscript).catch((err) => {
+        setError(err instanceof Error ? err.message : 'Stream failed.');
+        stopSession('Ended');
+      });
     };
 
     recognition.onerror = (event) => {
@@ -318,17 +352,19 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     };
 
     recognition.onend = () => {
-      if (!sessionActive) return;
-      if (sessionState === 'Listening') {
+      if (!sessionActiveRef.current) return;
+      if (sessionStateRef.current === 'Listening') {
         recognition.start();
       }
     };
 
     recognitionRef.current = recognition;
     recognition.start();
+    sessionActiveRef.current = true;
     setSessionActive(true);
     setSessionState('Listening');
-  }, [isMicMuted, markHumanSpeaking, persona.language, pushTranscript, sessionState, stopSession, streamAssistantReply]);
+    sessionStateRef.current = 'Listening';
+  }, [markHumanSpeaking, persona.language, pushTranscript, stopSession, streamAssistantReply]);
 
   const stopInterview = useCallback(() => {
     persistSession();
@@ -341,6 +377,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     persistSession();
     stopSession('Ended');
   }, [persistSession, stopSession]);
+
+  useEffect(() => {
+    startInterview();
+  }, [startInterview]);
 
   const currentUserName = useMemo(() => {
     const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
@@ -370,11 +410,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-slate-700 bg-slate-900/70 px-6 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100">{persona.language || 'English'}</span>
-          {!sessionActive ? (
-            <button onClick={startInterview} className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-100 hover:bg-emerald-500/25">Start Session</button>
-          ) : (
-            <button onClick={stopInterview} className="rounded-full border border-rose-400/30 bg-rose-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/25">End Session</button>
-          )}
+          <button onClick={stopInterview} className="rounded-full border border-rose-400/30 bg-rose-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/25">End Session</button>
           <button onClick={onExit} className="rounded-full border border-slate-700 bg-slate-900/70 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-100 hover:bg-slate-800/80">Exit Session</button>
         </div>
       </div>
@@ -389,17 +425,23 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         <div className="relative flex-1 overflow-y-auto bg-[#081838] px-6 py-5">
           {error && <p className="mb-4 text-sm text-rose-300">{error}</p>}
           <div className="space-y-4 pb-16">
-            {aiTurns.length === 0 && userTurns.length === 0 ? <p className="text-xs uppercase tracking-[0.22em] text-blue-200/40">Live neural stream online. Waiting for the first linguistic impulse.</p> : null}
-            {aiTurns.map((turn, idx) => (
-              <div key={`${turn.timestamp}-${idx}`} className="flex justify-start">
-                <div className="max-w-[75%] whitespace-pre-wrap rounded-2xl border border-indigo-400/30 bg-indigo-500/15 px-4 py-3 text-sm text-indigo-50">{turn.text}</div>
+            {aiTurns.length === 0 && userTurns.length === 0 && !liveTranscript ? <p className="text-xs uppercase tracking-[0.22em] text-blue-200/40">Live neural stream online. Waiting for the first linguistic impulse.</p> : null}
+            {transcriptions.map((turn, idx) => (
+              <div key={`${turn.timestamp}-${idx}`} className={`flex ${turn.speaker === 'ai' ? 'justify-start' : 'justify-end'}`}>
+                <div
+                  className={`max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${turn.speaker === 'ai' ? 'border border-indigo-400/30 bg-indigo-500/15 text-indigo-50' : 'border border-blue-300/35 bg-blue-500 font-semibold text-white'}`}
+                >
+                  {turn.text}
+                </div>
               </div>
             ))}
-            {userTurns.map((turn, idx) => (
-              <div key={`${turn.timestamp}-${idx}`} className="flex justify-end">
-                <div className="max-w-[75%] rounded-2xl border border-blue-300/35 bg-blue-500 px-4 py-3 text-sm font-semibold text-white">{turn.text}</div>
+            {liveTranscript ? (
+              <div className="flex justify-end">
+                <div className="max-w-[75%] whitespace-pre-wrap rounded-2xl border border-blue-300/35 bg-blue-500/60 px-4 py-3 text-sm font-semibold text-white/90">
+                  {liveTranscript}
+                </div>
               </div>
-            ))}
+            ) : null}
           </div>
 
           <div className="absolute right-8 top-8 text-right">
