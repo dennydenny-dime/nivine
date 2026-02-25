@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConversationHistoryItem, NeuralSpeechScoreCard, Persona, TranscriptionItem } from '../types';
 import { setUserConversationHistory, getUserConversationHistory } from '../lib/userStorage';
-import { hasPaidSubscription, isAdminEmail } from '../lib/subscription';
 
 interface ConversationRoomProps {
   persona: Persona;
@@ -16,6 +15,31 @@ type RoleOption =
   | 'Salesman'
   | 'Strict Academic Supervisor'
   | 'Company Manager';
+
+type StreamEvent = {
+  event: string;
+  data: string;
+};
+
+type SpeechRecognitionEventLike = Event & {
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: {
+      transcript: string;
+    };
+  }>;
+};
+
+type SpeechRecognitionLike = EventTarget & {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: Event & { error?: string }) => void) | null;
+  onend: (() => void) | null;
+};
 
 const ROLE_INSTRUCTIONS: Record<RoleOption, string> = {
   'Executive Recruiter': 'You are an Executive Recruiter. Stay in-role with formal, professional, and concise interview delivery. Ask competency-based questions only, require measurable examples, and never switch personas.',
@@ -34,7 +58,6 @@ const ROLE_QUESTION_LIMIT: Record<RoleOption, number> = {
 };
 
 const FILLER_WORDS = new Set(['um', 'uh', 'like', 'you know', 'actually', 'basically', 'literally', 'so']);
-const GEMINI_WS_ENDPOINT = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent';
 
 const clampScore = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
 
@@ -78,55 +101,20 @@ const buildNeuralSpeechScoreCard = (items: TranscriptionItem[]): NeuralSpeechSco
   };
 };
 
-const downsampleTo16kPcm16 = (input: Float32Array, inputSampleRate: number): Int16Array => {
-  if (inputSampleRate === 16000) {
-    const pcm16 = new Int16Array(input.length);
-    for (let i = 0; i < input.length; i += 1) {
-      const s = Math.max(-1, Math.min(1, input[i]));
-      pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
-    return pcm16;
-  }
+const backendBase = (import.meta.env.VITE_BACKEND_API_URL || '').replace(/\/$/, '');
+const chatEndpoint = backendBase ? `${backendBase}/chat` : '/api/chat';
 
-  const ratio = inputSampleRate / 16000;
-  const newLength = Math.round(input.length / ratio);
-  const result = new Int16Array(newLength);
+const getSpeechRecognition = (): (new () => SpeechRecognitionLike) | null => {
+  const win = window as Window & {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
 
-  let offsetResult = 0;
-  let offsetBuffer = 0;
-  while (offsetResult < result.length) {
-    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
-    let accum = 0;
-    let count = 0;
-
-    for (let i = offsetBuffer; i < nextOffsetBuffer && i < input.length; i += 1) {
-      accum += input[i];
-      count += 1;
-    }
-
-    const sample = count ? accum / count : 0;
-    const clamped = Math.max(-1, Math.min(1, sample));
-    result[offsetResult] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
-    offsetResult += 1;
-    offsetBuffer = nextOffsetBuffer;
-  }
-
-  return result;
-};
-
-const base64FromInt16 = (pcm16: Int16Array): string => {
-  const bytes = new Uint8Array(pcm16.buffer);
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
+  return win.SpeechRecognition || win.webkitSpeechRecognition || null;
 };
 
 const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) => {
-  const [role, setRole] = useState<RoleOption>((Object.keys(ROLE_INSTRUCTIONS).includes(persona.role) ? persona.role : 'Executive Recruiter') as RoleOption);
+  const [role] = useState<RoleOption>((Object.keys(ROLE_INSTRUCTIONS).includes(persona.role) ? persona.role : 'Executive Recruiter') as RoleOption);
   const [sessionState, setSessionState] = useState<SessionState>('Idle');
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -135,30 +123,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isHumanSpeaking, setIsHumanSpeaking] = useState(false);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const forcedStopRef = useRef(false);
-  const sessionTimerRef = useRef<number | null>(null);
-  const aiSpeakingTimeoutRef = useRef<number | null>(null);
-  const humanSpeakingTimeoutRef = useRef<number | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const transcriptRef = useRef<TranscriptionItem[]>([]);
   const questionCountRef = useRef(0);
-  const nextPlaybackAtRef = useRef(0);
-  const latestUserTranscriptRef = useRef('');
-
-  const apiKey = useMemo(
-    () =>
-      import.meta.env.VITE_GEMINI_API_KEY ||
-      import.meta.env.VITE_API_KEY ||
-      import.meta.env.GEMINI_API_KEY ||
-      import.meta.env.API_KEY ||
-      '',
-    [],
-  );
+  const streamingBufferRef = useRef('');
+  const aiSpeakingTimeoutRef = useRef<number | null>(null);
+  const humanSpeakingTimeoutRef = useRef<number | null>(null);
 
   const pushTranscript = useCallback((speaker: 'user' | 'ai', text: string) => {
     const item: TranscriptionItem = { speaker, text, timestamp: Date.now() };
@@ -166,59 +137,30 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     setTranscriptions(transcriptRef.current);
   }, []);
 
-  const currentUserName = useMemo(() => {
-    const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
-    return currentUser?.name || currentUser?.email || 'You';
-  }, []);
-
-  const aiName = useMemo(() => `${role} AI`, [role]);
-  const aiTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'ai'), [transcriptions]);
-  const userTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'user'), [transcriptions]);
-  const neuralIntensity = useMemo(() => `${persona.difficultyLevel || 5}/10`, [persona.difficultyLevel]);
-
-  const stopAudioPipeline = useCallback(() => {
-    processorRef.current?.disconnect();
-    sourceNodeRef.current?.disconnect();
-    processorRef.current = null;
-    sourceNodeRef.current = null;
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-    mediaStreamRef.current = null;
-    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-      void audioCtxRef.current.close();
+  const updateLastAiTurn = useCallback((text: string) => {
+    const next = [...transcriptRef.current];
+    const idx = [...next].reverse().findIndex((item) => item.speaker === 'ai');
+    if (idx === -1) {
+      pushTranscript('ai', text);
+      return;
     }
-    audioCtxRef.current = null;
-  }, []);
+    const absoluteIdx = next.length - 1 - idx;
+    next[absoluteIdx] = { ...next[absoluteIdx], text };
+    transcriptRef.current = next;
+    setTranscriptions(next);
+  }, [pushTranscript]);
 
   const markAiSpeaking = useCallback(() => {
     setIsAiSpeaking(true);
-    if (aiSpeakingTimeoutRef.current) {
-      window.clearTimeout(aiSpeakingTimeoutRef.current);
-    }
-    aiSpeakingTimeoutRef.current = window.setTimeout(() => setIsAiSpeaking(false), 260);
+    if (aiSpeakingTimeoutRef.current) window.clearTimeout(aiSpeakingTimeoutRef.current);
+    aiSpeakingTimeoutRef.current = window.setTimeout(() => setIsAiSpeaking(false), 280);
   }, []);
 
   const markHumanSpeaking = useCallback(() => {
     setIsHumanSpeaking(true);
-    if (humanSpeakingTimeoutRef.current) {
-      window.clearTimeout(humanSpeakingTimeoutRef.current);
-    }
-    humanSpeakingTimeoutRef.current = window.setTimeout(() => setIsHumanSpeaking(false), 260);
+    if (humanSpeakingTimeoutRef.current) window.clearTimeout(humanSpeakingTimeoutRef.current);
+    humanSpeakingTimeoutRef.current = window.setTimeout(() => setIsHumanSpeaking(false), 280);
   }, []);
-
-  const closeSession = useCallback((state: SessionState = 'Ended') => {
-    forcedStopRef.current = true;
-    if (sessionTimerRef.current) {
-      window.clearTimeout(sessionTimerRef.current);
-      sessionTimerRef.current = null;
-    }
-    wsRef.current?.close();
-    wsRef.current = null;
-    stopAudioPipeline();
-    setSessionActive(false);
-    setSessionState(state);
-    setIsAiSpeaking(false);
-    setIsHumanSpeaking(false);
-  }, [stopAudioPipeline]);
 
   const persistSession = useCallback(() => {
     if (!transcriptRef.current.length) return;
@@ -234,218 +176,181 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     setUserConversationHistory(currentUser.id, [historyItem, ...history].slice(0, 50));
   }, [persona, role]);
 
-  const playPcmChunk = useCallback((base64Data: string, sampleRate: number) => {
-    const audioCtx = audioCtxRef.current;
-    if (!audioCtx) return;
+  const stopSession = useCallback((state: SessionState = 'Ended') => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setSessionActive(false);
+    setSessionState(state);
+    setIsAiSpeaking(false);
+    setIsHumanSpeaking(false);
+  }, []);
 
-    const binary = atob(base64Data);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  const parseSseBlock = (block: string): StreamEvent | null => {
+    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) return null;
+    const event = lines.find((line) => line.startsWith('event:'))?.slice(6).trim() || 'message';
+    const data = lines.filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).join('');
+    return { event, data };
+  };
 
-    const pcm16 = new Int16Array(bytes.buffer);
-    const float32 = new Float32Array(pcm16.length);
-    for (let i = 0; i < pcm16.length; i += 1) float32[i] = pcm16[i] / 0x8000;
+  const streamAssistantReply = useCallback(async (transcript: string) => {
+    setSessionState('Thinking');
+    streamingBufferRef.current = '';
+    pushTranscript('ai', '');
 
-    const buffer = audioCtx.createBuffer(1, float32.length, sampleRate);
-    buffer.copyToChannel(float32, 0);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioCtx.destination);
+    const response = await fetch(`${chatEndpoint}?stream=1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        stream: true,
+        transcript,
+        language: persona.language || 'English',
+        persona,
+        roleDirectives: [ROLE_INSTRUCTIONS[role]],
+        history: transcriptRef.current,
+      }),
+    });
 
-    const now = audioCtx.currentTime;
-    const startAt = Math.max(now + 0.02, nextPlaybackAtRef.current || now + 0.02);
-    source.start(startAt);
-    nextPlaybackAtRef.current = startAt + buffer.duration;
-    setSessionState('Speaking');
-    markAiSpeaking();
-    source.onended = () => {
-      if (sessionActive) setSessionState('Listening');
-    };
-  }, [markAiSpeaking, sessionActive]);
-
-  const handleSocketMessage = useCallback((event: MessageEvent) => {
-    let payload: any;
-    try {
-      payload = JSON.parse(event.data);
-    } catch {
-      return;
+    if (!response.ok || !response.body) {
+      const details = await response.text();
+      throw new Error(`Streaming request failed (${response.status}): ${details}`);
     }
 
-    const userTranscript =
-      payload?.serverContent?.inputTranscription?.text ||
-      payload?.serverContent?.inputTranscription?.transcript ||
-      payload?.inputTranscription?.text ||
-      payload?.inputTranscription?.transcript;
-    if (typeof userTranscript === 'string' && userTranscript.trim()) {
-      const normalizedTranscript = userTranscript.trim();
-      if (normalizedTranscript !== latestUserTranscriptRef.current) {
-        latestUserTranscriptRef.current = normalizedTranscript;
-        pushTranscript('user', normalizedTranscript);
-      }
-    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
 
-    if (payload?.serverContent?.modelTurn?.parts) {
-      const parts = payload.serverContent.modelTurn.parts as any[];
-      parts.forEach((part) => {
-        if (part?.text) {
-          pushTranscript('ai', part.text);
-          questionCountRef.current += 1;
-          if (questionCountRef.current >= ROLE_QUESTION_LIMIT[role]) {
-            closeSession();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      pending += decoder.decode(value, { stream: true });
+      const blocks = pending.split('\n\n');
+      pending = blocks.pop() || '';
+
+      for (const block of blocks) {
+        const event = parseSseBlock(block);
+        if (!event) continue;
+
+        if (event.event === 'token') {
+          try {
+            const payload = JSON.parse(event.data) as { token?: string };
+            if (!payload.token) continue;
+            streamingBufferRef.current += payload.token;
+            updateLastAiTurn(streamingBufferRef.current.trimStart());
+            setSessionState('Speaking');
+            markAiSpeaking();
+          } catch {
+            // ignore malformed token payload
           }
         }
 
-        const audio = part?.inlineData;
-        if (audio?.data && typeof audio.data === 'string') {
-          const mime = audio.mimeType || 'audio/pcm;rate=24000';
-          const rateMatch = /rate=(\d+)/.exec(mime);
-          const sampleRate = rateMatch ? Number(rateMatch[1]) : 24000;
-          playPcmChunk(audio.data, sampleRate);
+        if (event.event === 'error') {
+          const payload = JSON.parse(event.data) as { error?: string };
+          throw new Error(payload.error || 'Unknown streaming error.');
         }
-      });
-    }
-
-    if (payload?.serverContent?.generationComplete) {
-      setSessionState('Listening');
-    }
-  }, [closeSession, playPcmChunk, pushTranscript, role]);
-
-  // Generic live session opener required for all role variants.
-  const openLiveSession = useCallback(async (selectedRole: RoleOption) => {
-    const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
-    const adminUser = isAdminEmail(currentUser?.email);
-    if (!adminUser && !hasPaidSubscription()) {
-      throw new Error('Paid subscription is required for live Gemini audio sessions.');
-    }
-
-    if (!apiKey) {
-      throw new Error('Missing Gemini API key. Set VITE_GEMINI_API_KEY (or VITE_API_KEY).');
-    }
-
-    const instructionText = `${ROLE_INSTRUCTIONS[selectedRole]} Address the user as ${persona.name}. Keep language output in ${persona.language || 'English'} unless asked to switch.`;
-    const ws = new WebSocket(`${GEMINI_WS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`);
-    wsRef.current = ws;
-
-    ws.onopen = async () => {
-      reconnectAttemptsRef.current = 0;
-      setSessionState('Thinking');
-      ws.send(
-        JSON.stringify({
-          setup: {
-            model: 'models/gemini-2.0-flash-exp',
-            systemInstruction: {
-              parts: [{ text: instructionText }],
-            },
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-            },
-          },
-        }),
-      );
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      const audioCtx = new AudioContext();
-      audioCtxRef.current = audioCtx;
-      nextPlaybackAtRef.current = audioCtx.currentTime;
-
-      const sourceNode = audioCtx.createMediaStreamSource(stream);
-      sourceNodeRef.current = sourceNode;
-
-      // ScriptProcessor keeps vanilla Web API compatibility for real-time PCM capture.
-      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-      sourceNode.connect(processor);
-      processor.connect(audioCtx.destination);
-
-      processor.onaudioprocess = (audioEvent) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-        if (isMicMuted) return;
-        const channelData = audioEvent.inputBuffer.getChannelData(0);
-        let peak = 0;
-        for (let i = 0; i < channelData.length; i += 1) {
-          peak = Math.max(peak, Math.abs(channelData[i]));
-        }
-        if (peak > 0.03) {
-          markHumanSpeaking();
-        }
-        const pcm16 = downsampleTo16kPcm16(channelData, audioCtx.sampleRate);
-        const b64 = base64FromInt16(pcm16);
-        wsRef.current.send(
-          JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [
-                {
-                  mimeType: 'audio/pcm;rate=16000',
-                  data: b64,
-                },
-              ],
-            },
-          }),
-        );
-      };
-
-      setSessionState('Listening');
-      setSessionActive(true);
-      sessionTimerRef.current = window.setTimeout(() => closeSession(), 60_000);
-    };
-
-    ws.onmessage = handleSocketMessage;
-
-    ws.onerror = () => {
-      setError('Live socket error occurred. Reconnecting...');
-    };
-
-    ws.onclose = () => {
-      if (forcedStopRef.current) return;
-
-      if (reconnectAttemptsRef.current >= 3) {
-        setError('Connection closed after retries. Please start again.');
-        closeSession('Ended');
-        return;
       }
+    }
 
-      reconnectAttemptsRef.current += 1;
-      setSessionState('Thinking');
-      window.setTimeout(() => {
-        void openLiveSession(selectedRole).catch((err) => {
-          setError(err instanceof Error ? err.message : 'Reconnect failed.');
-          closeSession('Ended');
-        });
-      }, 800 * reconnectAttemptsRef.current);
-    };
-  }, [apiKey, closeSession, handleSocketMessage, isMicMuted, markHumanSpeaking]);
+    questionCountRef.current += 1;
+    if (questionCountRef.current >= ROLE_QUESTION_LIMIT[role]) {
+      stopSession('Ended');
+      return;
+    }
+
+    const text = streamingBufferRef.current.trim();
+    if (text && !isMicMuted && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = persona.language || 'en-US';
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+
+    setSessionState('Listening');
+  }, [isMicMuted, markAiSpeaking, persona, pushTranscript, role, stopSession, updateLastAiTurn]);
 
   const startInterview = useCallback(() => {
     setError(null);
     setTranscriptions([]);
     transcriptRef.current = [];
-    latestUserTranscriptRef.current = '';
     questionCountRef.current = 0;
-    forcedStopRef.current = false;
-    void openLiveSession(role).catch((err) => {
-      setError(err instanceof Error ? err.message : 'Unable to start live session.');
-      closeSession('Ended');
-    });
-  }, [closeSession, openLiveSession, role]);
+
+    const SpeechRecognitionCtor = getSpeechRecognition();
+    if (!SpeechRecognitionCtor) {
+      setError('Speech Recognition is unavailable in this browser.');
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = persona.language || 'en-US';
+
+    recognition.onresult = (event) => {
+      if (sessionState !== 'Listening') return;
+      if (isMicMuted) return;
+
+      for (let i = event.results.length - 1; i >= 0; i -= 1) {
+        const result = event.results[i];
+        if (!result.isFinal) continue;
+        const transcript = result[0]?.transcript?.trim();
+        if (!transcript) continue;
+
+        pushTranscript('user', transcript);
+        markHumanSpeaking();
+        void streamAssistantReply(transcript).catch((err) => {
+          setError(err instanceof Error ? err.message : 'Stream failed.');
+          stopSession('Ended');
+        });
+        break;
+      }
+    };
+
+    recognition.onerror = (event) => {
+      setError(`Speech recognition error: ${event.error || 'unknown'}`);
+      stopSession('Ended');
+    };
+
+    recognition.onend = () => {
+      if (!sessionActive) return;
+      if (sessionState === 'Listening') {
+        recognition.start();
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setSessionActive(true);
+    setSessionState('Listening');
+  }, [isMicMuted, markHumanSpeaking, persona.language, pushTranscript, sessionState, stopSession, streamAssistantReply]);
 
   const stopInterview = useCallback(() => {
     persistSession();
-    closeSession('Ended');
-  }, [closeSession, persistSession]);
+    stopSession('Ended');
+  }, [persistSession, stopSession]);
 
   useEffect(() => () => {
-    if (aiSpeakingTimeoutRef.current) {
-      window.clearTimeout(aiSpeakingTimeoutRef.current);
-    }
-    if (humanSpeakingTimeoutRef.current) {
-      window.clearTimeout(humanSpeakingTimeoutRef.current);
-    }
+    if (aiSpeakingTimeoutRef.current) window.clearTimeout(aiSpeakingTimeoutRef.current);
+    if (humanSpeakingTimeoutRef.current) window.clearTimeout(humanSpeakingTimeoutRef.current);
     persistSession();
-    closeSession('Ended');
-  }, [closeSession, persistSession]);
+    stopSession('Ended');
+  }, [persistSession, stopSession]);
+
+  const currentUserName = useMemo(() => {
+    const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
+    return currentUser?.name || currentUser?.email || 'You';
+  }, []);
+
+  const aiName = useMemo(() => `${role} AI`, [role]);
+  const aiTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'ai'), [transcriptions]);
+  const userTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'user'), [transcriptions]);
+  const neuralIntensity = useMemo(() => `${persona.difficultyLevel || 5}/10`, [persona.difficultyLevel]);
 
   return (
     <div className="mx-auto flex h-[calc(100vh-7.5rem)] w-full max-w-5xl flex-col px-4 pb-4 lg:px-6">
@@ -458,6 +363,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.18em]">
               <span className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-sky-200">Neural Feed: {sessionActive ? 'Active' : 'Idle'}</span>
               <span className="rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-indigo-100">Intensity: {neuralIntensity}</span>
+              <span className="rounded-md border border-fuchsia-500/30 bg-fuchsia-500/10 px-2 py-1 text-fuchsia-100">Workflow: FE → SSE → Gemini Stream</span>
             </div>
           </div>
         </div>
@@ -465,13 +371,9 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-slate-700 bg-slate-900/70 px-6 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100">{persona.language || 'English'}</span>
           {!sessionActive ? (
-            <button onClick={startInterview} className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-100 hover:bg-emerald-500/25">
-              Start Session
-            </button>
+            <button onClick={startInterview} className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-100 hover:bg-emerald-500/25">Start Session</button>
           ) : (
-            <button onClick={stopInterview} className="rounded-full border border-rose-400/30 bg-rose-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/25">
-              End Session
-            </button>
+            <button onClick={stopInterview} className="rounded-full border border-rose-400/30 bg-rose-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/25">End Session</button>
           )}
           <button onClick={onExit} className="rounded-full border border-slate-700 bg-slate-900/70 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-100 hover:bg-slate-800/80">Exit Session</button>
         </div>
@@ -487,16 +389,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         <div className="relative flex-1 overflow-y-auto bg-[#081838] px-6 py-5">
           {error && <p className="mb-4 text-sm text-rose-300">{error}</p>}
           <div className="space-y-4 pb-16">
-            {aiTurns.length === 0 && userTurns.length === 0 ? (
-              <p className="text-xs uppercase tracking-[0.22em] text-blue-200/40">Live neural stream online. Waiting for the first linguistic impulse.</p>
-            ) : null}
-
+            {aiTurns.length === 0 && userTurns.length === 0 ? <p className="text-xs uppercase tracking-[0.22em] text-blue-200/40">Live neural stream online. Waiting for the first linguistic impulse.</p> : null}
             {aiTurns.map((turn, idx) => (
               <div key={`${turn.timestamp}-${idx}`} className="flex justify-start">
-                <div className="max-w-[75%] rounded-2xl border border-indigo-400/30 bg-indigo-500/15 px-4 py-3 text-sm text-indigo-50">{turn.text}</div>
+                <div className="max-w-[75%] whitespace-pre-wrap rounded-2xl border border-indigo-400/30 bg-indigo-500/15 px-4 py-3 text-sm text-indigo-50">{turn.text}</div>
               </div>
             ))}
-
             {userTurns.map((turn, idx) => (
               <div key={`${turn.timestamp}-${idx}`} className="flex justify-end">
                 <div className="max-w-[75%] rounded-2xl border border-blue-300/35 bg-blue-500 px-4 py-3 text-sm font-semibold text-white">{turn.text}</div>
@@ -514,13 +412,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(74,222,128,0.8)]" />Signal Locked</span>
           <span className="text-slate-400">|</span>
           <span>Secure Neural Stream v3.2</span>
-          <button
-            type="button"
-            onClick={() => setIsMicMuted((prev) => !prev)}
-            className="pointer-events-auto rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-1 text-[10px] text-blue-100"
-          >
-            Mic {isMicMuted ? 'Off' : 'On'}
-          </button>
+          <button type="button" onClick={() => setIsMicMuted((prev) => !prev)} className="pointer-events-auto rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-1 text-[10px] text-blue-100">Mic {isMicMuted ? 'Off' : 'On'}</button>
           <span className={`pointer-events-auto neural-voice-bubble human ${isHumanSpeaking && !isMicMuted ? 'is-active' : ''}`} />
           <span className={`pointer-events-auto neural-voice-bubble ${isAiSpeaking ? 'is-active' : ''}`} />
         </div>
