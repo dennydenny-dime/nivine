@@ -183,6 +183,9 @@ const InterviewIntelPage: React.FC = () => {
     return sampleQuestions.filter((q) => q.role === roleFilter);
   }, [roleFilter]);
 
+  const featuredNews = filteredNews[0];
+  const railNews = filteredNews.slice(1);
+
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 p-6 md:p-8">
@@ -196,9 +199,9 @@ const InterviewIntelPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 md:p-6">
+      <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl font-bold">📰 Interview News (Live Feed)</h2>
+          <h2 className="text-xl font-bold">📰 Interview News (Netflix-style Rail)</h2>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setKeyword('all')}
@@ -218,23 +221,47 @@ const InterviewIntelPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-4">
-          {filteredNews.map((article) => (
-            <article key={article.id} className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/70 hover:border-indigo-500/60 transition-colors">
-              <img src={article.image} alt={article.title} className="w-full h-40 object-cover" />
-              <div className="p-4 space-y-2">
-                <p className="text-xs text-slate-400">{article.source} • {prettyDate(article.publishedAt)}</p>
-                <h3 className="font-bold text-white">{article.title}</h3>
-                <p className="text-sm text-slate-300">{article.description}</p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {article.tags.map((tag) => (
-                    <span key={tag} className="text-[10px] px-2 py-1 rounded-full border border-slate-700 text-slate-300">{tag}</span>
-                  ))}
-                </div>
-                <a href={article.url} className="inline-block text-indigo-300 text-sm mt-1 hover:text-indigo-200">Read source →</a>
+        {featuredNews && (
+          <article className="group relative overflow-hidden rounded-2xl border border-slate-800 min-h-[300px] md:min-h-[360px] mb-5">
+            <img
+              src={featuredNews.image}
+              alt={featuredNews.title}
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
+            <div className="relative z-10 p-5 md:p-7 h-full flex flex-col justify-end gap-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-red-300">Featured Story</p>
+              <h3 className="text-xl md:text-3xl font-extrabold text-white max-w-3xl">{featuredNews.title}</h3>
+              <p className="text-sm md:text-base text-slate-200 max-w-2xl">{featuredNews.description}</p>
+              <p className="text-xs text-slate-300">{featuredNews.source} • {prettyDate(featuredNews.publishedAt)}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {featuredNews.tags.map((tag) => (
+                  <span key={tag} className="text-[10px] px-2 py-1 rounded-full border border-slate-500/60 text-slate-100 bg-slate-900/50">{tag}</span>
+                ))}
               </div>
-            </article>
-          ))}
+              <a href={featuredNews.url} className="inline-flex items-center text-red-200 text-sm mt-1 hover:text-red-100">Read source →</a>
+            </div>
+          </article>
+        )}
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">More Like This</h3>
+          <div className="flex gap-4 overflow-x-auto pb-2 pr-2 snap-x snap-mandatory">
+            {railNews.map((article) => (
+              <article
+                key={article.id}
+                className="group relative min-w-[240px] sm:min-w-[280px] md:min-w-[320px] h-[180px] rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/70 snap-start transition duration-300 hover:scale-[1.03] hover:border-red-400/70"
+              >
+                <img src={article.image} alt={article.title} className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+                <div className="relative h-full p-4 flex flex-col justify-end">
+                  <p className="text-[11px] text-slate-300">{article.source} • {prettyDate(article.publishedAt)}</p>
+                  <h4 className="text-sm font-bold text-white leading-snug">{article.title}</h4>
+                  <a href={article.url} className="text-xs text-red-200 opacity-0 group-hover:opacity-100 transition-opacity mt-1">Open story →</a>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
