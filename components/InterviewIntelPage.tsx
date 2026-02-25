@@ -284,7 +284,7 @@ const InterviewIntelPage: React.FC = () => {
 
       <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl font-bold">📰 Interview News (Netflix-style Rail)</h2>
+          <h2 className="text-xl font-bold">📰 Interview News</h2>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setKeyword('all')}
