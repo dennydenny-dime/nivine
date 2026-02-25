@@ -505,7 +505,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           </div>
 
           <div className="absolute right-8 top-8 text-right">
-            <div className="inline-flex h-16 w-20 items-center justify-center rounded-2xl bg-blue-500 text-3xl font-semibold text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.35)]">{isAiSpeaking ? '…' : 'Hmm.'}</div>
+            <div className="inline-flex h-16 w-20 items-center justify-center rounded-2xl bg-blue-500 text-3xl font-semibold text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.35)]">{isAiSpeaking ? '…' : ''}</div>
             <p className="mt-2 text-[10px] uppercase tracking-[0.28em] text-blue-100/40">Linguistic Impulse</p>
           </div>
         </div>
