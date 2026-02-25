@@ -53,15 +53,12 @@ type NavItem = {
   locked?: boolean;
 };
 
-const FREE_TRIAL_DURATION_MS = 60_000;
+const FREE_TRIAL_DURATION_MS = 150_000;
 const FREE_TRIAL_STORAGE_KEY = 'tm_free_feature_trial_expires_at';
 
 const FREE_TRIAL_VIEWS = new Set<View>([
   View.APP,
-  View.QUIZ,
-  View.INTERVIEW_INTEL,
-  View.CUSTOM_COACH,
-  View.MENTAL_PERFORMANCE,
+  View.CONVERSATION,
 ]);
 
 const isFreeTrialView = (view: View) => FREE_TRIAL_VIEWS.has(view);
@@ -79,6 +76,14 @@ const App: React.FC = () => {
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
   const isAdmin = isAdminEmail(normalizedEmail);
   const hasFullAccess = isAdmin || hasPaidSubscription();
+  const isNewUser = !hasFullAccess;
+
+  const expireTrialAndRedirect = useCallback(() => {
+    const notice = 'Free trial has expired. Buy Premium to continue neural modules.';
+    setTrialExpiredNotice(notice);
+    window.alert(notice);
+    setCurrentView(View.PRICING);
+  }, []);
 
   useEffect(() => {
     if (hasFullAccess) {
@@ -104,18 +109,16 @@ const App: React.FC = () => {
 
     const remaining = freeTrialExpiresAt - Date.now();
     if (remaining <= 0) {
-      setTrialExpiredNotice('Your 1-minute free workflow has ended. Tap here to choose a plan and continue.');
-      setCurrentView(View.PRICING);
+      expireTrialAndRedirect();
       return;
     }
 
     const timer = window.setTimeout(() => {
-      setTrialExpiredNotice('Your 1-minute free workflow has ended. Tap here to choose a plan and continue.');
-      setCurrentView(View.PRICING);
+      expireTrialAndRedirect();
     }, remaining);
 
     return () => window.clearTimeout(timer);
-  }, [currentView, freeTrialExpiresAt, hasFullAccess]);
+  }, [currentView, expireTrialAndRedirect, freeTrialExpiresAt, hasFullAccess]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -233,10 +236,10 @@ const App: React.FC = () => {
   };
 
   const openApp = () => {
-    openViewWithTrial(View.APP, 'Neural Training Modules');
+    openViewWithTrial(View.APP);
   };
 
-  const openViewWithTrial = (view: View, featureName: string) => {
+  const openViewWithTrial = (view: View) => {
     if (hasFullAccess || !isFreeTrialView(view)) {
       setCurrentView(view);
       return;
@@ -253,8 +256,7 @@ const App: React.FC = () => {
     }
 
     if (expiresAt <= now) {
-      setTrialExpiredNotice(`Your 1-minute free ${featureName} workflow ended. Tap here to view plans.`);
-      setCurrentView(View.PRICING);
+      expireTrialAndRedirect();
       return;
     }
 
@@ -262,7 +264,7 @@ const App: React.FC = () => {
   };
 
   const openQuiz = () => {
-    openViewWithTrial(View.QUIZ, 'Quiz + Interview Intel');
+    setCurrentView(View.QUIZ);
   };
 
   const openPricing = () => {
@@ -278,11 +280,21 @@ const App: React.FC = () => {
   };
 
   const openCustomCoach = () => {
-    openViewWithTrial(View.CUSTOM_COACH, 'Custom Coach');
+    if (isNewUser) {
+      setTrialExpiredNotice('Custom Coach is available on Premium plans. Tap to choose a plan.');
+      setCurrentView(View.PRICING);
+      return;
+    }
+    setCurrentView(View.CUSTOM_COACH);
   };
 
   const openMentalPerformance = () => {
-    openViewWithTrial(View.MENTAL_PERFORMANCE, 'Neural Module');
+    if (isNewUser) {
+      setTrialExpiredNotice('Mental Performance Coach is available on Premium plans. Tap to choose a plan.');
+      setCurrentView(View.PRICING);
+      return;
+    }
+    setCurrentView(View.MENTAL_PERFORMANCE);
   };
 
   const openPersonalDashboard = () => {
@@ -290,7 +302,7 @@ const App: React.FC = () => {
   };
 
   const openInterviewIntel = () => {
-    openViewWithTrial(View.INTERVIEW_INTEL, 'Interview Intel');
+    setCurrentView(View.INTERVIEW_INTEL);
   };
 
   const goBack = () => {
@@ -322,8 +334,8 @@ const App: React.FC = () => {
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
-    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach },
-    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance },
+    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
+    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: isNewUser },
     {
       key: View.LEADERBOARD,
       label: 'Leaderboard',
@@ -408,11 +420,6 @@ const App: React.FC = () => {
               ))}
             </div>
           </div>
-          {!hasFullAccess && (
-            <p className="text-xs text-amber-300 px-1">
-              Free users can try Quizzes, Interview Intel, Neural Modules, and Custom Coach for 1 minute. After that, choose a plan to continue.
-            </p>
-          )}
           {trialExpiredNotice && (
             <button
               onClick={openPricing}
@@ -434,7 +441,7 @@ const App: React.FC = () => {
         )}
 
         {currentView === View.APP && (
-          <MainAppPage onStart={startConversation} />
+          <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />
         )}
 
         {currentView === View.INTERVIEW_INTEL && (
