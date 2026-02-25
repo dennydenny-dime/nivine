@@ -2,35 +2,3 @@
 :root {
   color-scheme: dark;
 }
-
-.voice-wave {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 16px;
-}
-
-.voice-wave span {
-  width: 3px;
-  height: 5px;
-  border-radius: 9999px;
-  background: linear-gradient(180deg, #22d3ee 0%, #6366f1 100%);
-  opacity: 0.35;
-  transform-origin: center bottom;
-}
-
-.voice-wave.is-active span {
-  animation: voice-wave-pulse 0.9s ease-in-out infinite;
-  opacity: 1;
-}
-
-@keyframes voice-wave-pulse {
-  0%,
-  100% {
-    transform: scaleY(0.45);
-  }
-
-  50% {
-    transform: scaleY(1.45);
-  }
-}
