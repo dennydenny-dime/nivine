@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 type NewsItem = {
   id: string;
@@ -86,6 +86,24 @@ const sampleNews: NewsItem[] = [
   },
 ];
 
+const NEWS_API_BASE_URL = 'https://newsdata.io/api/1/latest';
+const NEWS_API_KEY = import.meta.env.VITE_NEWSDATA_API_KEY || 'pub_7036d83e247c4c828bcaf283093192a5';
+
+type NewsDataArticle = {
+  article_id?: string;
+  title?: string;
+  description?: string;
+  source_id?: string;
+  pubDate?: string;
+  link?: string;
+  image_url?: string;
+  keywords?: string[];
+};
+
+type NewsDataResponse = {
+  results?: NewsDataArticle[];
+};
+
 const sampleQuestions: InterviewQuestion[] = [
   {
     id: 'q1',
@@ -170,13 +188,78 @@ const prettyDate = (input: string) =>
 
 const InterviewIntelPage: React.FC = () => {
   const [keyword, setKeyword] = useState<string>('all');
+  const [news, setNews] = useState<NewsItem[]>(sampleNews);
+  const [newsLoading, setNewsLoading] = useState<boolean>(false);
+  const [newsError, setNewsError] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [openModuleId, setOpenModuleId] = useState<string>(sampleLearningModules[0].id);
 
-  const filteredNews = useMemo(() => {
-    if (keyword === 'all') return sampleNews;
-    return sampleNews.filter((article) => article.tags.includes(keyword));
+  useEffect(() => {
+    const activeKeyword = keyword === 'all' ? 'hiring trends OR job market OR interview process' : keyword;
+    const queryParams = new URLSearchParams({
+      apikey: NEWS_API_KEY,
+      q: activeKeyword,
+      language: 'en',
+      size: '10',
+    });
+    const controller = new AbortController();
+
+    const fetchNews = async () => {
+      try {
+        setNewsLoading(true);
+        setNewsError('');
+
+        const response = await fetch(`${NEWS_API_BASE_URL}?${queryParams.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`News API request failed (${response.status})`);
+        }
+
+        const data = (await response.json()) as NewsDataResponse;
+        const normalizedResults = (data.results || [])
+          .filter((article) => article.title)
+          .map((article, index) => ({
+            id: article.article_id || `live-${index}`,
+            title: article.title || 'Untitled article',
+            description: article.description || 'No summary available for this article.',
+            source: article.source_id || 'NewsData',
+            publishedAt: article.pubDate || new Date().toISOString(),
+            url: article.link || '#',
+            image: article.image_url || 'https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=1000&q=80',
+            tags: article.keywords?.length ? article.keywords.slice(0, 3) : [activeKeyword],
+          }));
+
+        if (normalizedResults.length > 0) {
+          setNews(normalizedResults);
+          return;
+        }
+
+        setNews(sampleNews);
+        setNewsError('No live stories returned. Showing sample news instead.');
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setNews(sampleNews);
+        setNewsError('Could not load live news right now. Showing sample news instead.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setNewsLoading(false);
+        }
+      }
+    };
+
+    fetchNews();
+
+    return () => controller.abort();
   }, [keyword]);
+
+  const filteredNews = useMemo(() => {
+    if (keyword === 'all') return news;
+    return news.filter((article) => article.tags.includes(keyword));
+  }, [keyword, news]);
 
   const filteredQuestions = useMemo(() => {
     if (roleFilter === 'All') return sampleQuestions;
@@ -219,6 +302,11 @@ const InterviewIntelPage: React.FC = () => {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mb-4 space-y-1">
+          {newsLoading && <p className="text-xs text-indigo-300">Loading live stories from NewsData…</p>}
+          {newsError && <p className="text-xs text-amber-300">{newsError}</p>}
         </div>
 
         {featuredNews && (
