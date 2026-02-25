@@ -62,9 +62,13 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
               onClick={() => handlePresetStart(p)}
               className="p-6 glass rounded-2xl text-left hover:border-blue-500/50 hover:bg-slate-900/50 transition-all group"
             >
-              <div className="text-[10px] uppercase tracking-[0.2em] text-pink-400 font-black mb-1.5">{p.mood}</div>
-              <h3 className="text-lg font-bold group-hover:text-blue-400 transition-colors">{p.role}</h3>
-              <p className="text-sm text-slate-500 mt-2">Simulate a session with {p.name} in {language}.</p>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-pink-400 font-black">{p.mood}</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">NTM {idx + 1}</div>
+              </div>
+              <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">{p.name}</h3>
+              <p className="text-sm text-slate-400 mt-1">{p.role}</p>
+              <p className="text-sm text-slate-500 mt-3">Start {p.name}'s neural training module in {language}.</p>
             </button>
           ))}
         </div>
