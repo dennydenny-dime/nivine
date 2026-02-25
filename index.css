@@ -2,3 +2,34 @@
 :root {
   color-scheme: dark;
 }
+
+.neural-voice-bubble {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #a78bfa, #6366f1);
+  box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.45);
+  transform-origin: center;
+}
+
+.neural-voice-bubble.human {
+  background: linear-gradient(180deg, #38bdf8, #2563eb);
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
+}
+
+.neural-voice-bubble.is-active {
+  animation: neuralBubblePulse 1s ease-in-out infinite;
+}
+
+@keyframes neuralBubblePulse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.3);
+  }
+
+  50% {
+    transform: translateY(-5px) scale(1.25);
+    box-shadow: 0 0 0 7px rgba(99, 102, 241, 0);
+  }
+}

@@ -131,6 +131,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
+  const [isMicMuted, setIsMicMuted] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -143,6 +144,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const transcriptRef = useRef<TranscriptionItem[]>([]);
   const questionCountRef = useRef(0);
   const nextPlaybackAtRef = useRef(0);
+  const latestUserTranscriptRef = useRef('');
 
   const apiKey = useMemo(
     () =>
@@ -159,6 +161,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     transcriptRef.current = [...transcriptRef.current, item];
     setTranscriptions(transcriptRef.current);
   }, []);
+
+  const currentUserName = useMemo(() => {
+    const currentUser = JSON.parse(localStorage.getItem('tm_current_user') || '{}');
+    return currentUser?.name || currentUser?.email || 'You';
+  }, []);
+
+  const aiName = useMemo(() => `${role} AI`, [role]);
+  const aiTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'ai'), [transcriptions]);
+  const userTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'user'), [transcriptions]);
 
   const stopAudioPipeline = useCallback(() => {
     processorRef.current?.disconnect();
@@ -235,6 +246,19 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       payload = JSON.parse(event.data);
     } catch {
       return;
+    }
+
+    const userTranscript =
+      payload?.serverContent?.inputTranscription?.text ||
+      payload?.serverContent?.inputTranscription?.transcript ||
+      payload?.inputTranscription?.text ||
+      payload?.inputTranscription?.transcript;
+    if (typeof userTranscript === 'string' && userTranscript.trim()) {
+      const normalizedTranscript = userTranscript.trim();
+      if (normalizedTranscript !== latestUserTranscriptRef.current) {
+        latestUserTranscriptRef.current = normalizedTranscript;
+        pushTranscript('user', normalizedTranscript);
+      }
     }
 
     if (payload?.serverContent?.modelTurn?.parts) {
@@ -314,6 +338,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       processor.onaudioprocess = (audioEvent) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        if (isMicMuted) return;
         const channelData = audioEvent.inputBuffer.getChannelData(0);
         const pcm16 = downsampleTo16kPcm16(channelData, audioCtx.sampleRate);
         const b64 = base64FromInt16(pcm16);
@@ -360,12 +385,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         });
       }, 800 * reconnectAttemptsRef.current);
     };
-  }, [apiKey, closeSession, handleSocketMessage]);
+  }, [apiKey, closeSession, handleSocketMessage, isMicMuted]);
 
   const startInterview = useCallback(() => {
     setError(null);
     setTranscriptions([]);
     transcriptRef.current = [];
+    latestUserTranscriptRef.current = '';
     questionCountRef.current = 0;
     forcedStopRef.current = false;
     void openLiveSession(role).catch((err) => {
@@ -420,16 +446,54 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
       </div>
 
-      <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-900/40 border border-slate-800 rounded-3xl">
-        {transcriptions.length === 0 ? (
-          <p className="text-slate-500 text-sm">No transcript yet. Start interview to begin real-time streaming.</p>
-        ) : transcriptions.map((t, idx) => (
-          <div key={`${t.timestamp}-${idx}`} className={`flex ${t.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm ${t.speaker === 'user' ? 'bg-blue-600' : 'bg-slate-800 border border-slate-700'}`}>
-              {t.text}
+      <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-4 min-h-0">
+        <div className="min-h-0 p-5 overflow-y-auto space-y-4 bg-slate-900/40 border border-indigo-400/30 rounded-3xl">
+          <div className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur rounded-2xl border border-indigo-500/30 p-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300">AI Section</p>
+              <p className="text-sm font-semibold text-indigo-100">{aiName}</p>
+            </div>
+            <span className={`neural-voice-bubble ${sessionState === 'Speaking' ? 'is-active' : ''}`} />
+          </div>
+
+          {aiTurns.length === 0 ? (
+            <p className="text-slate-500 text-sm">AI responses will appear here once the interview starts.</p>
+          ) : aiTurns.map((turn, idx) => (
+            <div key={`${turn.timestamp}-${idx}`} className="flex justify-start">
+              <div className="max-w-[85%] rounded-xl px-4 py-3 text-sm bg-slate-800 border border-slate-700">
+                {turn.text}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="min-h-0 p-5 overflow-y-auto space-y-4 bg-slate-900/40 border border-blue-400/30 rounded-3xl">
+          <div className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur rounded-2xl border border-blue-500/30 p-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-blue-300">Human Section</p>
+              <p className="text-sm font-semibold text-blue-100">{currentUserName}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`neural-voice-bubble human ${sessionState === 'Listening' && !isMicMuted ? 'is-active' : ''}`} />
+              <button
+                onClick={() => setIsMicMuted((prev) => !prev)}
+                className="rounded-lg border border-blue-500/40 px-3 py-1.5 text-xs font-semibold text-blue-100 hover:bg-blue-500/15"
+              >
+                {isMicMuted ? 'Unmute' : 'Mute'}
+              </button>
             </div>
           </div>
-        ))}
+
+          {userTurns.length === 0 ? (
+            <p className="text-slate-500 text-sm">Your transcript will appear here when the API returns speech transcription.</p>
+          ) : userTurns.map((turn, idx) => (
+            <div key={`${turn.timestamp}-${idx}`} className="flex justify-end">
+              <div className="max-w-[85%] rounded-xl px-4 py-3 text-sm bg-blue-600">
+                {turn.text}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
