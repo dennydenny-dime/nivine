@@ -132,6 +132,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const [error, setError] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [isHumanSpeaking, setIsHumanSpeaking] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -141,6 +143,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const reconnectAttemptsRef = useRef(0);
   const forcedStopRef = useRef(false);
   const sessionTimerRef = useRef<number | null>(null);
+  const aiSpeakingTimeoutRef = useRef<number | null>(null);
+  const humanSpeakingTimeoutRef = useRef<number | null>(null);
   const transcriptRef = useRef<TranscriptionItem[]>([]);
   const questionCountRef = useRef(0);
   const nextPlaybackAtRef = useRef(0);
@@ -184,6 +188,22 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     audioCtxRef.current = null;
   }, []);
 
+  const markAiSpeaking = useCallback(() => {
+    setIsAiSpeaking(true);
+    if (aiSpeakingTimeoutRef.current) {
+      window.clearTimeout(aiSpeakingTimeoutRef.current);
+    }
+    aiSpeakingTimeoutRef.current = window.setTimeout(() => setIsAiSpeaking(false), 260);
+  }, []);
+
+  const markHumanSpeaking = useCallback(() => {
+    setIsHumanSpeaking(true);
+    if (humanSpeakingTimeoutRef.current) {
+      window.clearTimeout(humanSpeakingTimeoutRef.current);
+    }
+    humanSpeakingTimeoutRef.current = window.setTimeout(() => setIsHumanSpeaking(false), 260);
+  }, []);
+
   const closeSession = useCallback((state: SessionState = 'Ended') => {
     forcedStopRef.current = true;
     if (sessionTimerRef.current) {
@@ -195,6 +215,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     stopAudioPipeline();
     setSessionActive(false);
     setSessionState(state);
+    setIsAiSpeaking(false);
+    setIsHumanSpeaking(false);
   }, [stopAudioPipeline]);
 
   const persistSession = useCallback(() => {
@@ -235,10 +257,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     source.start(startAt);
     nextPlaybackAtRef.current = startAt + buffer.duration;
     setSessionState('Speaking');
+    markAiSpeaking();
     source.onended = () => {
       if (sessionActive) setSessionState('Listening');
     };
-  }, [sessionActive]);
+  }, [markAiSpeaking, sessionActive]);
 
   const handleSocketMessage = useCallback((event: MessageEvent) => {
     let payload: any;
@@ -340,6 +363,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
         if (isMicMuted) return;
         const channelData = audioEvent.inputBuffer.getChannelData(0);
+        let peak = 0;
+        for (let i = 0; i < channelData.length; i += 1) {
+          peak = Math.max(peak, Math.abs(channelData[i]));
+        }
+        if (peak > 0.03) {
+          markHumanSpeaking();
+        }
         const pcm16 = downsampleTo16kPcm16(channelData, audioCtx.sampleRate);
         const b64 = base64FromInt16(pcm16);
         wsRef.current.send(
@@ -385,7 +415,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         });
       }, 800 * reconnectAttemptsRef.current);
     };
-  }, [apiKey, closeSession, handleSocketMessage, isMicMuted]);
+  }, [apiKey, closeSession, handleSocketMessage, isMicMuted, markHumanSpeaking]);
 
   const startInterview = useCallback(() => {
     setError(null);
@@ -406,6 +436,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   }, [closeSession, persistSession]);
 
   useEffect(() => () => {
+    if (aiSpeakingTimeoutRef.current) {
+      window.clearTimeout(aiSpeakingTimeoutRef.current);
+    }
+    if (humanSpeakingTimeoutRef.current) {
+      window.clearTimeout(humanSpeakingTimeoutRef.current);
+    }
     persistSession();
     closeSession('Ended');
   }, [closeSession, persistSession]);
@@ -446,14 +482,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
       </div>
 
-      <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
         <div className="min-h-0 p-5 overflow-y-auto space-y-4 bg-slate-900/40 border border-indigo-400/30 rounded-3xl">
           <div className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur rounded-2xl border border-indigo-500/30 p-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300">AI Section</p>
               <p className="text-sm font-semibold text-indigo-100">{aiName}</p>
             </div>
-            <span className={`neural-voice-bubble ${sessionState === 'Speaking' ? 'is-active' : ''}`} />
+            <span className={`neural-voice-bubble ${isAiSpeaking ? 'is-active' : ''}`} />
           </div>
 
           {aiTurns.length === 0 ? (
@@ -474,7 +510,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
               <p className="text-sm font-semibold text-blue-100">{currentUserName}</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`neural-voice-bubble human ${sessionState === 'Listening' && !isMicMuted ? 'is-active' : ''}`} />
+              <span className={`neural-voice-bubble human ${isHumanSpeaking && !isMicMuted ? 'is-active' : ''}`} />
               <button
                 onClick={() => setIsMicMuted((prev) => !prev)}
                 className="rounded-lg border border-blue-500/40 px-3 py-1.5 text-xs font-semibold text-blue-100 hover:bg-blue-500/15"
