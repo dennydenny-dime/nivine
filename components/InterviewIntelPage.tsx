@@ -415,17 +415,6 @@ const InterviewIntelPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-emerald-500/40 bg-emerald-500/10 p-5 md:p-6">
-        <h2 className="text-lg font-bold text-emerald-200">Recommended Backend Endpoints (Ready for your API integration)</h2>
-        <pre className="mt-3 text-xs md:text-sm whitespace-pre-wrap text-emerald-100/90 bg-slate-950/60 border border-emerald-600/30 rounded-xl p-4 overflow-auto">
-{`GET    /api/interview-news?keyword=&limit=
-POST   /api/interview-news/sync (cron-triggered worker)
-GET    /api/interview-questions?role=&company=&sort=trending
-POST   /api/interview-questions/submit
-PATCH  /api/interview-questions/:id/review
-GET    /api/learning-modules?role=`}
-        </pre>
-      </section>
     </div>
   );
 };
