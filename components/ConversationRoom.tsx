@@ -144,7 +144,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const questionCountRef = useRef(0);
   const nextPlaybackAtRef = useRef(0);
 
-  const apiKey = useMemo(() => import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '', []);
+  const apiKey = useMemo(
+    () =>
+      import.meta.env.VITE_GEMINI_API_KEY ||
+      import.meta.env.VITE_API_KEY ||
+      import.meta.env.GEMINI_API_KEY ||
+      import.meta.env.API_KEY ||
+      '',
+    [],
+  );
 
   const pushTranscript = useCallback((speaker: 'user' | 'ai', text: string) => {
     const item: TranscriptionItem = { speaker, text, timestamp: Date.now() };
@@ -264,7 +272,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     }
 
     if (!apiKey) {
-      throw new Error('Missing Gemini API key. Set VITE_GEMINI_API_KEY.');
+      throw new Error('Missing Gemini API key. Set VITE_GEMINI_API_KEY (or VITE_API_KEY).');
     }
 
     const instructionText = ROLE_INSTRUCTIONS[selectedRole];
