@@ -379,15 +379,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     closeSession('Ended');
   }, [closeSession, persistSession]);
 
-  const handleExit = useCallback(() => {
-    stopInterview();
-    onExit();
-  }, [onExit, stopInterview]);
-
-  useEffect(() => {
-    startInterview();
-  }, [startInterview]);
-
   useEffect(() => () => {
     persistSession();
     closeSession('Ended');
@@ -411,16 +402,19 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             ))}
           </select>
 
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-2 text-xs text-slate-200">
-            <div className={`voice-wave ${sessionActive ? 'is-active' : ''}`} aria-hidden="true">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <span key={index} style={{ animationDelay: `${index * 0.12}s` }} />
-              ))}
-            </div>
-            <span>{sessionActive ? `${sessionState}...` : 'Reconnecting...'}</span>
-          </div>
+          {!sessionActive ? (
+            <button onClick={startInterview} className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-bold">
+              Start Interview
+            </button>
+          ) : (
+            <button onClick={stopInterview} className="rounded-lg bg-rose-600 hover:bg-rose-500 px-4 py-2 text-sm font-bold">
+              Stop Interview
+            </button>
+          )}
 
-          <button onClick={handleExit} className="rounded-lg border border-slate-700 px-4 py-2 text-xs">Exit</button>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs">State: {sessionState}</span>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs">Question Limit: {ROLE_QUESTION_LIMIT[role]}</span>
+          <button onClick={onExit} className="rounded-lg border border-slate-700 px-4 py-2 text-xs">Exit</button>
         </div>
 
         {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
@@ -428,7 +422,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
       <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-900/40 border border-slate-800 rounded-3xl">
         {transcriptions.length === 0 ? (
-          <p className="text-slate-500 text-sm">No transcript yet. Listening for live interview audio...</p>
+          <p className="text-slate-500 text-sm">No transcript yet. Start interview to begin real-time streaming.</p>
         ) : transcriptions.map((t, idx) => (
           <div key={`${t.timestamp}-${idx}`} className={`flex ${t.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[75%] rounded-xl px-4 py-3 text-sm ${t.speaker === 'user' ? 'bg-blue-600' : 'bg-slate-800 border border-slate-700'}`}>
