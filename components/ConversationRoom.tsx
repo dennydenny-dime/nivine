@@ -18,11 +18,11 @@ type RoleOption =
   | 'Company Manager';
 
 const ROLE_INSTRUCTIONS: Record<RoleOption, string> = {
-  'Executive Recruiter': 'You are an Executive Recruiter. Be formal, professional, and concise. Ask competency-based interview questions and require measurable examples.',
-  'Angel Investor': 'You are an Angel Investor. Be challenging, analytical, and probing. Pressure-test assumptions, traction, market size, and unit economics.',
-  Salesman: 'You are a Salesman. Be energetic, persuasive, and conversational. Push for strong value articulation, objection handling, and clear closes.',
-  'Strict Academic Supervisor': 'You are a Strict Academic Supervisor. Be serious, critical, and analytical. Challenge weak arguments and require precise evidence.',
-  'Company Manager': 'You are a Company Manager. Be practical, professional, and structured. Focus on prioritization, accountability, and execution clarity.',
+  'Executive Recruiter': 'You are an Executive Recruiter. Stay in-role with formal, professional, and concise interview delivery. Ask competency-based questions only, require measurable examples, and never switch personas.',
+  'Angel Investor': 'You are an Angel Investor. Stay in-role with challenging, analytical, and probing investor questioning. Pressure-test assumptions, traction, market size, and unit economics without leaving the investor perspective.',
+  Salesman: 'You are a Salesman. Stay in-role with energetic, persuasive, and conversational momentum. Drive value articulation, objection handling, and clear closes while maintaining a professional sales posture.',
+  'Strict Academic Supervisor': 'You are a Strict Academic Supervisor. Stay in-role with serious, critical, and analytical academic standards. Challenge weak arguments, require precise evidence, and preserve strict supervisory tone.',
+  'Company Manager': 'You are a Company Manager. Stay in-role with practical, professional, and structured management dialogue. Focus on prioritization, accountability, and execution clarity as a manager at all times.',
 };
 
 const ROLE_QUESTION_LIMIT: Record<RoleOption, number> = {
@@ -174,6 +174,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const aiName = useMemo(() => `${role} AI`, [role]);
   const aiTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'ai'), [transcriptions]);
   const userTurns = useMemo(() => transcriptions.filter((item) => item.speaker === 'user'), [transcriptions]);
+  const neuralIntensity = useMemo(() => `${persona.difficultyLevel || 5}/10`, [persona.difficultyLevel]);
 
   const stopAudioPipeline = useCallback(() => {
     processorRef.current?.disconnect();
@@ -322,7 +323,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       throw new Error('Missing Gemini API key. Set VITE_GEMINI_API_KEY (or VITE_API_KEY).');
     }
 
-    const instructionText = ROLE_INSTRUCTIONS[selectedRole];
+    const instructionText = `${ROLE_INSTRUCTIONS[selectedRole]} Address the user as ${persona.name}. Keep language output in ${persona.language || 'English'} unless asked to switch.`;
     const ws = new WebSocket(`${GEMINI_WS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`);
     wsRef.current = ws;
 
@@ -447,90 +448,84 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   }, [closeSession, persistSession]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto px-4 lg:px-8 gap-5">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-        <h2 className="text-lg font-bold text-white">Live Neural Interview</h2>
-        <p className="text-xs text-slate-400 mt-1">Live Gemini bidi stream with microphone PCM16@16kHz uplink and real-time audio playback.</p>
+    <div className="mx-auto flex h-[calc(100vh-7.5rem)] w-full max-w-5xl flex-col px-4 pb-4 lg:px-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500/50 to-blue-500/60 text-xl font-bold text-white ring-2 ring-indigo-500/40">🧠</div>
+          <div>
+            <h2 className="text-3xl font-bold leading-none text-white">{persona.name}</h2>
+            <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-blue-300">{role}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.18em]">
+              <span className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-sky-200">Neural Feed: {sessionActive ? 'Active' : 'Idle'}</span>
+              <span className="rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-indigo-100">Intensity: {neuralIntensity}</span>
+            </div>
+          </div>
+        </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as RoleOption)}
-            disabled={sessionActive}
-            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-          >
-            {(Object.keys(ROLE_INSTRUCTIONS) as RoleOption[]).map((roleName) => (
-              <option key={roleName} value={roleName}>{roleName}</option>
-            ))}
-          </select>
-
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-slate-700 bg-slate-900/70 px-6 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-100">{persona.language || 'English'}</span>
           {!sessionActive ? (
-            <button onClick={startInterview} className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-bold">
-              Start Interview
+            <button onClick={startInterview} className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-100 hover:bg-emerald-500/25">
+              Start Session
             </button>
           ) : (
-            <button onClick={stopInterview} className="rounded-lg bg-rose-600 hover:bg-rose-500 px-4 py-2 text-sm font-bold">
-              Stop Interview
+            <button onClick={stopInterview} className="rounded-full border border-rose-400/30 bg-rose-500/15 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-rose-100 hover:bg-rose-500/25">
+              End Session
             </button>
           )}
-
-          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs">State: {sessionState}</span>
-          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs">Question Limit: {ROLE_QUESTION_LIMIT[role]}</span>
-          <button onClick={onExit} className="rounded-lg border border-slate-700 px-4 py-2 text-xs">Exit</button>
-        </div>
-
-        {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
-      </div>
-
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
-        <div className="min-h-0 p-5 overflow-y-auto space-y-4 bg-slate-900/40 border border-indigo-400/30 rounded-3xl">
-          <div className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur rounded-2xl border border-indigo-500/30 p-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300">AI Section</p>
-              <p className="text-sm font-semibold text-indigo-100">{aiName}</p>
-            </div>
-            <span className={`neural-voice-bubble ${isAiSpeaking ? 'is-active' : ''}`} />
-          </div>
-
-          {aiTurns.length === 0 ? (
-            <p className="text-slate-500 text-sm">AI responses will appear here once the interview starts.</p>
-          ) : aiTurns.map((turn, idx) => (
-            <div key={`${turn.timestamp}-${idx}`} className="flex justify-start">
-              <div className="max-w-[85%] rounded-xl px-4 py-3 text-sm bg-slate-800 border border-slate-700">
-                {turn.text}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="min-h-0 p-5 overflow-y-auto space-y-4 bg-slate-900/40 border border-blue-400/30 rounded-3xl">
-          <div className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur rounded-2xl border border-blue-500/30 p-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-blue-300">Human Section</p>
-              <p className="text-sm font-semibold text-blue-100">{currentUserName}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`neural-voice-bubble human ${isHumanSpeaking && !isMicMuted ? 'is-active' : ''}`} />
-              <button
-                onClick={() => setIsMicMuted((prev) => !prev)}
-                className="rounded-lg border border-blue-500/40 px-3 py-1.5 text-xs font-semibold text-blue-100 hover:bg-blue-500/15"
-              >
-                {isMicMuted ? 'Unmute' : 'Mute'}
-              </button>
-            </div>
-          </div>
-
-          {userTurns.length === 0 ? (
-            <p className="text-slate-500 text-sm">Your transcript will appear here when the API returns speech transcription.</p>
-          ) : userTurns.map((turn, idx) => (
-            <div key={`${turn.timestamp}-${idx}`} className="flex justify-end">
-              <div className="max-w-[85%] rounded-xl px-4 py-3 text-sm bg-blue-600">
-                {turn.text}
-              </div>
-            </div>
-          ))}
+          <button onClick={onExit} className="rounded-full border border-slate-700 bg-slate-900/70 px-6 py-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-100 hover:bg-slate-800/80">Exit Session</button>
         </div>
       </div>
+
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-blue-500/20 bg-[#020b2a]">
+        <div className="h-[34%] border-b border-blue-500/10 bg-gradient-to-b from-[#020824] to-[#020a22] px-6 py-8 text-center">
+          <div className="mx-auto mt-12 max-w-xs border-t border-dashed border-blue-300/30 pt-4 text-[11px] font-semibold uppercase tracking-[0.35em] text-blue-200/45">
+            {sessionActive ? `Session ${sessionState}` : 'Awaiting Neural Input'}
+          </div>
+        </div>
+
+        <div className="relative flex-1 overflow-y-auto bg-[#081838] px-6 py-5">
+          {error && <p className="mb-4 text-sm text-rose-300">{error}</p>}
+          <div className="space-y-4 pb-16">
+            {aiTurns.length === 0 && userTurns.length === 0 ? (
+              <p className="text-xs uppercase tracking-[0.22em] text-blue-200/40">Live neural stream online. Waiting for the first linguistic impulse.</p>
+            ) : null}
+
+            {aiTurns.map((turn, idx) => (
+              <div key={`${turn.timestamp}-${idx}`} className="flex justify-start">
+                <div className="max-w-[75%] rounded-2xl border border-indigo-400/30 bg-indigo-500/15 px-4 py-3 text-sm text-indigo-50">{turn.text}</div>
+              </div>
+            ))}
+
+            {userTurns.map((turn, idx) => (
+              <div key={`${turn.timestamp}-${idx}`} className="flex justify-end">
+                <div className="max-w-[75%] rounded-2xl border border-blue-300/35 bg-blue-500 px-4 py-3 text-sm font-semibold text-white">{turn.text}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="absolute right-8 top-8 text-right">
+            <div className="inline-flex h-16 w-20 items-center justify-center rounded-2xl bg-blue-500 text-3xl font-semibold text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.35)]">{isAiSpeaking ? '…' : 'Hmm.'}</div>
+            <p className="mt-2 text-[10px] uppercase tracking-[0.28em] text-blue-100/40">Linguistic Impulse</p>
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-full border border-cyan-400/20 bg-[#07112b] px-6 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/70">
+          <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(74,222,128,0.8)]" />Signal Locked</span>
+          <span className="text-slate-400">|</span>
+          <span>Secure Neural Stream v3.2</span>
+          <button
+            type="button"
+            onClick={() => setIsMicMuted((prev) => !prev)}
+            className="pointer-events-auto rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-1 text-[10px] text-blue-100"
+          >
+            Mic {isMicMuted ? 'Off' : 'On'}
+          </button>
+          <span className={`pointer-events-auto neural-voice-bubble human ${isHumanSpeaking && !isMicMuted ? 'is-active' : ''}`} />
+          <span className={`pointer-events-auto neural-voice-bubble ${isAiSpeaking ? 'is-active' : ''}`} />
+        </div>
+      </div>
+      <p className="mt-3 text-center text-[10px] uppercase tracking-[0.22em] text-slate-500">{aiName} • Max prompts {ROLE_QUESTION_LIMIT[role]} • Candidate {currentUserName}</p>
     </div>
   );
 };
