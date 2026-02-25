@@ -123,6 +123,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isHumanSpeaking, setIsHumanSpeaking] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
+  const [statusBanner, setStatusBanner] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -134,6 +135,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const sessionStateRef = useRef<SessionState>('Idle');
   const sessionActiveRef = useRef(false);
   const isMicMutedRef = useRef(false);
+  const recognitionRestartTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     sessionStateRef.current = sessionState;
@@ -197,6 +199,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     abortControllerRef.current = null;
     recognitionRef.current?.stop();
     recognitionRef.current = null;
+    if (recognitionRestartTimeoutRef.current) {
+      window.clearTimeout(recognitionRestartTimeoutRef.current);
+      recognitionRestartTimeoutRef.current = null;
+    }
     sessionActiveRef.current = false;
     setSessionActive(false);
     setSessionState(state);
@@ -204,6 +210,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     setIsAiSpeaking(false);
     setIsHumanSpeaking(false);
     setLiveTranscript('');
+    setStatusBanner(null);
   }, []);
 
   const parseSseBlock = (block: string): StreamEvent | null => {
@@ -298,6 +305,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     if (sessionActiveRef.current) return;
 
     setError(null);
+    setStatusBanner('Neural link established. Listening for your voice signal.');
     setTranscriptions([]);
     transcriptRef.current = [];
     questionCountRef.current = 0;
@@ -335,6 +343,9 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       }
 
       setLiveTranscript(interimTranscript);
+      if (interimTranscript) {
+        markHumanSpeaking();
+      }
       if (!finalTranscript) return;
 
       pushTranscript('user', finalTranscript);
@@ -347,14 +358,42 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     };
 
     recognition.onerror = (event) => {
-      setError(`Speech recognition error: ${event.error || 'unknown'}`);
+      const errorType = event.error || 'unknown';
+      if (errorType === 'network') {
+        setError('Speech recognition network issue detected. Reconnecting neural microphone...');
+        setStatusBanner('Neural microphone reconnecting...');
+        if (sessionActiveRef.current && recognitionRef.current) {
+          recognition.stop();
+          if (recognitionRestartTimeoutRef.current) {
+            window.clearTimeout(recognitionRestartTimeoutRef.current);
+          }
+          recognitionRestartTimeoutRef.current = window.setTimeout(() => {
+            if (!sessionActiveRef.current || !recognitionRef.current) return;
+            try {
+              recognitionRef.current.start();
+              setError(null);
+              setStatusBanner('Neural link established. Listening for your voice signal.');
+            } catch {
+              stopSession('Ended');
+            }
+          }, 700);
+          return;
+        }
+      }
+
+      setError(`Speech recognition error: ${errorType}`);
       stopSession('Ended');
     };
 
     recognition.onend = () => {
       if (!sessionActiveRef.current) return;
       if (sessionStateRef.current === 'Listening') {
-        recognition.start();
+        try {
+          recognition.start();
+        } catch {
+          setError('Speech recognizer was interrupted. Please start a new session.');
+          stopSession('Ended');
+        }
       }
     };
 
@@ -364,6 +403,16 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     setSessionActive(true);
     setSessionState('Listening');
     sessionStateRef.current = 'Listening';
+
+    const introLine = 'Neural link established.';
+    pushTranscript('ai', introLine);
+
+    if (!isMicMutedRef.current && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(introLine);
+      utterance.lang = persona.language || 'en-US';
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
   }, [markHumanSpeaking, persona.language, pushTranscript, stopSession, streamAssistantReply]);
 
   const stopInterview = useCallback(() => {
@@ -374,6 +423,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   useEffect(() => () => {
     if (aiSpeakingTimeoutRef.current) window.clearTimeout(aiSpeakingTimeoutRef.current);
     if (humanSpeakingTimeoutRef.current) window.clearTimeout(humanSpeakingTimeoutRef.current);
+    if (recognitionRestartTimeoutRef.current) window.clearTimeout(recognitionRestartTimeoutRef.current);
     persistSession();
     stopSession('Ended');
   }, [persistSession, stopSession]);
@@ -423,6 +473,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
         </div>
 
         <div className="relative flex-1 overflow-y-auto bg-[#081838] px-6 py-5">
+          {statusBanner ? <p className="mb-2 text-xs uppercase tracking-[0.24em] text-cyan-200/80">{statusBanner}</p> : null}
           {error && <p className="mb-4 text-sm text-rose-300">{error}</p>}
           <div className="space-y-4 pb-16">
             {aiTurns.length === 0 && userTurns.length === 0 && !liveTranscript ? <p className="text-xs uppercase tracking-[0.22em] text-blue-200/40">Live neural stream online. Waiting for the first linguistic impulse.</p> : null}
@@ -447,6 +498,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
           <div className="absolute right-8 top-8 text-right">
             <div className="inline-flex h-16 w-20 items-center justify-center rounded-2xl bg-blue-500 text-3xl font-semibold text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.35)]">{isAiSpeaking ? '…' : ''}</div>
             <p className="mt-2 text-[10px] uppercase tracking-[0.28em] text-blue-100/40">Linguistic Impulse</p>
+            <div className="mt-3 flex items-end justify-end gap-1" aria-hidden>
+              {[0, 1, 2, 3, 4].map((wave) => (
+                <span
+                  key={wave}
+                  className={`neural-wave-bar ${(isHumanSpeaking && !isMicMuted) || isAiSpeaking ? 'is-active' : ''}`}
+                  style={{ animationDelay: `${wave * 110}ms` }}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
