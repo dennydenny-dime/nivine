@@ -28,7 +28,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1ubcYEKoruC1u0ihSS6ovuh
 
 All neural training modules now follow this loop:
 
-`User Voice → Browser STT (Web Speech API) → Frontend sends transcript to Backend → Backend calls Gemini REST API → Backend returns AI text → Frontend TTS speaks response → Listening restarts`
+`FRONTEND (Voice/Prompt) → WebSocket or SSE Connection → BACKEND STREAM → Gemini AI Stream API → Streaming Tokens → FRONTEND UI Real-time Answer`
 
 To use your own backend, set `VITE_BACKEND_API_URL` (example: `http://localhost:3000/api`).
 The frontend posts to `<VITE_BACKEND_API_URL>/chat` (or `/api/chat` when the env var is omitted) with transcript + persona metadata.
