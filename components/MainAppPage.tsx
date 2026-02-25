@@ -5,9 +5,10 @@ import { SynapseLogo } from '../App';
 
 interface MainAppPageProps {
   onStart: (persona: Persona) => void;
+  showTrialBanner?: boolean;
 }
 
-const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
+const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, showTrialBanner = false }) => {
   const [language, setLanguage] = useState('English');
 
   const handlePresetStart = (p: Persona) => {
@@ -27,6 +28,12 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Choose a neural training module and practice with focused scenarios in your target language.
         </p>
+
+        {showTrialBanner && (
+          <p className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2">
+            Free trial for Neural Modules is limited to 2.5 minutes. The timer starts when you launch a module.
+          </p>
+        )}
 
         <div className="relative inline-block w-64 mt-4">
           <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Target Practice Language</label>
