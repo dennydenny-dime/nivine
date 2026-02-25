@@ -495,19 +495,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
             ) : null}
           </div>
 
-          <div className="absolute right-8 top-8 text-right">
-            <div className="inline-flex h-16 w-20 items-center justify-center rounded-2xl bg-blue-500 text-3xl font-semibold text-blue-100 shadow-[0_0_24px_rgba(59,130,246,0.35)]">{isAiSpeaking ? '…' : ''}</div>
-            <p className="mt-2 text-[10px] uppercase tracking-[0.28em] text-blue-100/40">Linguistic Impulse</p>
-            <div className="mt-3 flex items-end justify-end gap-1" aria-hidden>
-              {[0, 1, 2, 3, 4].map((wave) => (
-                <span
-                  key={wave}
-                  className={`neural-wave-bar ${(isHumanSpeaking && !isMicMuted) || isAiSpeaking ? 'is-active' : ''}`}
-                  style={{ animationDelay: `${wave * 110}ms` }}
-                />
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="pointer-events-none absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-full border border-cyan-400/20 bg-[#07112b] px-6 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/70">
