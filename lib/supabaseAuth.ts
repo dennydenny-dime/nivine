@@ -25,24 +25,59 @@ const SUPABASE_ANON_KEY = readEnvValue([
   'REACT_APP_SUPABASE_ANON_KEY'
 ]);
 
+const decodeBase64Url = (value: string) => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = normalized.length % 4;
+  const padded = padding ? normalized + '='.repeat(4 - padding) : normalized;
+  return atob(padded);
+};
+
+const extractSupabaseUrlFromAnonKey = (anonKey?: string) => {
+  if (!anonKey) return undefined;
+
+  const tokenParts = anonKey.split('.');
+  if (tokenParts.length < 2) return undefined;
+
+  try {
+    const payload = JSON.parse(decodeBase64Url(tokenParts[1]));
+    if (typeof payload?.iss !== 'string') return undefined;
+
+    const issuerUrl = new URL(payload.iss);
+    return issuerUrl.origin;
+  } catch {
+    return undefined;
+  }
+};
+
 const normalizeSupabaseUrl = (value?: string) => {
   if (!value) return value;
 
+  const trimmedValue = value.trim();
+
+  if (/^[a-z0-9-]+\.supabase\.co$/i.test(trimmedValue)) {
+    return `https://${trimmedValue}`;
+  }
+
   // Accept project dashboard URLs and normalize to API URL format.
-  const dashboardMatch = value.match(/supabase\.com\/dashboard\/project\/([a-z0-9-]+)/i);
+  const dashboardMatch = trimmedValue.match(/supabase\.com\/dashboard\/project\/([a-z0-9-]+)/i);
   if (dashboardMatch?.[1]) {
     return `https://${dashboardMatch[1]}.supabase.co`;
   }
 
   // Accept plain project refs too.
-  if (/^[a-z0-9-]+$/i.test(value)) {
-    return `https://${value}.supabase.co`;
+  if (/^[a-z0-9-]+$/i.test(trimmedValue)) {
+    return `https://${trimmedValue}.supabase.co`;
   }
 
-  return value.replace(/\/$/, '');
+  try {
+    const parsedUrl = new URL(trimmedValue);
+    return parsedUrl.origin;
+  } catch {
+    return trimmedValue.replace(/\/$/, '');
+  }
 };
 
-const SUPABASE_URL = normalizeSupabaseUrl(RAW_SUPABASE_URL);
+const SUPABASE_URL = normalizeSupabaseUrl(RAW_SUPABASE_URL) || normalizeSupabaseUrl(extractSupabaseUrlFromAnonKey(SUPABASE_ANON_KEY));
 const SESSION_KEY = 'tm_supabase_session';
 
 interface SupabaseUser {
