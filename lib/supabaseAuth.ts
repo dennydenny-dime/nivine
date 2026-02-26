@@ -77,7 +77,43 @@ const normalizeSupabaseUrl = (value?: string) => {
   }
 };
 
-const SUPABASE_URL = normalizeSupabaseUrl(RAW_SUPABASE_URL) || normalizeSupabaseUrl(extractSupabaseUrlFromAnonKey(SUPABASE_ANON_KEY));
+const extractProjectRef = (value?: string) => {
+  if (!value) return undefined;
+
+  try {
+    const host = new URL(value).hostname;
+    const match = host.match(/^([a-z0-9-]+)\.supabase\.co$/i);
+    return match?.[1]?.toLowerCase();
+  } catch {
+    return undefined;
+  }
+};
+
+const getSupabaseUrl = () => {
+  const normalizedEnvUrl = normalizeSupabaseUrl(RAW_SUPABASE_URL);
+  const normalizedAnonKeyUrl = normalizeSupabaseUrl(extractSupabaseUrlFromAnonKey(SUPABASE_ANON_KEY));
+
+  if (!normalizedEnvUrl) {
+    return normalizedAnonKeyUrl;
+  }
+
+  if (!normalizedAnonKeyUrl) {
+    return normalizedEnvUrl;
+  }
+
+  const envRef = extractProjectRef(normalizedEnvUrl);
+  const anonKeyRef = extractProjectRef(normalizedAnonKeyUrl);
+
+  // Prefer the URL encoded in the anon key if the two references disagree.
+  // A mismatched project URL causes OAuth redirects to fail with Cloudflare/Supabase error pages.
+  if (envRef && anonKeyRef && envRef !== anonKeyRef) {
+    return normalizedAnonKeyUrl;
+  }
+
+  return normalizedEnvUrl;
+};
+
+const SUPABASE_URL = getSupabaseUrl();
 const SESSION_KEY = 'tm_supabase_session';
 
 interface SupabaseUser {
@@ -227,8 +263,7 @@ export const getGoogleOAuthUrl = () => {
 
   const url = new URL(`${SUPABASE_URL}/auth/v1/authorize`);
   url.searchParams.set('provider', 'google');
-  url.searchParams.set('redirect_to', window.location.origin);
-  url.searchParams.set('apikey', SUPABASE_ANON_KEY);
+  url.searchParams.set('redirect_to', `${window.location.origin}${window.location.pathname}`);
   return url.toString();
 };
 
