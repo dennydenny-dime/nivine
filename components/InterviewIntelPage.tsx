@@ -23,14 +23,6 @@ type InterviewQuestion = {
   upvotes: number;
 };
 
-type LearningModule = {
-  id: string;
-  role: string;
-  moduleTitle: string;
-  contentHtml: string;
-  order: number;
-  estimatedTime: string;
-};
 
 const KEYWORDS = [
   'hiring trends',
@@ -156,32 +148,6 @@ const sampleQuestions: InterviewQuestion[] = [
   },
 ];
 
-const sampleLearningModules: LearningModule[] = [
-  {
-    id: 'm1',
-    role: 'SDE',
-    moduleTitle: 'System Design Interview Blueprint',
-    contentHtml: '<p>Learn requirement scoping, back-of-envelope estimates, API boundaries, and trade-off storytelling.</p>',
-    order: 1,
-    estimatedTime: '35 mins',
-  },
-  {
-    id: 'm2',
-    role: 'HR',
-    moduleTitle: 'Behavioral Precision Framework',
-    contentHtml: '<p>Master STAR+Metrics responses with confidence calibration and recruiter expectation mapping.</p>',
-    order: 2,
-    estimatedTime: '22 mins',
-  },
-  {
-    id: 'm3',
-    role: 'MBA',
-    moduleTitle: 'Case Structuring Essentials',
-    contentHtml: '<p>Use issue trees, hypothesis-led analysis, and executive synthesis for final recommendations.</p>',
-    order: 3,
-    estimatedTime: '28 mins',
-  },
-];
 
 const prettyDate = (input: string) =>
   new Date(input).toLocaleString(undefined, {
@@ -197,7 +163,6 @@ const InterviewIntelPage: React.FC = () => {
   const [newsLoading, setNewsLoading] = useState<boolean>(false);
   const [newsError, setNewsError] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
-  const [openModuleId, setOpenModuleId] = useState<string>(sampleLearningModules[0].id);
 
   useEffect(() => {
     const activeKeyword = keyword === 'all' ? 'hiring trends OR job market OR interview process' : keyword;
@@ -292,9 +257,9 @@ const InterviewIntelPage: React.FC = () => {
         <div className="absolute -top-12 -right-8 w-40 h-40 bg-indigo-500/20 blur-3xl rounded-full" />
         <div className="relative z-10">
           <p className="text-xs uppercase tracking-[0.22em] text-indigo-300 mb-3">Interview Intelligence Hub</p>
-          <h1 className="text-2xl md:text-4xl font-black text-white leading-tight">Live-style Interview News + Questions + Learning Modules</h1>
+          <h1 className="text-2xl md:text-4xl font-black text-white leading-tight">Live-style Interview News + Questions</h1>
           <p className="mt-3 text-slate-300 max-w-3xl">
-            Built for backend-first architecture: News API ingestion via CRON, curated interview-question database, and role-based learning modules served fast from your own data layer.
+            Built for backend-first architecture: News API ingestion via CRON and a curated interview-question database served fast from your own data layer.
           </p>
         </div>
       </section>
@@ -371,8 +336,7 @@ const InterviewIntelPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid lg:grid-cols-2 gap-5">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 md:p-6">
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">📚 Previously Asked Questions</h2>
             <select
@@ -399,38 +363,6 @@ const InterviewIntelPage: React.FC = () => {
             ))}
           </div>
           <p className="text-xs text-slate-400 mt-4">Supports both curated DB and community-submitted workflow with admin review.</p>
-        </div>
-
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 md:p-6">
-          <h2 className="text-xl font-bold mb-4">📖 Learning Modules (Role-based)</h2>
-          <div className="space-y-3">
-            {sampleLearningModules
-              .sort((a, b) => a.order - b.order)
-              .map((module) => {
-                const open = openModuleId === module.id;
-                return (
-                  <div key={module.id} className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/60">
-                    <button
-                      onClick={() => setOpenModuleId(open ? '' : module.id)}
-                      className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-900/70 transition-colors"
-                    >
-                      <div>
-                        <p className="text-xs text-slate-400">{module.role} • {module.estimatedTime}</p>
-                        <h3 className="font-semibold text-white">{module.moduleTitle}</h3>
-                      </div>
-                      <span className="text-slate-300">{open ? '−' : '+'}</span>
-                    </button>
-                    {open && (
-                      <div className="px-4 pb-4 text-slate-300 text-sm" dangerouslySetInnerHTML={{ __html: module.contentHtml }} />
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-          <div className="mt-4 rounded-xl border border-dashed border-indigo-500/40 p-3 text-xs text-indigo-200 bg-indigo-500/10">
-            DB fields: <strong>role</strong>, <strong>module_title</strong>, <strong>content_html</strong>, <strong>order</strong>, <strong>estimated_time</strong>
-          </div>
-        </div>
       </section>
 
     </div>

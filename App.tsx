@@ -12,6 +12,7 @@ import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupa
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
+import LearningModulesPage from './components/LearningModulesPage';
 import { hasPaidSubscription, isAdminEmail } from './lib/subscription';
 import { Persona, User } from './types';
 
@@ -42,6 +43,7 @@ enum View {
   MENTAL_PERFORMANCE = 'mental_performance',
   PERSONAL_DASHBOARD = 'personal_dashboard',
   INTERVIEW_INTEL = 'interview_intel',
+  LEARNING_MODULES = 'learning_modules',
 };
 
 type NavItem = {
@@ -305,6 +307,10 @@ const App: React.FC = () => {
     setCurrentView(View.INTERVIEW_INTEL);
   };
 
+  const openLearningModules = () => {
+    setCurrentView(View.LEARNING_MODULES);
+  };
+
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
@@ -334,6 +340,7 @@ const App: React.FC = () => {
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
+    { key: View.LEARNING_MODULES, label: 'Learning Modules', onClick: openLearningModules },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
     { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: isNewUser },
     {
@@ -437,6 +444,7 @@ const App: React.FC = () => {
           {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
           {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
+          {currentView === View.LEARNING_MODULES && <LearningModulesPage />}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={startConversation} />}
           {currentView === View.MENTAL_PERFORMANCE && <MentalPerformanceCoachPage />}
           {currentView === View.CONVERSATION && selectedPersona && <ConversationRoom persona={selectedPersona} onExit={goBack} />}
