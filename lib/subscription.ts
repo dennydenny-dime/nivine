@@ -21,8 +21,8 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
   free: {
     tier: 'free',
     monthlyCallLimit: 6,
-    maxMinutesPerCall: 3,
-    quizzesEnabled: false,
+    maxMinutesPerCall: 5,
+    quizzesEnabled: true,
     customCoachEnabled: false,
     mentalPerformanceEnabled: false,
     allNeuralModulesEnabled: false,
