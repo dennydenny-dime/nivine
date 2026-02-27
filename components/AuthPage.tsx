@@ -35,7 +35,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || (!isLogin && !name)) return;
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = name.trim();
+
+    if (!normalizedEmail || !password || (!isLogin && !normalizedName)) {
+      setAuthError('Please enter all required fields before continuing.');
+      return;
+    }
 
     setLoading(true);
     setAuthError(null);
@@ -43,8 +50,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
     try {
       const response = isLogin
-        ? await signInWithEmail(email, password)
-        : await signUpWithEmail(email, password, name);
+        ? await signInWithEmail(normalizedEmail, password)
+        : await signUpWithEmail(normalizedEmail, password, normalizedName);
 
       if (!response.user) {
         throw new Error('Unable to fetch user details from Supabase.');
