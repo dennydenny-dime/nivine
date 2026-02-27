@@ -358,14 +358,14 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 px-4">
+      <div className="min-h-screen bg-[#0B0F14] text-slate-100 selection:bg-indigo-500/30 px-4">
         <AuthPage onLogin={setCurrentUser} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-[#0B0F14] text-slate-100 selection:bg-indigo-500/30">
       {/* Navigation - hidden in conversation mode if desired, but here we keep it for exit */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/85 backdrop-blur-md border-b border-slate-800 transition-transform duration-500">
         <div className="max-w-7xl mx-auto px-4 py-3 md:py-2 flex flex-col gap-3">
@@ -432,45 +432,18 @@ const App: React.FC = () => {
       </nav>
 
       <main className={`pt-40 md:pt-36 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
-        {currentView === View.LANDING && (
-          <LandingPage onEnterApp={openApp} />
-        )}
-
-        {currentView === View.PERSONAL_DASHBOARD && (
-          <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />
-        )}
-
-        {currentView === View.APP && (
-          <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />
-        )}
-
-        {currentView === View.INTERVIEW_INTEL && (
-          <InterviewIntelPage />
-        )}
-
-        {currentView === View.CUSTOM_COACH && (
-          <CustomCoachPage onStart={startConversation} />
-        )}
-
-        {currentView === View.MENTAL_PERFORMANCE && (
-          <MentalPerformanceCoachPage />
-        )}
-
-        {currentView === View.CONVERSATION && selectedPersona && (
-          <ConversationRoom persona={selectedPersona} onExit={goBack} />
-        )}
-
-        {currentView === View.QUIZ && (
-          <DailyQuiz onSeeLeaderboard={openLeaderboard} />
-        )}
-
-        {currentView === View.PRICING && (
-          <PricingPage onBack={goBack} />
-        )}
-
-        {currentView === View.LEADERBOARD && (
-          <Leaderboard onBack={goBack} />
-        )}
+        <div className="animate-in fade-in duration-300">
+          {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
+          {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
+          {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />}
+          {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
+          {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={startConversation} />}
+          {currentView === View.MENTAL_PERFORMANCE && <MentalPerformanceCoachPage />}
+          {currentView === View.CONVERSATION && selectedPersona && <ConversationRoom persona={selectedPersona} onExit={goBack} />}
+          {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
+          {currentView === View.PRICING && <PricingPage onBack={goBack} />}
+          {currentView === View.LEADERBOARD && <Leaderboard onBack={goBack} />}
+        </div>
       </main>
 
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-900 mt-auto">

@@ -244,135 +244,99 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 px-4">
-        <div className="p-8 bg-slate-900 border border-red-500/30 rounded-3xl text-center max-w-md shadow-2xl">
-          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⚠️</div>
-          <h3 className="text-xl font-bold text-white mb-2">Neural Link Failed</h3>
-          <p className="text-slate-400 text-sm mb-6 leading-relaxed">{error}</p>
-          <div className="flex flex-col gap-3">
-            <button onClick={onExit} className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-bold transition-all shadow-lg text-white">
-              Return to Labs
-            </button>
-          </div>
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-8 text-center">
+          <h3 className="text-lg font-semibold text-slate-100">Connection interrupted</h3>
+          <p className="mt-3 text-sm leading-relaxed text-slate-400">{error}</p>
+          <button onClick={onExit} className="mt-6 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-slate-500">
+            Return
+          </button>
         </div>
       </div>
     );
   }
 
+  const interviewSeconds = Math.max(0, transcriptions.length ? Math.round((Date.now() - transcriptions[0].timestamp) / 1000) : 0);
+  const timerLabel = `${Math.floor(interviewSeconds / 60).toString().padStart(2, '0')}:${(interviewSeconds % 60).toString().padStart(2, '0')}`;
+  const fillerWords = ['um', 'uh', 'like', 'you know', 'actually'];
+
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto px-4 lg:px-8">
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4 animate-in fade-in duration-700">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 to-blue-500 flex items-center justify-center text-3xl shadow-lg ring-4 ring-blue-500/10 flex-shrink-0 animate-pulse">
-            {persona.gender === 'Male' ? '🧠' : '🧬'}
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">{persona.name}</h2>
-            <p className="text-blue-400 font-bold text-[10px] uppercase tracking-widest line-clamp-1 max-w-[250px]">{persona.role}</p>
-            <div className="flex flex-wrap gap-2 mt-1">
-              <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-black uppercase tracking-widest">Neural Feed: Active</span>
-              <span className="text-[8px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700 font-black uppercase">Intensity: {persona.difficultyLevel}/10</span>
-            </div>
-          </div>
+    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-7xl flex-col gap-4 px-4 pb-4 lg:px-8">
+      <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-[#111827]/75 px-4 py-3">
+        <div className="flex items-center gap-4 text-xs uppercase tracking-[0.14em] text-slate-400">
+          <span>Live Interview</span>
+          <span className="rounded-md border border-slate-700 px-2 py-1 text-slate-200">{timerLabel}</span>
+          <span className={`flex items-center gap-2 ${isSpeaking ? 'text-blue-300' : 'text-slate-500'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />Mic {isSpeaking ? 'active' : 'idle'}</span>
         </div>
-        
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none group">
-            <select
-              value={currentLanguage}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              className="w-full sm:w-32 bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider rounded-full px-4 py-2 appearance-none outline-none focus:border-blue-500/50 hover:bg-slate-800 transition-all cursor-pointer text-center"
-            >
-              {COMMON_LANGUAGES.map(lang => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-500 group-hover:text-blue-400">
-              <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+        <button onClick={handleSaveAndExit} className="rounded-lg border border-red-500/50 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/10">
+          End Interview
+        </button>
+      </div>
+
+      <div className="grid flex-1 gap-4 lg:grid-cols-2">
+        <section className="relative rounded-2xl border border-slate-800 bg-[#111827] p-6">
+          <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/10 blur-3xl" />
+          <div className="relative flex h-full flex-col justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">AI Interviewer</p>
+              <h2 className="mt-2 text-xl font-medium text-slate-100">{persona.name}</h2>
+              <p className="mt-1 text-sm text-slate-400">{persona.role}</p>
+            </div>
+
+            <div className="flex flex-col items-center gap-5 py-8">
+              <div className={`h-24 w-24 rounded-full border border-blue-400/30 bg-blue-500/10 ${isSpeaking ? 'animate-pulse' : ''}`} />
+              <div className="flex h-10 items-end gap-1">
+                {[...Array(22)].map((_, i) => (
+                  <div key={i} className={`w-1 rounded-full bg-blue-400/70 ${isSpeaking ? 'neural-wave-bar is-active' : 'neural-wave-bar'}`} style={{ animationDelay: `${i * 0.04}s` }} />
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Current Question</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-200">
+                {transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text || 'The AI interviewer will begin shortly. Stay concise and structured.'}
+              </p>
             </div>
           </div>
+        </section>
 
-          <button 
-            onClick={handleSaveAndExit}
-            className="flex-1 sm:flex-none px-6 py-2 bg-slate-900 border border-slate-800 rounded-full hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <div className="h-full rounded-xl border border-slate-700 bg-[#0B0F14]" />
+          <p className="mt-3 text-center text-xs uppercase tracking-[0.16em] text-slate-500">User video feed</p>
+        </section>
+      </div>
+
+      <section className="h-56 rounded-2xl border border-slate-800 bg-[#111827]/80 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Real-time transcript</p>
+          <select
+            value={currentLanguage}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-300"
           >
-            Exit Session
-          </button>
+            {COMMON_LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+          </select>
         </div>
-      </div>
-
-      <div className="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-2xl synapse-glow animate-in zoom-in-95 duration-500">
-        {isConnecting && (
-          <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center space-y-4">
-            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] animate-pulse">Initializing Synapse Network...</p>
-          </div>
-        )}
-
-        <div className="h-32 sm:h-40 flex items-center justify-center bg-slate-950 border-b border-slate-800 relative overflow-hidden shrink-0">
-          <div className={`absolute inset-0 bg-blue-500/5 transition-opacity duration-1000 ${isSpeaking ? 'opacity-100' : 'opacity-0'}`}></div>
-          <div className="flex items-end gap-1.5 h-16">
-            {[...Array(32)].map((_, i) => (
-              <div 
-                key={i} 
-                className={`w-0.5 sm:w-1 bg-gradient-to-t from-blue-600 to-pink-500 rounded-full transition-all duration-300 ${isSpeaking ? 'animate-bounce' : 'h-1 opacity-10'}`}
-                style={{ 
-                  animationDelay: `${i * 0.03}s`,
-                  height: isSpeaking ? `${Math.random() * 80 + 20}%` : '4px'
-                }}
-              ></div>
-            ))}
-          </div>
-          <div className="absolute bottom-3 flex items-center gap-3">
-             <div className="text-[8px] font-black uppercase tracking-[0.3em] text-slate-700">
-               {isSpeaking ? `COACH SYNAPSE FIRING` : 'AWAITING NEURAL INPUT'}
-             </div>
-          </div>
-        </div>
-
-        <div 
-          ref={containerRef}
-          className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6 scroll-smooth bg-slate-900/40"
-        >
-          {transcriptions.length === 0 && !isConnecting && (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-12">
-              <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-blue-400 animate-pulse border border-slate-700">⚡</div>
-              <div>
-                <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Neural Link Synchronized</p>
-                <p className="text-slate-600 italic text-sm mt-1">Speak clearly to begin your training session.</p>
+        <div ref={containerRef} className="h-[calc(100%-2rem)] space-y-3 overflow-y-auto pr-2">
+          {isConnecting && <p className="text-sm text-slate-500">Establishing interview channel...</p>}
+          {transcriptions.map((t, idx) => {
+            const words = t.text.split(/\s+/);
+            return (
+              <div key={idx} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-sm leading-relaxed text-slate-200">
+                <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-slate-500">{t.speaker === 'user' ? 'You' : 'AI'}</p>
+                <p>
+                  {words.map((word, i) => {
+                    const clean = word.toLowerCase().replace(/[^a-z]/g, '');
+                    const isFiller = fillerWords.includes(clean) || (clean === 'you' && words[i + 1]?.toLowerCase().replace(/[^a-z]/g, '') === 'know');
+                    return <span key={`${idx}-${i}`} className={isFiller ? 'text-violet-300' : ''}>{word} </span>;
+                  })}
+                </p>
               </div>
-            </div>
-          )}
-          {transcriptions.map((t, idx) => (
-            <div 
-              key={idx} 
-              className={`flex flex-col ${t.speaker === 'user' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-            >
-              <div className={`max-w-[90%] sm:max-w-[75%] p-4 sm:p-5 rounded-2xl shadow-xl leading-relaxed ${
-                t.speaker === 'user' 
-                  ? 'bg-blue-600 text-white rounded-tr-none' 
-                  : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
-              }`}>
-                <p className="text-sm md:text-base">{t.text}</p>
-              </div>
-              <span className="text-[8px] uppercase font-black text-slate-600 mt-2 px-1 tracking-[0.2em]">
-                {t.speaker === 'user' ? 'Linguistic Impulse' : 'Neuro-Response'}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </div>
-
-      <div className="mt-4 flex items-center justify-center gap-6 py-2.5 px-6 bg-slate-900/50 rounded-full border border-slate-800 w-fit mx-auto shadow-lg backdrop-blur-sm animate-in fade-in duration-1000 delay-500">
-        <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
-          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Signal Locked</span>
-        </div>
-        <div className="h-3 w-px bg-slate-800"></div>
-        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
-          Secure Neural Stream v3.2
-        </div>
-      </div>
+      </section>
     </div>
   );
 };
