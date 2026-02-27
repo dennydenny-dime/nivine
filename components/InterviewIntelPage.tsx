@@ -43,6 +43,11 @@ const KEYWORDS = [
   'recruitment strategy',
 ];
 
+const RAIL_MOTION_CONFIG = {
+  floatDurations: [7.5, 9, 10.5],
+  driftOffsets: [6, 10, 14],
+};
+
 const sampleNews: NewsItem[] = [
   {
     id: 'n1',
@@ -269,6 +274,18 @@ const InterviewIntelPage: React.FC = () => {
   const featuredNews = filteredNews[0];
   const railNews = filteredNews.slice(1);
 
+  const getRailCardMotionStyle = (index: number): React.CSSProperties => {
+    const floatDuration = RAIL_MOTION_CONFIG.floatDurations[index % RAIL_MOTION_CONFIG.floatDurations.length];
+    const driftOffset = RAIL_MOTION_CONFIG.driftOffsets[index % RAIL_MOTION_CONFIG.driftOffsets.length];
+    const animationDelay = `${index * 0.45}s`;
+
+    return {
+      '--intel-rail-float-duration': `${floatDuration}s`,
+      '--intel-rail-drift-offset': `${driftOffset}px`,
+      '--intel-rail-delay': animationDelay,
+    } as React.CSSProperties;
+  };
+
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 p-6 md:p-8">
@@ -335,10 +352,11 @@ const InterviewIntelPage: React.FC = () => {
         <div className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">More Like This</h3>
           <div className="flex gap-4 overflow-x-auto pb-2 pr-2 snap-x snap-mandatory">
-            {railNews.map((article) => (
+            {railNews.map((article, index) => (
               <article
                 key={article.id}
-                className="group relative min-w-[240px] sm:min-w-[280px] md:min-w-[320px] h-[180px] rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/70 snap-start transition duration-300 hover:scale-[1.03] hover:border-red-400/70"
+                style={getRailCardMotionStyle(index)}
+                className="intel-rail-card group relative min-w-[240px] sm:min-w-[280px] md:min-w-[320px] h-[180px] rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/70 snap-start transition duration-300 hover:scale-[1.03] hover:border-red-400/70"
               >
                 <img src={article.image} alt={article.title} className="absolute inset-0 w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
