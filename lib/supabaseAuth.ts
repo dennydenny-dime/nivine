@@ -115,6 +115,25 @@ const getSupabaseUrl = () => {
 
 const SUPABASE_URL = getSupabaseUrl();
 const SESSION_KEY = 'tm_supabase_session';
+const AUTH_RETRY_DELAYS_MS = [400, 1200];
+
+const RETRYABLE_HTTP_STATUS = new Set([
+  408,
+  425,
+  429,
+  500,
+  502,
+  503,
+  504,
+  520,
+  521,
+  522,
+  523,
+  524,
+  525,
+  526,
+  527
+]);
 
 interface SupabaseUser {
   id: string;
@@ -199,12 +218,59 @@ export const clearStoredSession = () => {
 const throwIfErrorResponse = async (response: Response) => {
   if (response.ok) return;
 
-  const data = await response.json().catch(() => null);
-  throw new Error(data?.msg || data?.error_description || data?.error || 'Authentication request failed');
+  const bodyText = await response.text().catch(() => '');
+
+  let parsedBody: { msg?: string; error_description?: string; error?: string } | null = null;
+  if (bodyText) {
+    try {
+      parsedBody = JSON.parse(bodyText);
+    } catch {
+      parsedBody = null;
+    }
+  }
+
+  const isSslHandshakeFailure = response.status === 525
+    || /SSL handshake failed/i.test(bodyText)
+    || /Error code\s*525/i.test(bodyText);
+
+  if (isSslHandshakeFailure) {
+    throw new Error('Login service is temporarily unavailable (SSL handshake failed). Please retry in a moment.');
+  }
+
+  throw new Error(parsedBody?.msg || parsedBody?.error_description || parsedBody?.error || 'Authentication request failed');
+};
+
+const wait = (ms: number) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+
+const fetchAuthWithRetry = async (input: string, init: RequestInit) => {
+  let response: Response | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= AUTH_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      response = await fetch(input, init);
+
+      if (!RETRYABLE_HTTP_STATUS.has(response.status) || attempt === AUTH_RETRY_DELAYS_MS.length) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === AUTH_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+    }
+
+    await wait(AUTH_RETRY_DELAYS_MS[attempt]);
+  }
+
+  if (response) return response;
+  throw lastError instanceof Error ? lastError : new Error('Authentication request failed');
 };
 
 export const signInWithEmail = async (email: string, password: string) => {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+  const response = await fetchAuthWithRetry(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({ email, password })
@@ -215,7 +281,7 @@ export const signInWithEmail = async (email: string, password: string) => {
 };
 
 export const signUpWithEmail = async (email: string, password: string, fullName: string) => {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+  const response = await fetchAuthWithRetry(`${SUPABASE_URL}/auth/v1/signup`, {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({
@@ -232,7 +298,7 @@ export const signUpWithEmail = async (email: string, password: string, fullName:
 };
 
 export const fetchUserWithAccessToken = async (accessToken: string) => {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+  const response = await fetchAuthWithRetry(`${SUPABASE_URL}/auth/v1/user`, {
     method: 'GET',
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -245,7 +311,7 @@ export const fetchUserWithAccessToken = async (accessToken: string) => {
 };
 
 export const signOutSession = async (accessToken: string) => {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+  const response = await fetchAuthWithRetry(`${SUPABASE_URL}/auth/v1/logout`, {
     method: 'POST',
     headers: {
       apikey: SUPABASE_ANON_KEY,
