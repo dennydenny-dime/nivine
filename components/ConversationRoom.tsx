@@ -244,12 +244,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
 
   if (error) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-8 text-center">
-          <h3 className="text-lg font-semibold text-slate-100">Connection interrupted</h3>
-          <p className="mt-3 text-sm leading-relaxed text-slate-400">{error}</p>
-          <button onClick={onExit} className="mt-6 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:border-slate-500">
-            Return
+      <div className="flex min-h-[65vh] items-center justify-center px-4">
+        <div className="premium-panel w-full max-w-lg rounded-3xl p-8 text-center">
+          <h3 className="text-lg font-semibold tracking-tight text-[#ededed]">Signal interrupted</h3>
+          <p className="mt-3 text-sm leading-relaxed text-[#8a8f98]">{error}</p>
+          <button onClick={onExit} className="mt-7 rounded-xl border border-white/20 px-4 py-2 text-sm text-[#ededed] transition hover:border-white/35">
+            Return to console
           </button>
         </div>
       </div>
@@ -261,75 +261,75 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
   const fillerWords = ['um', 'uh', 'like', 'you know', 'actually'];
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-7xl flex-col gap-4 px-4 pb-4 lg:px-8">
-      <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-[#111827]/75 px-4 py-3">
-        <div className="flex items-center gap-4 text-xs uppercase tracking-[0.14em] text-slate-400">
+    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-[95rem] flex-col gap-4 px-4 pb-4 lg:px-8">
+      <div className="premium-panel flex items-center justify-between rounded-2xl px-4 py-3">
+        <div className="flex items-center gap-4 text-xs uppercase tracking-[0.2em] text-[#8a8f98]">
           <span>Live Interview</span>
-          <span className="rounded-md border border-slate-700 px-2 py-1 text-slate-200">{timerLabel}</span>
-          <span className={`flex items-center gap-2 ${isSpeaking ? 'text-blue-300' : 'text-slate-500'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />Mic {isSpeaking ? 'active' : 'idle'}</span>
+          <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 font-mono text-[#ededed]">{timerLabel}</span>
+          <span className={`flex items-center gap-2 ${isSpeaking ? 'text-indigo-300' : 'text-slate-500'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />Mic {isSpeaking ? 'active' : 'idle'}</span>
         </div>
-        <button onClick={handleSaveAndExit} className="rounded-lg border border-red-500/50 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/10">
+        <button onClick={handleSaveAndExit} className="rounded-lg border border-red-500/55 px-3 py-1.5 text-xs tracking-wide text-red-300 transition hover:bg-red-500/10">
           End Interview
         </button>
       </div>
 
-      <div className="grid flex-1 gap-4 lg:grid-cols-2">
-        <section className="relative rounded-2xl border border-slate-800 bg-[#111827] p-6">
-          <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/10 blur-3xl" />
+      <div className="grid flex-1 gap-4 lg:grid-cols-[1.1fr,1fr]">
+        <section className="premium-panel relative overflow-hidden rounded-3xl p-7">
+          <div className="absolute left-1/2 top-1/2 h-60 w-60 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="relative flex h-full flex-col justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">AI Interviewer</p>
-              <h2 className="mt-2 text-xl font-medium text-slate-100">{persona.name}</h2>
-              <p className="mt-1 text-sm text-slate-400">{persona.role}</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">AI Analyst</p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#ededed]">{persona.name}</h2>
+              <p className="mt-1 text-sm text-[#8a8f98]">{persona.role}</p>
             </div>
 
-            <div className="flex flex-col items-center gap-5 py-8">
-              <div className={`h-24 w-24 rounded-full border border-blue-400/30 bg-blue-500/10 ${isSpeaking ? 'animate-pulse' : ''}`} />
+            <div className="flex flex-col items-center gap-7 py-8">
+              <div className={`pulse-orb h-28 w-28 ${isSpeaking ? 'is-active premium-glow-active' : ''}`} />
               <div className="flex h-10 items-end gap-1">
-                {[...Array(22)].map((_, i) => (
-                  <div key={i} className={`w-1 rounded-full bg-blue-400/70 ${isSpeaking ? 'neural-wave-bar is-active' : 'neural-wave-bar'}`} style={{ animationDelay: `${i * 0.04}s` }} />
+                {[...Array(28)].map((_, i) => (
+                  <div key={i} className={`neural-wave-bar ${isSpeaking ? 'is-active' : ''}`} style={{ animationDelay: `${i * 0.04}s` }} />
                 ))}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Current Question</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-200">
-                {transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text || 'The AI interviewer will begin shortly. Stay concise and structured.'}
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Current question</p>
+              <p className="mt-3 text-lg leading-relaxed text-[#ededed]">
+                {transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text || 'The AI interviewer is calibrating the session. Maintain concise high-signal responses.'}
               </p>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="h-full rounded-xl border border-slate-700 bg-[#0B0F14]" />
-          <p className="mt-3 text-center text-xs uppercase tracking-[0.16em] text-slate-500">User video feed</p>
+        <section className="premium-panel rounded-3xl p-4">
+          <div className="h-full rounded-2xl border border-white/10 bg-black/30 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]" />
+          <p className="mt-3 text-center text-[11px] uppercase tracking-[0.2em] text-slate-500">User video feed</p>
         </section>
       </div>
 
-      <section className="h-56 rounded-2xl border border-slate-800 bg-[#111827]/80 p-4">
+      <section className="premium-panel h-60 rounded-3xl p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Real-time transcript</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Real-time transcript</p>
           <select
             value={currentLanguage}
             onChange={(e) => handleLanguageChange(e.target.value)}
-            className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-300"
+            className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs text-slate-300"
           >
             {COMMON_LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
           </select>
         </div>
         <div ref={containerRef} className="h-[calc(100%-2rem)] space-y-3 overflow-y-auto pr-2">
-          {isConnecting && <p className="text-sm text-slate-500">Establishing interview channel...</p>}
+          {isConnecting && <p className="text-sm text-slate-500">Establishing encrypted interview channel...</p>}
           {transcriptions.map((t, idx) => {
             const words = t.text.split(/\s+/);
             return (
-              <div key={idx} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-sm leading-relaxed text-slate-200">
-                <p className="mb-1 text-[10px] uppercase tracking-[0.16em] text-slate-500">{t.speaker === 'user' ? 'You' : 'AI'}</p>
+              <div key={idx} className="rounded-xl border border-white/10 bg-black/25 p-3 text-sm leading-relaxed text-slate-200">
+                <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-slate-500">{t.speaker === 'user' ? 'You' : 'AI'}</p>
                 <p>
                   {words.map((word, i) => {
                     const clean = word.toLowerCase().replace(/[^a-z]/g, '');
                     const isFiller = fillerWords.includes(clean) || (clean === 'you' && words[i + 1]?.toLowerCase().replace(/[^a-z]/g, '') === 'know');
-                    return <span key={`${idx}-${i}`} className={isFiller ? 'text-violet-300' : ''}>{word} </span>;
+                    return <span key={`${idx}-${i}`} className={isFiller ? 'underline decoration-red-400/70 decoration-2 underline-offset-[3px] text-red-200/90' : ''}>{word} </span>;
                   })}
                 </p>
               </div>
@@ -339,6 +339,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
       </section>
     </div>
   );
+
 };
 
 export default ConversationRoom;
