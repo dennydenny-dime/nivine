@@ -350,7 +350,7 @@ const App: React.FC = () => {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0A0A0B] text-[#EDEDED] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin"></div>
       </div>
     );
@@ -358,27 +358,27 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#0B0F14] text-slate-100 selection:bg-indigo-500/30 px-4">
+      <div className="min-h-screen bg-[#0A0A0B] text-[#EDEDED] selection:bg-indigo-500/30 px-4">
         <AuthPage onLogin={setCurrentUser} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F14] text-slate-100 selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-[#0A0A0B] text-[#EDEDED] selection:bg-indigo-500/30">
       {/* Navigation - hidden in conversation mode if desired, but here we keep it for exit */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/85 backdrop-blur-md border-b border-slate-800 transition-transform duration-500">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#0A0A0B]/80 backdrop-blur-xl transition-transform duration-500">
         <div className="max-w-7xl mx-auto px-4 py-3 md:py-2 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={goBack}>
             <SynapseLogo className="w-8 h-8 shadow-lg shadow-white/5" />
-            <span className="text-lg md:text-xl font-bold tracking-tight">NODE <span className="text-indigo-400">AI</span></span>
+            <span className="text-lg md:text-xl font-semibold tracking-tight">NODE <span className="text-indigo-300">AI</span></span>
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
               <button
                 onClick={toggleFullScreen}
-                className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
+                className="p-2 hover:bg-white/5 rounded-full transition-colors text-slate-400 hover:text-white"
                 title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}
               >
                 {isFullScreen ? (
@@ -390,7 +390,7 @@ const App: React.FC = () => {
 
               <button
                 onClick={openPersonalDashboard}
-                className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border transition ${currentView === View.PERSONAL_DASHBOARD ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800'}`}
+                className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border transition ${currentView === View.PERSONAL_DASHBOARD ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'bg-black/40 border-white/10 text-slate-100 hover:bg-white/5'}`}
                 title="Open personal dashboard"
               >
                 <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
@@ -399,19 +399,19 @@ const App: React.FC = () => {
 
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium hover:bg-slate-800 transition-all text-slate-300"
+                className="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium hover:bg-white/5 transition-all text-slate-300"
               >
                 Logout
               </button>
             </div>
           </div>
-          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-1.5">
+          <div className="premium-panel rounded-2xl p-1.5">
             <div className="flex gap-1.5 items-center overflow-x-auto md:overflow-visible scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
               {navItems.map((item) => (
                 <button
                   key={item.key}
                   onClick={item.onClick}
-                  className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-slate-800 hover:text-white'} ${item.locked ? 'relative' : ''}`}
+                  className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-white/5 hover:text-white'} ${item.locked ? 'relative' : ''}`}
                 >
                   {item.icon}
                   {item.label}
@@ -446,7 +446,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-900 mt-auto">
+      <footer className="py-8 text-center text-slate-500 text-sm border-t border-white/10 mt-auto">
         &copy; 2026 NODE AI. All rights reserved.
       </footer>
     </div>

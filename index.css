@@ -1,61 +1,92 @@
-/* Local stylesheet to prevent missing asset 404s and host shared app-level overrides. */
 :root {
   color-scheme: dark;
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #111114;
+  --text-primary: #ededed;
+  --text-secondary: #8a8f98;
+  --accent: #5f77ff;
+  --accent-violet: #5b45c6;
 }
 
-.neural-voice-bubble {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #a78bfa, #6366f1);
-  box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.45);
-  transform-origin: center;
+* {
+  scrollbar-color: #2a2a31 #0f0f12;
 }
 
-.neural-voice-bubble.human {
-  background: linear-gradient(180deg, #38bdf8, #2563eb);
-  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.45);
+body {
+  margin: 0;
+  background: radial-gradient(circle at 18% 20%, rgba(95, 119, 255, 0.12), transparent 35%),
+    radial-gradient(circle at 80% 10%, rgba(91, 69, 198, 0.1), transparent 30%),
+    var(--bg-primary);
+  color: var(--text-primary);
+  font-family: Inter, "SF Pro Text", "SF Pro Display", "Geist", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.neural-voice-bubble.is-active {
-  animation: neuralBubblePulse 1s ease-in-out infinite;
+.premium-panel {
+  background: linear-gradient(160deg, rgba(17, 17, 20, 0.8), rgba(10, 10, 11, 0.84));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+}
+
+.premium-noise {
+  position: relative;
+}
+
+.premium-noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.4) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+  mix-blend-mode: soft-light;
+}
+
+.premium-glow-active {
+  box-shadow: 0 0 0 1px rgba(95, 119, 255, 0.45), 0 0 38px rgba(95, 119, 255, 0.2);
 }
 
 .neural-wave-bar {
   width: 4px;
-  height: 8px;
+  height: 10px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.9), rgba(129, 140, 248, 0.7));
-  opacity: 0.3;
+  background: linear-gradient(180deg, rgba(120, 140, 255, 0.95), rgba(70, 84, 172, 0.5));
+  opacity: 0.26;
 }
 
 .neural-wave-bar.is-active {
-  animation: neuralWaveSignal 720ms ease-in-out infinite;
-  opacity: 1;
+  animation: neuralWaveSignal 820ms ease-in-out infinite;
+  opacity: 0.95;
 }
 
-@keyframes neuralBubblePulse {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.3);
-  }
+.pulse-orb {
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(152, 168, 255, 0.42), rgba(95, 119, 255, 0.12) 45%, transparent 70%);
+  border: 1px solid rgba(148, 162, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(95, 119, 255, 0.2), 0 0 45px rgba(95, 119, 255, 0.32), inset 0 0 28px rgba(255, 255, 255, 0.08);
+}
 
-  50% {
-    transform: translateY(-5px) scale(1.25);
-    box-shadow: 0 0 0 7px rgba(99, 102, 241, 0);
-  }
+.pulse-orb.is-active {
+  animation: orbPulse 2.2s ease-in-out infinite;
+}
+
+.metric-counter {
+  animation: metricRise 900ms ease-out both;
+}
+
+@keyframes metricRise {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes orbPulse {
+  0%,
+  100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.08); filter: brightness(1.2); }
 }
 
 @keyframes neuralWaveSignal {
-  0%,
-  100% {
-    height: 8px;
-    transform: translateY(0);
-  }
-
-  50% {
-    height: 22px;
-    transform: translateY(-2px);
-  }
+  0%, 100% { height: 10px; transform: translateY(0); }
+  50% { height: 26px; transform: translateY(-3px); }
 }
