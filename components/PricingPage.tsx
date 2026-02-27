@@ -35,6 +35,9 @@ type Plan = {
   fallbackHref?: string;
   usdPrice?: number;
   razorpayDescription?: string;
+  blurb?: string;
+  badge?: string;
+  highlight?: boolean;
 };
 
 type PricingConfig = {
@@ -52,12 +55,17 @@ const RAZORPAY_PAYMENT_METHODS: Record<string, boolean> = {
 const individualPlans: Plan[] = [
   {
     label: 'Free',
+    blurb: 'A great solution for getting started',
+    badge: 'Starter',
     value: '6 calls · 3 mins each · Any neural module',
     cta: 'Start Free',
     href: '/#app',
   },
   {
     label: 'Premium',
+    blurb: 'Everything you need to scale your learning',
+    badge: 'Popular',
+    highlight: true,
     value: '30 calls · 10 mins each · All neural modules + quizzes + unlimited custom coaches',
     cta: 'Buy Premium',
     usdPrice: 20,
@@ -66,6 +74,8 @@ const individualPlans: Plan[] = [
   },
   {
     label: 'Elite',
+    blurb: 'More power and flexibility for experts',
+    badge: 'Best Value',
     value: 'All features included',
     cta: 'Buy Elite',
     usdPrice: 25,
@@ -77,6 +87,8 @@ const individualPlans: Plan[] = [
 const teamPlans: Plan[] = [
   {
     label: 'Team',
+    blurb: 'Full access for your whole organization',
+    badge: 'Teams',
     value: '25 members · 150 calls · 15 mins each · All features included',
     cta: 'Buy Team',
     usdPrice: 299,
@@ -86,6 +98,8 @@ const teamPlans: Plan[] = [
 ];
 
 const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
+  const allPlans = [...individualPlans, ...teamPlans];
+
   const defaultRazorpayKeyId = 'rzp_live_SJfxhwyl0mfTHg';
   const razorpayKeyId =
     import.meta.env.VITE_RAZORPAY_KEY_ID ||
@@ -247,74 +261,89 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-6xl mx-auto py-12">
-      <div className="text-center mb-14">
-        <h2 className="text-4xl md:text-5xl font-extrabold mb-4">
-          Pricing Built for <span className="gradient-text">Every Stage</span>
+    <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-[1320px] mx-auto py-12 px-4 md:px-6">
+      <div className="text-center mb-12">
+        <h2 className="text-4xl md:text-5xl font-extrabold mb-4 text-slate-100">
+          Pick the plan that fits your <span className="text-violet-400">next level</span>
         </h2>
         <p className="text-slate-400 text-lg max-w-3xl mx-auto">
-          Flexible plans for individuals and teams, with clear usage limits and feature access.
+          Same plans and limits, redesigned in a cleaner dark layout for easier comparison.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-950 border border-cyan-500/40 rounded-[28px] p-7 md:p-10 shadow-[0_0_60px_rgba(8,145,178,0.08)]">
-          <p className="text-cyan-400 uppercase tracking-[0.2em] text-xs md:text-sm font-semibold mb-5">Individual</p>
-          <h3 className="text-3xl md:text-4xl font-bold text-slate-100 mb-6">Individual Plans</h3>
-          <p className="text-slate-400 text-lg leading-relaxed mb-8 max-w-lg">
-            Start on Free, then upgrade to Premium or Elite for broader access, longer calls, and full coaching workflows.
-          </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {allPlans.map((plan) => {
+          const wasPrice = plan.usdPrice ? Math.round(plan.usdPrice * 2.4) : undefined;
 
-          <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
-            {individualPlans.map((plan) => (
-              <div key={plan.label} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start py-5">
-                <span className="text-slate-200 font-semibold text-2xl leading-tight">
-                  {plan.label}
-                  {plan.usdPrice ? ` — $${plan.usdPrice}/mo` : ''}
+          return (
+            <article
+              key={plan.label}
+              className={`rounded-3xl bg-slate-900 border p-6 min-h-[620px] flex flex-col transition-all ${
+                plan.highlight
+                  ? 'border-violet-400 shadow-[0_0_0_1px_rgba(167,139,250,0.7),0_18px_50px_rgba(124,58,237,0.2)]'
+                  : 'border-slate-700/90 shadow-[0_14px_35px_rgba(2,6,23,0.45)]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3 mb-5">
+                <div>
+                  <h3 className="text-3xl font-bold text-slate-100">{plan.label}</h3>
+                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">{plan.blurb}</p>
+                </div>
+                <span className="bg-lime-300 text-slate-900 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                  {plan.badge}
                 </span>
-                <span className="text-slate-300 text-xl leading-tight md:text-right">{plan.value}</span>
-                <button
-                  onClick={() => void handleBuyClick(plan)}
-                  className="justify-self-start md:justify-self-end px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-colors"
-                >
-                  {plan.cta}
-                </button>
               </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="bg-slate-950 border border-cyan-500/40 rounded-[28px] p-7 md:p-10 shadow-[0_0_60px_rgba(8,145,178,0.08)]">
-          <p className="text-cyan-400 uppercase tracking-[0.2em] text-xs md:text-sm font-semibold mb-5">Team</p>
-          <h3 className="text-3xl md:text-4xl font-bold text-slate-100 mb-6">Team Plan</h3>
-          <p className="text-slate-400 text-lg leading-relaxed mb-8 max-w-lg">
-            One unified plan for organizations that need full platform access for cohorts and teams.
-          </p>
-
-          <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
-            {teamPlans.map((plan) => (
-              <div key={plan.label} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start py-5">
-                <span className="text-slate-200 font-semibold text-2xl leading-tight">
-                  {plan.label}
-                  {plan.usdPrice ? ` — $${plan.usdPrice}/mo` : ''}
-                </span>
-                <span className="text-slate-300 text-xl leading-tight md:text-right">{plan.value}</span>
-                <button
-                  onClick={() => void handleBuyClick(plan)}
-                  className="justify-self-start md:justify-self-end px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition-colors"
-                >
-                  {plan.cta}
-                </button>
+              <div className="mb-5">
+                {typeof wasPrice === 'number' ? (
+                  <p className="text-slate-500 line-through text-lg mb-1">${wasPrice.toFixed(2)}</p>
+                ) : (
+                  <p className="text-slate-500 text-lg mb-1">No payment required</p>
+                )}
+                <p className="text-slate-100 text-5xl font-extrabold tracking-tight">
+                  {plan.usdPrice ? `$${plan.usdPrice.toFixed(2)}` : '$0.00'}
+                  <span className="text-lg font-medium text-slate-400">/mo</span>
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
+
+              <p className="text-violet-300 text-sm font-semibold mb-5 rounded-xl bg-violet-500/10 border border-violet-400/20 px-3 py-2 text-center">
+                Limited time offer
+              </p>
+
+              <button
+                onClick={() => void handleBuyClick(plan)}
+                className={`w-full rounded-xl border text-base font-semibold py-3 transition-colors ${
+                  plan.highlight
+                    ? 'bg-slate-100 text-slate-950 border-slate-100 hover:bg-white'
+                    : 'bg-transparent text-slate-100 border-slate-500 hover:border-slate-200 hover:text-white'
+                }`}
+              >
+                {plan.cta}
+              </button>
+
+              <p className="text-slate-500 text-sm mt-4 leading-relaxed border-b border-slate-700/70 pb-5">
+                {plan.value}
+              </p>
+
+              <div className="mt-6 space-y-3 text-sm text-slate-300">
+                <h4 className="text-slate-100 font-semibold text-base">What you get:</h4>
+                <p className="leading-relaxed">• {plan.value}</p>
+                {plan.usdPrice ? (
+                  <p className="leading-relaxed">• Secure checkout with cards, netbanking, and UPI.</p>
+                ) : (
+                  <p className="leading-relaxed">• Instant activation so you can start right away.</p>
+                )}
+                <p className="leading-relaxed">• Keep full access to all features included in {plan.label}.</p>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       <div className="mt-10 flex justify-center">
         <button
           onClick={onBack}
-          className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors text-slate-100 font-semibold"
+          className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors text-slate-100 font-semibold"
         >
           Back
         </button>
