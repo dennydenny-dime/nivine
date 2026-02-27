@@ -328,6 +328,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
   const [consentAudio, setConsentAudio] = useState(false);
   const [consentPolicy, setConsentPolicy] = useState(false);
   const [deviceStatus, setDeviceStatus] = useState<'idle' | 'ready' | 'error'>('idle');
+  const [deviceErrorMessage, setDeviceErrorMessage] = useState<string | null>(null);
   const [micLevel, setMicLevel] = useState(0);
   const [videoSignals, setVideoSignals] = useState<VideoFrameSignals>({
     frameStability: 58,
@@ -384,6 +385,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
 
   const beginDeviceCapture = async () => {
     try {
+      setDeviceErrorMessage(null);
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -476,15 +478,19 @@ const MentalPerformanceCoachPage: React.FC = () => {
       };
       tick();
       setDeviceStatus('ready');
+      return true;
     } catch {
       setDeviceStatus('error');
+      setDeviceErrorMessage('Camera and microphone access are required for 1:1 live interview scoring. Please enable permissions and retry.');
+      return false;
     }
   };
 
   const startSession = async () => {
     if (!consentComplete) return;
     if (deviceStatus !== 'ready') {
-      await beginDeviceCapture();
+      const ready = await beginDeviceCapture();
+      if (!ready) return;
     }
 
     const now = Date.now();
@@ -673,9 +679,9 @@ const MentalPerformanceCoachPage: React.FC = () => {
       <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/40 p-6 shadow-2xl shadow-indigo-900/30">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-indigo-300">Real-Time Video-Based Cognitive Interview Engine</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight">High-Pressure Adaptive Interview System</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-300">Live webcam + microphone capture, dynamic AI interrogation, multimodal cognitive analytics, and longitudinal progress tracking.</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-indigo-300">Mental Health Coach · Live AI Interview</p>
+            <h1 className="mt-2 text-3xl font-black leading-tight">1:1 Live Interview With Camera-On Scoring</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-300">Live webcam + microphone capture for one-on-one AI interviews that scan speech, posture, and behavioral stability, then output actionable scores in real time and in the final report.</p>
           </div>
           <SynapseLogo className="h-12 w-12" />
         </div>
@@ -683,7 +689,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <label className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm">
             <input type="checkbox" checked={consentVideo} onChange={(event) => setConsentVideo(event.target.checked)} className="mr-2" />
-            I consent to live video analysis (eye contact, facial behavior, micro-hesitation).
+            I consent to live video analysis with camera-on requirements (eye contact, posture, facial behavior, micro-hesitation).
           </label>
           <label className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm">
             <input type="checkbox" checked={consentAudio} onChange={(event) => setConsentAudio(event.target.checked)} className="mr-2" />
@@ -691,7 +697,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
           </label>
           <label className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm">
             <input type="checkbox" checked={consentPolicy} onChange={(event) => setConsentPolicy(event.target.checked)} className="mr-2" />
-            I understand this is performance coaching, not clinical diagnosis.
+            I understand this is coaching feedback and not a clinical diagnosis.
           </label>
         </div>
 
@@ -745,13 +751,14 @@ const MentalPerformanceCoachPage: React.FC = () => {
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live camera feed</p>
             <video ref={videoRef} className="mt-2 h-52 w-full rounded-xl border border-slate-700 bg-black object-cover" muted playsInline />
             <canvas ref={canvasRef} className="hidden" />
-            <p className="mt-2 text-xs text-slate-400">Device status: {deviceStatus === 'ready' ? 'Connected' : deviceStatus === 'error' ? 'Unavailable (permission/device issue)' : 'Idle'}</p>
+            <p className="mt-2 text-xs text-slate-400">Device status: {deviceStatus === 'ready' ? 'Connected (camera on)' : deviceStatus === 'error' ? 'Unavailable (permission/device issue)' : 'Idle'}</p>
+            {deviceErrorMessage && <p className="mt-2 text-xs text-rose-300">{deviceErrorMessage}</p>}
             <p className="mt-2 text-xs text-slate-500">Privacy: raw media stays in browser session for real-time coaching signals.</p>
           </div>
 
           <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4">
             <div className="flex flex-wrap gap-3">
-              <button onClick={startSession} disabled={sessionActive || !consentComplete} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold disabled:opacity-50">Start Live Session</button>
+              <button onClick={startSession} disabled={sessionActive || !consentComplete} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold disabled:opacity-50">Start 1:1 Live Interview</button>
               <button onClick={finishSession} disabled={!sessionActive} className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold disabled:opacity-50">End + Generate Elite Report</button>
             </div>
 
