@@ -39,3 +39,13 @@ The frontend posts to `<VITE_BACKEND_API_URL>/chat` (or `/api/chat` when the env
 
 This repo now includes a built-in Vercel Serverless Function at `api/chat.ts`.
 If you deploy to Vercel, add `GEMINI_API_KEY` (or `API_KEY`) in your project Environment Variables so `/api/chat` can generate responses.
+
+## Verify Supabase custom login integration
+
+After setting `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local`, run:
+
+```bash
+npm run check:supabase-auth
+```
+
+This performs a live connectivity check against your Supabase Auth endpoints (`/auth/v1/settings` and password grant) so you can quickly confirm your email/password login integration is healthy.
