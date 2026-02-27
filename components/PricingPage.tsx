@@ -33,9 +33,14 @@ type Plan = {
   cta: string;
   href?: string;
   fallbackHref?: string;
-  razorpayAmount?: number;
-  razorpayCurrency?: string;
+  usdPrice?: number;
   razorpayDescription?: string;
+};
+
+type PricingConfig = {
+  currency: string;
+  amountInMinorUnits: number;
+  displayPrice: string;
 };
 
 const RAZORPAY_PAYMENT_METHODS: Record<string, boolean> = {
@@ -52,20 +57,18 @@ const individualPlans: Plan[] = [
     href: '/#app',
   },
   {
-    label: 'Premium — $20/mo',
+    label: 'Premium',
     value: '30 calls · 10 mins each · All neural modules + quizzes + unlimited custom coaches',
     cta: 'Buy Premium',
-    razorpayAmount: 2000,
-    razorpayCurrency: 'INR',
+    usdPrice: 20,
     razorpayDescription: 'Premium monthly subscription',
     fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Premium%20Plan',
   },
   {
-    label: 'Elite — $25/mo',
+    label: 'Elite',
     value: 'All features included',
     cta: 'Buy Elite',
-    razorpayAmount: 2500,
-    razorpayCurrency: 'INR',
+    usdPrice: 25,
     razorpayDescription: 'Elite monthly subscription',
     fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Elite%20Plan',
   },
@@ -73,11 +76,10 @@ const individualPlans: Plan[] = [
 
 const teamPlans: Plan[] = [
   {
-    label: 'Team — $299/mo',
+    label: 'Team',
     value: '25 members · 150 calls · 15 mins each · All features included',
     cta: 'Buy Team',
-    razorpayAmount: 29900,
-    razorpayCurrency: 'INR',
+    usdPrice: 299,
     razorpayDescription: 'Team monthly subscription',
     fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Team%20Plan',
   },
@@ -113,21 +115,87 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     });
   };
 
-  const openRazorpayCheckout = async (plan: Plan) => {
+  const getCurrencyFractionDigits = (currency: string) => {
+    try {
+      const formatted = new Intl.NumberFormat('en', { style: 'currency', currency });
+      return formatted.resolvedOptions().maximumFractionDigits;
+    } catch {
+      return 2;
+    }
+  };
+
+  const formatDisplayPrice = (amount: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toFixed(2)}`;
+    }
+  };
+
+  const resolvePricingForPlan = async (plan: Plan): Promise<PricingConfig | null> => {
+    if (!plan.usdPrice) return null;
+
+    let currency = 'USD';
+    let exchangeRate = 1;
+
+    try {
+      const geoResponse = await fetch('https://ipapi.co/json/');
+      if (geoResponse.ok) {
+        const geoData = (await geoResponse.json()) as { currency?: string };
+        if (geoData.currency) {
+          currency = geoData.currency.toUpperCase();
+        }
+      }
+    } catch {
+      // Ignore geo failures and keep USD fallback.
+    }
+
+    if (currency !== 'USD') {
+      try {
+        const ratesResponse = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (ratesResponse.ok) {
+          const ratesData = (await ratesResponse.json()) as { rates?: Record<string, number> };
+          const targetRate = ratesData.rates?.[currency];
+          if (typeof targetRate === 'number' && targetRate > 0) {
+            exchangeRate = targetRate;
+          }
+        }
+      } catch {
+        // Ignore exchange-rate failures and keep USD fallback.
+      }
+    }
+
+    const localizedAmount = plan.usdPrice * exchangeRate;
+    const fractionDigits = getCurrencyFractionDigits(currency);
+    const amountInMinorUnits = Math.round(localizedAmount * Math.pow(10, fractionDigits));
+
+    return {
+      currency,
+      amountInMinorUnits,
+      displayPrice: formatDisplayPrice(localizedAmount, currency),
+    };
+  };
+
+  const openRazorpayCheckout = async (plan: Plan, pricingConfig: PricingConfig) => {
     const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded || !window.Razorpay || !plan.razorpayAmount || !razorpayKeyId) {
+    if (!scriptLoaded || !window.Razorpay || !razorpayKeyId) {
       return false;
     }
 
     const razorpay = new window.Razorpay({
       key: razorpayKeyId,
-      amount: plan.razorpayAmount,
-      currency: plan.razorpayCurrency ?? 'USD',
+      amount: pricingConfig.amountInMinorUnits,
+      currency: pricingConfig.currency,
       name: 'Synapse AI',
-      description: plan.razorpayDescription ?? plan.label,
+      description: `${plan.razorpayDescription ?? plan.label} (${pricingConfig.displayPrice})`,
       method: RAZORPAY_PAYMENT_METHODS,
       notes: {
         availablePaymentOptions: 'Cards, Net Banking, and BHIM/UPI',
+        localizedPrice: pricingConfig.displayPrice,
       },
       handler: () => {
         const label = plan.label.toLowerCase();
@@ -146,8 +214,13 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
   };
 
   const handleBuyClick = async (plan: Plan) => {
-    if (plan.razorpayAmount) {
-      const checkoutOpened = await openRazorpayCheckout(plan);
+    if (plan.usdPrice) {
+      const pricingConfig = await resolvePricingForPlan(plan);
+      if (!pricingConfig) {
+        return;
+      }
+
+      const checkoutOpened = await openRazorpayCheckout(plan, pricingConfig);
       if (!checkoutOpened) {
         const fallbackHref = plan.fallbackHref ?? 'mailto:sales@synapseai.app?subject=Payment%20Support';
         window.alert('Online checkout is temporarily unavailable. You will be redirected so we can help you complete your purchase.');
@@ -195,7 +268,10 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
           <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
             {individualPlans.map((plan) => (
               <div key={plan.label} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start py-5">
-                <span className="text-slate-200 font-semibold text-2xl leading-tight">{plan.label}</span>
+                <span className="text-slate-200 font-semibold text-2xl leading-tight">
+                  {plan.label}
+                  {plan.usdPrice ? ` — $${plan.usdPrice}/mo` : ''}
+                </span>
                 <span className="text-slate-300 text-xl leading-tight md:text-right">{plan.value}</span>
                 <button
                   onClick={() => void handleBuyClick(plan)}
@@ -218,7 +294,10 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
           <div className="divide-y divide-slate-800/80 border-y border-slate-800/80">
             {teamPlans.map((plan) => (
               <div key={plan.label} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start py-5">
-                <span className="text-slate-200 font-semibold text-2xl leading-tight">{plan.label}</span>
+                <span className="text-slate-200 font-semibold text-2xl leading-tight">
+                  {plan.label}
+                  {plan.usdPrice ? ` — $${plan.usdPrice}/mo` : ''}
+                </span>
                 <span className="text-slate-300 text-xl leading-tight md:text-right">{plan.value}</span>
                 <button
                   onClick={() => void handleBuyClick(plan)}
