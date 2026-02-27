@@ -13,7 +13,7 @@ import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage'
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
-import { SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail } from './lib/subscription';
+import { SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail, setSubscriptionTier as persistSubscriptionTier } from './lib/subscription';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -61,7 +61,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>(() => getSubscriptionTier());
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [trialExpiredNotice, setTrialExpiredNotice] = useState<string | null>(null);
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
@@ -127,6 +127,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser) return;
 
+    setSubscriptionTier(getSubscriptionTier(currentUser.email || currentUser.id));
     localStorage.setItem('tm_current_user', JSON.stringify(currentUser));
 
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
@@ -285,7 +286,7 @@ const App: React.FC = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
     setTrialExpiredNotice(null);
-    setSubscriptionTier(getSubscriptionTier());
+    setSubscriptionTier('free');
   };
 
   const navItems: NavItem[] = [
@@ -408,6 +409,7 @@ const App: React.FC = () => {
           )}
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
           {currentView === View.PRICING && <PricingPage onBack={goBack} onPurchaseSuccess={(tier) => {
+            persistSubscriptionTier(tier, currentUser.email || currentUser.id);
             setSubscriptionTier(tier);
             setTrialExpiredNotice(null);
             setCurrentView(View.LANDING);

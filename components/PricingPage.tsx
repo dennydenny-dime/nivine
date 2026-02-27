@@ -1,5 +1,5 @@
 import React from 'react';
-import { setSubscriptionTier, SubscriptionTier } from '../lib/subscription';
+import { SubscriptionTier } from '../lib/subscription';
 
 type RazorpayCheckoutOptions = {
   key: string;
@@ -220,7 +220,6 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess }) 
         else if (label.includes('elite')) purchasedTier = 'elite';
         else if (label.includes('team')) purchasedTier = 'team';
 
-        setSubscriptionTier(purchasedTier);
         onPurchaseSuccess(purchasedTier);
         window.alert('Payment successful! Your subscription has been activated.');
       },
@@ -255,7 +254,6 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess }) 
     }
 
     if (plan.label.toLowerCase() === 'free') {
-      setSubscriptionTier('free');
       onPurchaseSuccess('free');
     }
 
