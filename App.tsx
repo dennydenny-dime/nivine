@@ -72,10 +72,6 @@ const App: React.FC = () => {
   const isNewUser = effectiveTier === 'free';
   const remainingCalls = getRemainingCalls(effectiveTier);
 
-  const planNotice = remainingCalls === null
-    ? `Plan: ${effectiveTier.toUpperCase()} · Unlimited calls · No per-call time cap.`
-    : `Plan: ${effectiveTier.toUpperCase()} · ${remainingCalls} calls left this month · Up to ${planAccess.maxMinutesPerCall ?? 0} mins per call.`;
-
   const redirectToPricing = useCallback((notice: string) => {
     setTrialExpiredNotice(notice);
     window.alert(notice);
@@ -395,7 +391,7 @@ const App: React.FC = () => {
         <div className="animate-in fade-in duration-300">
           {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
           {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
-          {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} planNotice={planNotice} />}
+          {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
           {currentView === View.LEARNING_MODULES && <LearningModulesPage />}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={startConversation} />}
