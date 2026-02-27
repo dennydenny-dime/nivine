@@ -76,8 +76,24 @@ export const normalizeTier = (tier?: string | null): SubscriptionTier => {
   return 'free';
 };
 
-export const getSubscriptionTier = (): SubscriptionTier => {
+const getScopedSubscriptionKey = (userKey?: string | null) => {
+  const normalizedUserKey = (userKey || '').trim().toLowerCase();
+  return normalizedUserKey ? `${SUBSCRIPTION_TIER_KEY}:${normalizedUserKey}` : SUBSCRIPTION_TIER_KEY;
+};
+
+export const getSubscriptionTier = (userKey?: string | null): SubscriptionTier => {
   try {
+    const scopedTier = localStorage.getItem(getScopedSubscriptionKey(userKey));
+
+    if (scopedTier) {
+      return normalizeTier(scopedTier);
+    }
+
+    // Ensure first-time users always start on free if no user-scoped tier is found.
+    if (userKey) {
+      return 'free';
+    }
+
     return normalizeTier(localStorage.getItem(SUBSCRIPTION_TIER_KEY));
   } catch {
     return 'free';
@@ -89,9 +105,13 @@ export const hasPaidSubscription = (): boolean => {
   return tier === 'premium' || tier === 'elite' || tier === 'team';
 };
 
-export const setSubscriptionTier = (tier: string) => {
+export const setSubscriptionTier = (tier: string, userKey?: string | null) => {
   const normalizedTier = normalizeTier(tier);
-  localStorage.setItem(SUBSCRIPTION_TIER_KEY, normalizedTier);
+  localStorage.setItem(getScopedSubscriptionKey(userKey), normalizedTier);
+
+  if (!userKey) {
+    localStorage.setItem(SUBSCRIPTION_TIER_KEY, normalizedTier);
+  }
 };
 
 export const getPlanAccess = (tier: SubscriptionTier): PlanAccess => PLAN_ACCESS[tier];
