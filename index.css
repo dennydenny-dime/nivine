@@ -90,3 +90,19 @@ body {
   0%, 100% { height: 10px; transform: translateY(0); }
   50% { height: 26px; transform: translateY(-3px); }
 }
+
+.intel-rail-card {
+  animation: intelRailFloat var(--intel-rail-float-duration, 8.5s) ease-in-out infinite;
+  animation-delay: var(--intel-rail-delay, 0s);
+  will-change: transform;
+}
+
+@keyframes intelRailFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(calc(var(--intel-rail-drift-offset, 10px) * -1));
+  }
+}
