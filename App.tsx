@@ -13,7 +13,7 @@ import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage'
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
-import { hasPaidSubscription, isAdminEmail } from './lib/subscription';
+import { SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail } from './lib/subscription';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -55,72 +55,32 @@ type NavItem = {
   locked?: boolean;
 };
 
-const FREE_TRIAL_DURATION_MS = 150_000;
-const FREE_TRIAL_STORAGE_KEY = 'tm_free_feature_trial_expires_at';
-
-const FREE_TRIAL_VIEWS = new Set<View>([
-  View.APP,
-  View.CONVERSATION,
-]);
-
-const isFreeTrialView = (view: View) => FREE_TRIAL_VIEWS.has(view);
-
-
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [freeTrialExpiresAt, setFreeTrialExpiresAt] = useState<number | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>(() => getSubscriptionTier());
   const [trialExpiredNotice, setTrialExpiredNotice] = useState<string | null>(null);
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
   const isAdmin = isAdminEmail(normalizedEmail);
-  const hasFullAccess = isAdmin || hasPaidSubscription();
-  const isNewUser = !hasFullAccess;
+  const effectiveTier: SubscriptionTier = isAdmin ? 'elite' : subscriptionTier;
+  const planAccess = getPlanAccess(effectiveTier);
+  const hasFullAccess = isAdmin || subscriptionTier !== 'free';
+  const isNewUser = effectiveTier === 'free';
+  const remainingCalls = getRemainingCalls(effectiveTier);
 
-  const expireTrialAndRedirect = useCallback(() => {
-    const notice = 'Free trial has expired. Buy Premium to continue neural modules.';
+  const planNotice = remainingCalls === null
+    ? `Plan: ${effectiveTier.toUpperCase()} · Unlimited calls · No per-call time cap.`
+    : `Plan: ${effectiveTier.toUpperCase()} · ${remainingCalls} calls left this month · Up to ${planAccess.maxMinutesPerCall ?? 0} mins per call.`;
+
+  const redirectToPricing = useCallback((notice: string) => {
     setTrialExpiredNotice(notice);
     window.alert(notice);
     setCurrentView(View.PRICING);
   }, []);
-
-  useEffect(() => {
-    if (hasFullAccess) {
-      setFreeTrialExpiresAt(null);
-      localStorage.removeItem(FREE_TRIAL_STORAGE_KEY);
-      return;
-    }
-
-    const storedExpiryRaw = localStorage.getItem(FREE_TRIAL_STORAGE_KEY);
-    const storedExpiry = storedExpiryRaw ? Number(storedExpiryRaw) : NaN;
-    if (!Number.isFinite(storedExpiry) || storedExpiry <= 0) {
-      setFreeTrialExpiresAt(null);
-      return;
-    }
-
-    setFreeTrialExpiresAt(storedExpiry);
-  }, [hasFullAccess]);
-
-  useEffect(() => {
-    if (hasFullAccess || !freeTrialExpiresAt || !isFreeTrialView(currentView)) {
-      return;
-    }
-
-    const remaining = freeTrialExpiresAt - Date.now();
-    if (remaining <= 0) {
-      expireTrialAndRedirect();
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      expireTrialAndRedirect();
-    }, remaining);
-
-    return () => window.clearTimeout(timer);
-  }, [currentView, expireTrialAndRedirect, freeTrialExpiresAt, hasFullAccess]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -231,41 +191,28 @@ const App: React.FC = () => {
   }, [enterFullScreen]);
 
   const startConversation = (persona: Persona) => {
+    if (remainingCalls !== null && remainingCalls <= 0) {
+      redirectToPricing('You have reached your monthly call limit for this plan. Please upgrade to continue.');
+      return;
+    }
+
+    consumeCall();
     // Attempt to enter fullscreen as the user clicked a primary action button
     enterFullScreen();
     setSelectedPersona(persona);
     setCurrentView(View.CONVERSATION);
+    setTrialExpiredNotice(null);
   };
 
   const openApp = () => {
-    openViewWithTrial(View.APP);
-  };
-
-  const openViewWithTrial = (view: View) => {
-    if (hasFullAccess || !isFreeTrialView(view)) {
-      setCurrentView(view);
-      return;
-    }
-
-    const now = Date.now();
-    let expiresAt = freeTrialExpiresAt;
-
-    if (!expiresAt) {
-      expiresAt = now + FREE_TRIAL_DURATION_MS;
-      localStorage.setItem(FREE_TRIAL_STORAGE_KEY, String(expiresAt));
-      setFreeTrialExpiresAt(expiresAt);
-      setTrialExpiredNotice(null);
-    }
-
-    if (expiresAt <= now) {
-      expireTrialAndRedirect();
-      return;
-    }
-
-    setCurrentView(view);
+    setCurrentView(View.APP);
   };
 
   const openQuiz = () => {
+    if (!planAccess.quizzesEnabled) {
+      redirectToPricing('Quizzes are available on Premium and above plans.');
+      return;
+    }
     setCurrentView(View.QUIZ);
   };
 
@@ -282,7 +229,7 @@ const App: React.FC = () => {
   };
 
   const openCustomCoach = () => {
-    if (isNewUser) {
+    if (!planAccess.customCoachEnabled) {
       setTrialExpiredNotice('Custom Coach is available on Premium plans. Tap to choose a plan.');
       setCurrentView(View.PRICING);
       return;
@@ -291,7 +238,7 @@ const App: React.FC = () => {
   };
 
   const openMentalPerformance = () => {
-    if (isNewUser) {
+    if (!planAccess.mentalPerformanceEnabled) {
       setTrialExpiredNotice('Mental Performance Coach is available on Premium plans. Tap to choose a plan.');
       setCurrentView(View.PRICING);
       return;
@@ -331,9 +278,8 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
-    setFreeTrialExpiresAt(null);
     setTrialExpiredNotice(null);
-    localStorage.removeItem(FREE_TRIAL_STORAGE_KEY);
+    setSubscriptionTier(getSubscriptionTier());
   };
 
   const navItems: NavItem[] = [
@@ -442,14 +388,24 @@ const App: React.FC = () => {
         <div className="animate-in fade-in duration-300">
           {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
           {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
-          {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />}
+          {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} planNotice={planNotice} />}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
           {currentView === View.LEARNING_MODULES && <LearningModulesPage />}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={startConversation} />}
           {currentView === View.MENTAL_PERFORMANCE && <MentalPerformanceCoachPage />}
-          {currentView === View.CONVERSATION && selectedPersona && <ConversationRoom persona={selectedPersona} onExit={goBack} />}
+          {currentView === View.CONVERSATION && selectedPersona && (
+            <ConversationRoom
+              persona={selectedPersona}
+              onExit={goBack}
+              maxDurationMinutes={planAccess.maxMinutesPerCall}
+            />
+          )}
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
-          {currentView === View.PRICING && <PricingPage onBack={goBack} />}
+          {currentView === View.PRICING && <PricingPage onBack={goBack} onPurchaseSuccess={(tier) => {
+            setSubscriptionTier(tier);
+            setTrialExpiredNotice(null);
+            setCurrentView(View.LANDING);
+          }} />}
           {currentView === View.LEADERBOARD && <Leaderboard onBack={goBack} />}
         </div>
       </main>

@@ -7,9 +7,10 @@ import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 interface ConversationRoomProps {
   persona: Persona;
   onExit: () => void;
+  maxDurationMinutes: number | null;
 }
 
-const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) => {
+const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, maxDurationMinutes }) => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
@@ -235,6 +236,29 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit }) 
     initSession();
     return cleanup;
   }, [persona, cleanup]);
+
+
+  useEffect(() => {
+    if (maxDurationMinutes === null || !transcriptions.length) {
+      return;
+    }
+
+    const elapsedMs = Date.now() - transcriptions[0].timestamp;
+    const maxDurationMs = maxDurationMinutes * 60 * 1000;
+
+    if (elapsedMs >= maxDurationMs) {
+      window.alert(`This call reached your plan limit of ${maxDurationMinutes} minutes.`);
+      handleSaveAndExit();
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      window.alert(`This call reached your plan limit of ${maxDurationMinutes} minutes.`);
+      handleSaveAndExit();
+    }, maxDurationMs - elapsedMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [handleSaveAndExit, maxDurationMinutes, transcriptions]);
 
   useEffect(() => {
     if (containerRef.current) {
