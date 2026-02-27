@@ -6,9 +6,10 @@ import { SynapseLogo } from '../App';
 interface MainAppPageProps {
   onStart: (persona: Persona) => void;
   showTrialBanner?: boolean;
+  planNotice?: string;
 }
 
-const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, showTrialBanner = false }) => {
+const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, showTrialBanner = false, planNotice }) => {
   const [language, setLanguage] = useState('English');
 
   const handlePresetStart = (p: Persona) => {
@@ -31,7 +32,13 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, showTrialBanner = fa
 
         {showTrialBanner && (
           <p className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2">
-            Free trial for Neural Modules is limited to 2.5 minutes. The timer starts when you launch a module.
+            Free plan gives you limited monthly calls and shorter call duration. Upgrade for quizzes, custom coaches, and more.
+          </p>
+        )}
+
+        {planNotice && (
+          <p className="text-sm text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-4 py-2">
+            {planNotice}
           </p>
         )}
 

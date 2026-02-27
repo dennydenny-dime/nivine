@@ -1,5 +1,5 @@
 import React from 'react';
-import { setSubscriptionTier } from '../lib/subscription';
+import { setSubscriptionTier, SubscriptionTier } from '../lib/subscription';
 
 type RazorpayCheckoutOptions = {
   key: string;
@@ -25,6 +25,7 @@ declare global {
 
 interface PricingPageProps {
   onBack: () => void;
+  onPurchaseSuccess: (tier: SubscriptionTier) => void;
 }
 
 type Plan = {
@@ -97,7 +98,7 @@ const teamPlans: Plan[] = [
   },
 ];
 
-const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
+const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess }) => {
   const allPlans = [...individualPlans, ...teamPlans];
 
   const defaultRazorpayKeyId = 'rzp_live_SJfxhwyl0mfTHg';
@@ -213,9 +214,14 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
       },
       handler: () => {
         const label = plan.label.toLowerCase();
-        if (label.includes('premium')) setSubscriptionTier('premium');
-        else if (label.includes('elite')) setSubscriptionTier('elite');
-        else if (label.includes('team')) setSubscriptionTier('team');
+        let purchasedTier: SubscriptionTier = 'free';
+
+        if (label.includes('premium')) purchasedTier = 'premium';
+        else if (label.includes('elite')) purchasedTier = 'elite';
+        else if (label.includes('team')) purchasedTier = 'team';
+
+        setSubscriptionTier(purchasedTier);
+        onPurchaseSuccess(purchasedTier);
         window.alert('Payment successful! Your subscription has been activated.');
       },
       theme: {
@@ -250,6 +256,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
     if (plan.label.toLowerCase() === 'free') {
       setSubscriptionTier('free');
+      onPurchaseSuccess('free');
     }
 
     if (href.startsWith('mailto:')) {
