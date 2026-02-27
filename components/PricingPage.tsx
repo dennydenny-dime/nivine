@@ -68,7 +68,7 @@ const individualPlans: Plan[] = [
     highlight: true,
     value: '30 calls · 10 mins each · All neural modules + quizzes + unlimited custom coaches',
     cta: 'Buy Premium',
-    usdPrice: 20,
+    usdPrice: 0.1,
     razorpayDescription: 'Premium monthly subscription',
     fallbackHref: 'mailto:sales@synapseai.app?subject=Buy%20Premium%20Plan',
   },
