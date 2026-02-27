@@ -7,60 +7,98 @@ interface PersonalDashboardProps {
   onContinueTraining: () => void;
 }
 
+const getRingOffset = (score: number, radius = 52) => {
+  const circumference = 2 * Math.PI * radius;
+  return circumference - (Math.max(0, Math.min(score, 100)) / 100) * circumference;
+};
+
 const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUser, onContinueTraining }) => {
   const userStats: UserStats = getUserStats(currentUser.id);
   const userHistory: ConversationHistoryItem[] = getUserConversationHistory(currentUser.id);
   const latestSession = userHistory[0];
-  const averageConversationScore = userHistory.length
-    ? Math.round(
-      (userHistory.reduce((sum, item) => sum + (item.scoreCard?.overallScore || 0), 0) / userHistory.length) * 10,
-    ) / 10
+  const score = latestSession?.scoreCard;
+
+  const confidenceScore = score?.confidenceScore ?? 0;
+  const clarityScore = score?.clarityScore ?? 0;
+  const fillerCount = score?.fillerCount ?? 0;
+  const pressureHandling = Math.max(0, Math.min(100, (score?.overallScore ?? 0) + 8));
+  const speakingSpeed = latestSession
+    ? Math.round((score?.totalWords ?? 0) / Math.max(1, (latestSession.transcriptions.at(-1)?.timestamp ?? Date.now()) - latestSession.transcriptions[0].timestamp) * 60000)
     : 0;
+  const structureScore = Math.max(0, Math.min(100, Math.round((score?.concisenessScore ?? 0) * 9.5)));
 
   return (
-    <section className="rounded-3xl border border-indigo-500/30 bg-slate-900/70 p-6 sm:p-8">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300">Personal Dashboard</p>
-      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <section className="rounded-3xl border border-slate-800 bg-[#111827]/70 p-6 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black">Welcome back, {currentUser.name.split(' ')[0]}.</h2>
-          <p className="text-slate-400 mt-1">Your progress is private to your account and updates every time you train.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Feedback Dashboard</p>
+          <h2 className="mt-2 text-3xl font-semibold text-slate-100">Cognitive Performance Profile</h2>
+          <p className="mt-2 text-sm text-slate-400">A scientific summary of your interview behavior under pressure.</p>
         </div>
-        <button
-          onClick={onContinueTraining}
-          className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition"
-        >
-          Continue Training
+        <button onClick={onContinueTraining} className="rounded-xl border border-blue-400/40 bg-blue-500/90 px-5 py-2.5 text-sm font-medium text-slate-50">
+          Start Next Session
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-widest">Total XP</p>
-          <p className="text-2xl font-bold mt-2">{userStats.totalXP.toLocaleString()}</p>
+      <div className="mt-7 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Confidence Score</p>
+          <div className="mt-4 flex justify-center">
+            <svg viewBox="0 0 140 140" className="h-36 w-36">
+              <circle cx="70" cy="70" r="52" className="fill-none stroke-slate-700" strokeWidth="10" />
+              <circle cx="70" cy="70" r="52" className="fill-none stroke-blue-400" strokeWidth="10" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={getRingOffset(confidenceScore)} transform="rotate(-90 70 70)" />
+              <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" className="fill-slate-100 text-3xl font-semibold">{confidenceScore}</text>
+            </svg>
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-widest">Quizzes Completed</p>
-          <p className="text-2xl font-bold mt-2">{userStats.totalQuizzes}</p>
+
+        <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Clarity Score</p>
+          <div className="h-2 rounded-full bg-slate-700">
+            <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.max(0, Math.min(clarityScore, 100))}%` }} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F14] p-3">
+              <p className="text-xs text-slate-500">Filler Words</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-100">{fillerCount}</p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-[#0B0F14] p-3">
+              <p className="text-xs text-slate-500">Speaking Speed</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-100">{speakingSpeed || '--'} <span className="text-xs text-slate-500">WPM</span></p>
+            </div>
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-widest">Average Quiz Score</p>
-          <p className="text-2xl font-bold mt-2">{userStats.avgRating}%</p>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-widest">Conversation Score</p>
-          <p className="text-2xl font-bold mt-2">{averageConversationScore || '--'}</p>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Response Structure</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <div className="mb-1 flex justify-between text-xs text-slate-400"><span>Logical sequencing</span><span>{structureScore}%</span></div>
+              <div className="h-2 rounded-full bg-slate-700"><div className="h-full rounded-full bg-blue-400" style={{ width: `${structureScore}%` }} /></div>
+            </div>
+            <div>
+              <div className="mb-1 flex justify-between text-xs text-slate-400"><span>Pressure handling</span><span>{pressureHandling}%</span></div>
+              <div className="h-2 rounded-full bg-slate-700"><div className="h-full rounded-full bg-indigo-400" style={{ width: `${pressureHandling}%` }} /></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Latest Session</p>
+      <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Session Overview</p>
         {latestSession ? (
-          <p className="text-slate-300 mt-2">
-            {new Date(latestSession.date).toLocaleDateString()} · {latestSession.persona.name} ({latestSession.persona.role}) · Score {latestSession.scoreCard?.overallScore || '--'}
+          <p className="mt-2 text-sm text-slate-300">
+            {new Date(latestSession.date).toLocaleDateString()} · {latestSession.persona.name} · Overall {score?.overallScore ?? '--'} · Clarity {clarityScore} · Confidence {confidenceScore}
           </p>
         ) : (
-          <p className="text-slate-400 mt-2">No sessions yet. Start your first role-play to build your personal dashboard.</p>
+          <p className="mt-2 text-sm text-slate-400">No session data yet. Complete one AI interview to populate your profile.</p>
         )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        <div className="rounded-xl border border-slate-800 bg-[#0B0F14] p-3"><p className="text-xs text-slate-500">Total XP</p><p className="mt-1 text-xl font-semibold">{userStats.totalXP.toLocaleString()}</p></div>
+        <div className="rounded-xl border border-slate-800 bg-[#0B0F14] p-3"><p className="text-xs text-slate-500">Quizzes</p><p className="mt-1 text-xl font-semibold">{userStats.totalQuizzes}</p></div>
+        <div className="rounded-xl border border-slate-800 bg-[#0B0F14] p-3"><p className="text-xs text-slate-500">Average Quiz Score</p><p className="mt-1 text-xl font-semibold">{userStats.avgRating}%</p></div>
       </div>
     </section>
   );
