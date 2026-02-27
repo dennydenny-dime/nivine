@@ -68,7 +68,7 @@ const App: React.FC = () => {
   const isAdmin = isAdminEmail(normalizedEmail);
   const effectiveTier: SubscriptionTier = isAdmin ? 'elite' : subscriptionTier;
   const planAccess = getPlanAccess(effectiveTier);
-  const hasFullAccess = isAdmin || subscriptionTier !== 'free';
+  const hasPaidAccess = isAdmin || subscriptionTier !== 'free';
   const isNewUser = effectiveTier === 'free';
   const remainingCalls = getRemainingCalls(effectiveTier);
 
@@ -221,7 +221,8 @@ const App: React.FC = () => {
   };
 
   const openLeaderboard = () => {
-    if (!hasFullAccess) {
+    if (!hasPaidAccess) {
+      setTrialExpiredNotice('Leaderboard is available on Premium plans. Tap to choose a plan.');
       setCurrentView(View.PRICING);
       return;
     }
@@ -255,6 +256,11 @@ const App: React.FC = () => {
   };
 
   const openLearningModules = () => {
+    if (!hasPaidAccess) {
+      setTrialExpiredNotice('Learning Modules are available on Premium plans. Tap to choose a plan.');
+      setCurrentView(View.PRICING);
+      return;
+    }
     setCurrentView(View.LEARNING_MODULES);
   };
 
@@ -286,7 +292,7 @@ const App: React.FC = () => {
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
-    { key: View.LEARNING_MODULES, label: 'Learning Modules', onClick: openLearningModules },
+    { key: View.LEARNING_MODULES, label: 'Learning Modules', onClick: openLearningModules, locked: isNewUser },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
     { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: isNewUser },
     {
@@ -295,7 +301,7 @@ const App: React.FC = () => {
       onClick: openLeaderboard,
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
       className: 'shadow-lg shadow-indigo-500/20',
-      locked: !hasFullAccess
+      locked: !hasPaidAccess
     },
     { key: View.PRICING, label: 'Plans', onClick: openPricing },
     { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz }
