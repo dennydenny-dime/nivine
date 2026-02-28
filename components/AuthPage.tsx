@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { SynapseLogo } from '../App';
-import { getGoogleOAuthUrl, mapSupabaseUser, saveSession, signInWithEmail, signUpWithEmail } from '../lib/supabaseAuth';
+import { mapFirebaseUser, saveSession, signInWithEmail, signUpWithEmail } from '../lib/firebaseAuth';
 
 interface AuthPageProps {
   onLogin: (user: User) => void;
@@ -53,18 +53,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         ? await signInWithEmail(normalizedEmail, password)
         : await signUpWithEmail(normalizedEmail, password, normalizedName);
 
-      if (!response.user) {
-        throw new Error('Unable to fetch user details from Supabase.');
-      }
-
-      if (!response.access_token || !response.refresh_token) {
-        setAuthMessage('Sign-up succeeded. Please verify your email, then sign in.');
-        setIsLogin(true);
-        return;
-      }
-
       saveSession(response);
-      const user = mapSupabaseUser(response.user);
+      const user = mapFirebaseUser(response.user);
       syncToLeaderboardPool(user);
       onLogin(user);
     } catch (error) {
@@ -75,13 +65,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
   };
 
   const handleGoogleSignIn = async () => {
-    setAuthError(null);
+    setAuthError('Google sign-in is not configured yet. Please continue with email and password.');
     setAuthMessage(null);
-    try {
-      window.location.href = getGoogleOAuthUrl();
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.');
-    }
   };
 
   return (
@@ -104,7 +89,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.02 0-5.58-2.03-6.5-4.82l-4.11 3.19C3.33 21.31 7.31 24 12 24z" />
             <path fill="#FBBC05" d="M5.5 14.43c-.24-.72-.37-1.49-.37-2.43s.13-1.71.37-2.43L1.39 6.39C.5 8.09 0 10 0 12s.5 3.91 1.39 5.61l4.11-3.18z" />
           </svg>
-          Sign in with Google
+          Google sign-in (coming soon)
         </button>
 
         <div className="relative mb-6">
