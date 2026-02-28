@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "check:supabase-auth": "node scripts/check-supabase-auth.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react-dom": "^19.2.4",

@@ -8,7 +8,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
-import { clearStoredSession, fetchUserWithAccessToken, getStoredSession, mapSupabaseUser, readSessionFromUrlHash, saveSession, signOutSession } from './lib/supabaseAuth';
+import { clearStoredSession, fetchUserWithIdToken, getStoredSession, mapFirebaseUser, signOutSession } from './lib/firebaseAuth';
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
@@ -94,21 +94,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const restoreSession = async () => {
-      const urlSession = readSessionFromUrlHash();
-      const session = urlSession || getStoredSession();
+      const session = getStoredSession();
 
       if (!session) {
         setAuthReady(true);
         return;
       }
 
-      if (urlSession) {
-        saveSession(urlSession);
-      }
-
       try {
-        const supabaseUser = await fetchUserWithAccessToken(session.access_token);
-        setCurrentUser(mapSupabaseUser(supabaseUser));
+        const firebaseUser = await fetchUserWithIdToken(session.idToken);
+        setCurrentUser(mapFirebaseUser(firebaseUser));
       } catch {
         clearStoredSession();
         setCurrentUser(null);
@@ -267,13 +262,10 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    const session = getStoredSession();
-    if (session?.access_token) {
-      try {
-        await signOutSession(session.access_token);
-      } catch {
-        // Ignore logout API errors and clear local session anyway.
-      }
+    try {
+      await signOutSession();
+    } catch {
+      // Ignore logout API errors and clear local session anyway.
     }
 
     clearStoredSession();

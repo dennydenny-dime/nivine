@@ -17,11 +17,9 @@ View your app in AI Studio: https://ai.studio/apps/drive/1ubcYEKoruC1u0ihSS6ovuh
    `npm install`
 2. Create a `.env.local` file and set:
    - `VITE_API_KEY` (or `GEMINI_API_KEY`) to your Gemini API key
-   - `VITE_SUPABASE_URL` to your Supabase project URL or project ref
-   - `VITE_SUPABASE_ANON_KEY` to your Supabase anon key
-3. In Supabase Auth settings, add your local URL (for example `http://localhost:5173`) to allowed redirect URLs when using Google OAuth.
-4. Restart the dev server after updating env vars so Vite picks up the new values.
-5. Run the app:
+   - `VITE_FIREBASE_API_KEY` if you want to override the default Firebase web API key
+3. Restart the dev server after updating env vars so Vite picks up the new values.
+4. Run the app:
    `npm run dev`
 
 ## Voice workflow for neural modules
@@ -40,12 +38,3 @@ The frontend posts to `<VITE_BACKEND_API_URL>/chat` (or `/api/chat` when the env
 This repo now includes a built-in Vercel Serverless Function at `api/chat.ts`.
 If you deploy to Vercel, add `GEMINI_API_KEY` (or `API_KEY`) in your project Environment Variables so `/api/chat` can generate responses.
 
-## Verify Supabase custom login integration
-
-After setting `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local`, run:
-
-```bash
-npm run check:supabase-auth
-```
-
-This performs a live connectivity check against your Supabase Auth endpoints (`/auth/v1/settings` and password grant) so you can quickly confirm your email/password login integration is healthy.
