@@ -39,6 +39,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
 
     try {
       const response = await signInWithGoogle();
+
+      if (!response) {
+        setAuthError('Redirecting to Google sign-in… complete authentication in the opened tab/window.');
+        return;
+      }
+
       saveSession(response);
       const user = mapFirebaseUser(response.user);
       syncToLeaderboardPool(user);
