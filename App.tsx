@@ -8,7 +8,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
-import { clearStoredSession, fetchUserWithIdToken, getStoredSession, mapFirebaseUser, signOutSession } from './lib/firebaseAuth';
+import { clearStoredSession, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
@@ -93,26 +93,18 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const restoreSession = async () => {
-      const session = getStoredSession();
-
-      if (!session) {
-        setAuthReady(true);
-        return;
-      }
-
-      try {
-        const firebaseUser = await fetchUserWithIdToken(session.idToken);
+    const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
+      if (firebaseUser) {
         setCurrentUser(mapFirebaseUser(firebaseUser));
-      } catch {
+      } else {
         clearStoredSession();
         setCurrentUser(null);
-      } finally {
-        setAuthReady(true);
       }
-    };
 
-    restoreSession();
+      setAuthReady(true);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
