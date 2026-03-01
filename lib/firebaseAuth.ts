@@ -6,6 +6,7 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signInWithEmailAndPassword,
   signOut,
   updateProfile
@@ -95,7 +96,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   }
 };
 
-export const signInWithGoogle = async (): Promise<FirebaseSession> => {
+export const signInWithGoogle = async (): Promise<FirebaseSession | null> => {
   try {
     const credential = await signInWithPopup(auth, googleProvider);
     const idToken = await credential.user.getIdToken();
@@ -107,6 +108,11 @@ export const signInWithGoogle = async (): Promise<FirebaseSession> => {
       user: credential.user
     };
   } catch (error) {
+    if (error instanceof Error && (error.message.includes('auth/popup-blocked') || error.message.includes('auth/cancelled-popup-request'))) {
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+
     throw new Error(getFriendlyAuthError(error));
   }
 };
