@@ -1,9 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import {
+  GoogleAuthProvider,
   User as FirebaseSdkUser,
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  signInWithPopup,
   signInWithEmailAndPassword,
   signOut,
   updateProfile
@@ -21,6 +23,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 const buildFallbackAvatar = (firebaseUser: FirebaseSdkUser) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email || firebaseUser.uid}`;
@@ -92,6 +95,22 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   }
 };
 
+export const signInWithGoogle = async (): Promise<FirebaseSession> => {
+  try {
+    const credential = await signInWithPopup(auth, googleProvider);
+    const idToken = await credential.user.getIdToken();
+
+    return {
+      idToken,
+      refreshToken: credential.user.refreshToken,
+      expiresIn: '',
+      user: credential.user
+    };
+  } catch (error) {
+    throw new Error(getFriendlyAuthError(error));
+  }
+};
+
 export const fetchUserWithIdToken = async (_idToken: string): Promise<FirebaseSdkUser> => {
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) {
@@ -117,6 +136,8 @@ const getFriendlyAuthError = (error: unknown) => {
   if (error.message.includes('auth/invalid-email')) return 'Please enter a valid email address.';
   if (error.message.includes('auth/weak-password')) return 'Password must be at least 6 characters.';
   if (error.message.includes('auth/too-many-requests')) return 'Too many attempts. Please wait a moment and try again.';
+  if (error.message.includes('auth/popup-closed-by-user')) return 'Google sign-in was cancelled before completion.';
+  if (error.message.includes('auth/popup-blocked')) return 'Google sign-in popup was blocked. Please allow popups and try again.';
 
   return 'Authentication failed. Please try again.';
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { SynapseLogo } from '../App';
-import { mapFirebaseUser, saveSession, signInWithEmail, signUpWithEmail } from '../lib/firebaseAuth';
+import { mapFirebaseUser, saveSession, signInWithEmail, signInWithGoogle, signUpWithEmail } from '../lib/firebaseAuth';
 
 interface AuthPageProps {
   onLogin: (user: User) => void;
@@ -29,6 +29,24 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
         totalQuizzes: 0
       });
       localStorage.setItem('tm_leaderboard_pool', JSON.stringify(pool));
+    }
+  };
+
+
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    setAuthError(null);
+
+    try {
+      const response = await signInWithGoogle();
+      saveSession(response);
+      const user = mapFirebaseUser(response.user);
+      syncToLeaderboardPool(user);
+      onLogin(user);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Google authentication failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -128,6 +146,28 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin }) => {
             className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 py-3 font-semibold text-white shadow-lg shadow-indigo-900/40 hover:brightness-110 transition disabled:opacity-60 flex items-center justify-center"
           >
             {loading ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : (isLogin ? 'Sign In Securely' : 'Create Account')}
+          </button>
+
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/15" />
+            </div>
+            <span className="relative block mx-auto w-fit bg-transparent px-3 text-xs uppercase tracking-[0.2em] text-slate-400">Or</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleAuth}
+            disabled={loading}
+            className="w-full rounded-xl border border-white/25 bg-white/10 py-3 font-semibold text-white hover:bg-white/20 transition disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
+              <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-1.9 3l3 2.3c1.8-1.6 2.8-4 2.8-6.9 0-.7-.1-1.4-.2-2H12z" />
+              <path fill="#34A853" d="M12 21c2.7 0 5-0.9 6.7-2.5l-3-2.3c-.8.6-2 1-3.6 1-2.8 0-5.2-1.9-6-4.5l-3.1 2.4C4.8 18.6 8.1 21 12 21z" />
+              <path fill="#4A90E2" d="M6 12c0-.8.1-1.5.4-2.2L3.3 7.4C2.5 8.9 2 10.4 2 12s.5 3.1 1.3 4.6l3.1-2.4C6.1 13.5 6 12.8 6 12z" />
+              <path fill="#FBBC05" d="M12 6.8c1.5 0 2.8.5 3.9 1.5l2.9-2.9C17 3.8 14.7 3 12 3 8.1 3 4.8 5.4 3.3 9l3.1 2.4c.8-2.6 3.2-4.6 6-4.6z" />
+            </svg>
+            Continue with Google
           </button>
         </form>
 
