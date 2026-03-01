@@ -1,166 +1,122 @@
+import { initializeApp } from 'firebase/app';
+import {
+  User as FirebaseSdkUser,
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile
+} from 'firebase/auth';
 import { User } from '../types';
 
-const FIREBASE_CONFIG = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBM2kuREX9zFgw9TAOT40X1vJFqfWgmrLQ',
-  authDomain: 'node-ai-d2b11.firebaseapp.com',
-  projectId: 'node-ai-d2b11',
-  storageBucket: 'node-ai-d2b11.firebasestorage.app',
-  messagingSenderId: '202712240788',
-  appId: '1:202712240788:web:c71103b5a5498c47279a81',
-  measurementId: 'G-10BPF6SV9C'
+const firebaseConfig = {
+  apiKey: 'AIzaSyCjY-ezOaccYVysb6NGaOuPyz_OluIgbvM',
+  authDomain: 'node-ai-d0015.firebaseapp.com',
+  projectId: 'node-ai-d0015',
+  storageBucket: 'node-ai-d0015.firebasestorage.app',
+  messagingSenderId: '986509381276',
+  appId: '1:986509381276:web:a0f790b186078bf1d82759'
 };
 
-const SESSION_KEY = 'tm_firebase_session';
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
-interface FirebaseAuthUser {
-  localId: string;
-  email?: string;
-  displayName?: string;
-  photoUrl?: string;
-}
+const buildFallbackAvatar = (firebaseUser: FirebaseSdkUser) =>
+  `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email || firebaseUser.uid}`;
+
+export const mapFirebaseUser = (firebaseUser: FirebaseSdkUser): User => ({
+  id: firebaseUser.uid,
+  email: firebaseUser.email || '',
+  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+  avatar: firebaseUser.photoURL || buildFallbackAvatar(firebaseUser)
+});
 
 export interface FirebaseSession {
   idToken: string;
   refreshToken: string;
   expiresIn: string;
-  user: FirebaseAuthUser;
+  user: FirebaseSdkUser;
 }
 
-const buildFallbackAvatar = (firebaseUser: FirebaseAuthUser) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email || firebaseUser.localId}`;
-
-export const mapFirebaseUser = (firebaseUser: FirebaseAuthUser): User => ({
-  id: firebaseUser.localId,
-  email: firebaseUser.email || '',
-  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-  avatar: firebaseUser.photoUrl || buildFallbackAvatar(firebaseUser)
-});
-
-const parseAuthError = (payload: { error?: { message?: string } }) => {
-  const code = payload.error?.message;
-  if (!code) return 'Authentication failed.';
-
-  if (code.includes('EMAIL_EXISTS')) return 'This email is already registered. Please sign in.';
-  if (code.includes('INVALID_LOGIN_CREDENTIALS') || code.includes('INVALID_PASSWORD') || code.includes('EMAIL_NOT_FOUND')) return 'Invalid email or password.';
-  if (code.includes('WEAK_PASSWORD')) return 'Password must be at least 6 characters.';
-
-  return code.replace(/_/g, ' ').toLowerCase();
-};
-
-const authRequest = async <T>(path: string, body: Record<string, unknown>) => {
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/${path}?key=${FIREBASE_CONFIG.apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(parseAuthError(data));
-  }
-
-  return data as T;
-};
-
-export const saveSession = (session: FirebaseSession) => {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+export const saveSession = (_session: FirebaseSession) => {
+  // Firebase JS SDK persists auth state automatically in local storage.
 };
 
 export const getStoredSession = (): FirebaseSession | null => {
-  const raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) return null;
 
-  try {
-    return JSON.parse(raw) as FirebaseSession;
-  } catch {
-    localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
+  return {
+    idToken: '',
+    refreshToken: firebaseUser.refreshToken,
+    expiresIn: '',
+    user: firebaseUser
+  };
 };
 
 export const clearStoredSession = () => {
-  localStorage.removeItem(SESSION_KEY);
+  // Keeping this function for compatibility with existing app logout flow.
 };
 
-export const signUpWithEmail = async (email: string, password: string, fullName: string) => {
-  const created = await authRequest<{
-    localId: string;
-    email: string;
-    idToken: string;
-    refreshToken: string;
-    expiresIn: string;
-  }>('accounts:signUp', {
-    email,
-    password,
-    returnSecureToken: true
-  });
+export const signUpWithEmail = async (email: string, password: string, fullName: string): Promise<FirebaseSession> => {
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName: fullName });
+    const idToken = await credential.user.getIdToken();
 
-  const updated = await authRequest<{
-    localId: string;
-    email?: string;
-    displayName?: string;
-    photoUrl?: string;
-    idToken: string;
-    refreshToken: string;
-    expiresIn: string;
-  }>('accounts:update', {
-    idToken: created.idToken,
-    displayName: fullName,
-    returnSecureToken: true
-  });
-
-  return {
-    idToken: updated.idToken,
-    refreshToken: updated.refreshToken,
-    expiresIn: updated.expiresIn,
-    user: {
-      localId: updated.localId,
-      email: updated.email,
-      displayName: updated.displayName,
-      photoUrl: updated.photoUrl
-    }
-  } satisfies FirebaseSession;
+    return {
+      idToken,
+      refreshToken: credential.user.refreshToken,
+      expiresIn: '',
+      user: credential.user
+    };
+  } catch (error) {
+    throw new Error(getFriendlyAuthError(error));
+  }
 };
 
-export const signInWithEmail = async (email: string, password: string) => {
-  const data = await authRequest<{
-    localId: string;
-    email?: string;
-    displayName?: string;
-    photoUrl?: string;
-    idToken: string;
-    refreshToken: string;
-    expiresIn: string;
-  }>('accounts:signInWithPassword', {
-    email,
-    password,
-    returnSecureToken: true
-  });
+export const signInWithEmail = async (email: string, password: string): Promise<FirebaseSession> => {
+  try {
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    const idToken = await credential.user.getIdToken();
 
-  return {
-    idToken: data.idToken,
-    refreshToken: data.refreshToken,
-    expiresIn: data.expiresIn,
-    user: {
-      localId: data.localId,
-      email: data.email,
-      displayName: data.displayName,
-      photoUrl: data.photoUrl
-    }
-  } satisfies FirebaseSession;
+    return {
+      idToken,
+      refreshToken: credential.user.refreshToken,
+      expiresIn: '',
+      user: credential.user
+    };
+  } catch (error) {
+    throw new Error(getFriendlyAuthError(error));
+  }
 };
 
-export const fetchUserWithIdToken = async (idToken: string) => {
-  const data = await authRequest<{ users?: FirebaseAuthUser[] }>('accounts:lookup', { idToken });
-  const [user] = data.users || [];
-
-  if (!user) {
+export const fetchUserWithIdToken = async (_idToken: string): Promise<FirebaseSdkUser> => {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) {
     throw new Error('Unable to fetch Firebase user profile.');
   }
 
-  return user;
+  await firebaseUser.reload();
+  return auth.currentUser ?? firebaseUser;
 };
 
 export const signOutSession = async () => {
-  // Firebase sign-out for this app is local-session based.
-  return Promise.resolve();
+  await signOut(auth);
+};
+
+export const subscribeToAuthChanges = (callback: (user: FirebaseSdkUser | null) => void) =>
+  onAuthStateChanged(auth, callback);
+
+const getFriendlyAuthError = (error: unknown) => {
+  if (!(error instanceof Error)) return 'Authentication failed.';
+
+  if (error.message.includes('auth/email-already-in-use')) return 'This email is already registered. Please sign in.';
+  if (error.message.includes('auth/invalid-credential')) return 'Invalid email or password.';
+  if (error.message.includes('auth/invalid-email')) return 'Please enter a valid email address.';
+  if (error.message.includes('auth/weak-password')) return 'Password must be at least 6 characters.';
+  if (error.message.includes('auth/too-many-requests')) return 'Too many attempts. Please wait a moment and try again.';
+
+  return 'Authentication failed. Please try again.';
 };
