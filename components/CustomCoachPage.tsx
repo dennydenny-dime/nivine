@@ -74,7 +74,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart }) => {
             <div className="h-full flex flex-col justify-center items-center text-center p-6 space-y-6">
               <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-3xl animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.2)]">🔑</div>
               <div>
-                <h3 className="text-xl font-bold mb-2">Start Engine</h3>
+                <h3 className="text-xl font-bold mb-2">Connect API Key to Start Engine</h3>
                 <p className="text-sm text-slate-400 leading-relaxed max-w-xs">Engine startup is blocked because no API key was found in the environment variables.</p>
               </div>
               <div className="p-4 bg-slate-950 rounded-lg text-[10px] font-mono text-slate-500 break-all border border-slate-800 text-left">
