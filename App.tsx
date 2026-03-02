@@ -395,7 +395,7 @@ const App: React.FC = () => {
             <MainAppPage
               onStart={(persona) => startConversation(persona, 'neural')}
               showTrialBanner={isNewUser}
-              planNotice={'Premium includes 30 neural module calls per month (10 mins each) + 20 custom coach calls, quizzes, and leaderboards.'}
+              planNotice={'Premium includes 30 neural module calls per month (10 mins each), 120 minutes of custom coach calls, quizzes, and leaderboards.'}
             />
           )}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}

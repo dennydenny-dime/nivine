@@ -607,7 +607,7 @@ All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLang
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="text-center">
             <h2 className="text-4xl font-extrabold mb-4">Choose Your <span className="gradient-text">Practice Path</span></h2>
-            <p className="text-slate-400">Select a category and difficulty to begin your daily communication test. Premium includes 30 neural module calls per month (10 mins each), custom coach calls, quizzes, and leaderboards.</p>
+            <p className="text-slate-400">Select a category and difficulty to begin your daily communication test. Premium includes 30 neural module calls per month (10 mins each), 120 minutes of custom coach calls, quizzes, and leaderboards.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
