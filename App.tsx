@@ -391,7 +391,13 @@ const App: React.FC = () => {
         <div className="animate-in fade-in duration-300">
           {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
           {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
-          {currentView === View.APP && <MainAppPage onStart={(persona) => startConversation(persona, 'neural')} showTrialBanner={isNewUser} />}
+          {currentView === View.APP && (
+            <MainAppPage
+              onStart={(persona) => startConversation(persona, 'neural')}
+              showTrialBanner={isNewUser}
+              planNotice={'Premium includes 30 neural module calls per month (10 mins each) + 20 custom coach calls, quizzes, and leaderboards.'}
+            />
+          )}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
           {currentView === View.LEARNING_MODULES && <LearningModulesPage />}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={(persona) => startConversation(persona, 'coaching')} />}

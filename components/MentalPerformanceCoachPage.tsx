@@ -681,7 +681,7 @@ const MentalPerformanceCoachPage: React.FC = () => {
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-indigo-300">Mental Health Coach · Live AI Interview</p>
             <h1 className="mt-2 text-3xl font-black leading-tight">1:1 Live Interview With Camera-On Scoring</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-300">Live webcam + microphone capture for one-on-one AI interviews that scan speech, posture, and behavioral stability, then output actionable scores in real time and in the final report.</p>
+            <p className="mt-2 max-w-3xl text-sm text-slate-300">Live webcam + microphone capture for one-on-one AI interviews that scan speech, posture, and behavioral stability, then output actionable scores in real time and in the final report. Premium unlocks 30 neural module calls monthly (10 mins each) alongside custom coach calls, quizzes, and leaderboards.</p>
           </div>
           <SynapseLogo className="h-12 w-12" />
         </div>
