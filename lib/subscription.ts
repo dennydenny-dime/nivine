@@ -8,53 +8,75 @@ export type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 
 type PlanAccess = {
   tier: SubscriptionTier;
-  monthlyCallLimit: number | null;
-  maxMinutesPerCall: number | null;
+  neuralMonthlyCallLimit: number | null;
+  neuralMaxMinutesPerCall: number | null;
+  coachingMonthlyCallLimit: number | null;
+  coachingMaxMinutesPerCall: number | null;
   quizzesEnabled: boolean;
+  leaderboardEnabled: boolean;
   customCoachEnabled: boolean;
   mentalPerformanceEnabled: boolean;
+  learningModulesEnabled: boolean;
   allNeuralModulesEnabled: boolean;
   unlimitedCustomCoaches: boolean;
 };
 
+export type CallCategory = 'neural' | 'coaching';
+
 const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
   free: {
     tier: 'free',
-    monthlyCallLimit: 6,
-    maxMinutesPerCall: 5,
+    neuralMonthlyCallLimit: 6,
+    neuralMaxMinutesPerCall: 5,
+    coachingMonthlyCallLimit: 0,
+    coachingMaxMinutesPerCall: 0,
     quizzesEnabled: true,
+    leaderboardEnabled: false,
     customCoachEnabled: false,
     mentalPerformanceEnabled: false,
+    learningModulesEnabled: false,
     allNeuralModulesEnabled: false,
     unlimitedCustomCoaches: false,
   },
   premium: {
     tier: 'premium',
-    monthlyCallLimit: 30,
-    maxMinutesPerCall: 10,
+    neuralMonthlyCallLimit: 30,
+    neuralMaxMinutesPerCall: 10,
+    coachingMonthlyCallLimit: 20,
+    coachingMaxMinutesPerCall: 5,
     quizzesEnabled: true,
+    leaderboardEnabled: true,
     customCoachEnabled: true,
     mentalPerformanceEnabled: true,
+    learningModulesEnabled: false,
     allNeuralModulesEnabled: true,
-    unlimitedCustomCoaches: true,
+    unlimitedCustomCoaches: false,
   },
   elite: {
     tier: 'elite',
-    monthlyCallLimit: null,
-    maxMinutesPerCall: null,
+    neuralMonthlyCallLimit: null,
+    neuralMaxMinutesPerCall: null,
+    coachingMonthlyCallLimit: null,
+    coachingMaxMinutesPerCall: null,
     quizzesEnabled: true,
+    leaderboardEnabled: true,
     customCoachEnabled: true,
     mentalPerformanceEnabled: true,
+    learningModulesEnabled: true,
     allNeuralModulesEnabled: true,
     unlimitedCustomCoaches: true,
   },
   team: {
     tier: 'team',
-    monthlyCallLimit: 150,
-    maxMinutesPerCall: 15,
+    neuralMonthlyCallLimit: 150,
+    neuralMaxMinutesPerCall: 15,
+    coachingMonthlyCallLimit: 150,
+    coachingMaxMinutesPerCall: 15,
     quizzesEnabled: true,
+    leaderboardEnabled: true,
     customCoachEnabled: true,
     mentalPerformanceEnabled: true,
+    learningModulesEnabled: true,
     allNeuralModulesEnabled: true,
     unlimitedCustomCoaches: true,
   },
@@ -123,18 +145,24 @@ const getUsageMonthKey = () => {
 
 type UsagePayload = {
   month: string;
-  callsUsed: number;
+  neuralCallsUsed: number;
+  coachingCallsUsed: number;
 };
 
 const readUsage = (): UsagePayload => {
-  const defaultUsage = { month: getUsageMonthKey(), callsUsed: 0 };
+  const defaultUsage = { month: getUsageMonthKey(), neuralCallsUsed: 0, coachingCallsUsed: 0 };
 
   try {
     const raw = localStorage.getItem(CALL_USAGE_KEY);
     if (!raw) return defaultUsage;
 
     const parsed = JSON.parse(raw) as UsagePayload;
-    if (!parsed || typeof parsed.callsUsed !== 'number' || typeof parsed.month !== 'string') {
+    if (
+      !parsed ||
+      typeof parsed.neuralCallsUsed !== 'number' ||
+      typeof parsed.coachingCallsUsed !== 'number' ||
+      typeof parsed.month !== 'string'
+    ) {
       return defaultUsage;
     }
 
@@ -152,19 +180,24 @@ const writeUsage = (usage: UsagePayload) => {
   localStorage.setItem(CALL_USAGE_KEY, JSON.stringify(usage));
 };
 
-export const getCallsUsedThisMonth = (): number => readUsage().callsUsed;
-
-export const getRemainingCalls = (tier: SubscriptionTier): number | null => {
-  const plan = getPlanAccess(tier);
-  if (plan.monthlyCallLimit === null) return null;
-  return Math.max(0, plan.monthlyCallLimit - getCallsUsedThisMonth());
+export const getCallsUsedThisMonth = (category: CallCategory = 'neural'): number => {
+  const usage = readUsage();
+  return category === 'coaching' ? usage.coachingCallsUsed : usage.neuralCallsUsed;
 };
 
-export const consumeCall = () => {
+export const getRemainingCalls = (tier: SubscriptionTier, category: CallCategory = 'neural'): number | null => {
+  const plan = getPlanAccess(tier);
+  const limit = category === 'coaching' ? plan.coachingMonthlyCallLimit : plan.neuralMonthlyCallLimit;
+  if (limit === null) return null;
+  return Math.max(0, limit - getCallsUsedThisMonth(category));
+};
+
+export const consumeCall = (category: CallCategory = 'neural') => {
   const usage = readUsage();
   const updated = {
     month: getUsageMonthKey(),
-    callsUsed: usage.callsUsed + 1,
+    neuralCallsUsed: usage.neuralCallsUsed + (category === 'neural' ? 1 : 0),
+    coachingCallsUsed: usage.coachingCallsUsed + (category === 'coaching' ? 1 : 0),
   };
   writeUsage(updated);
 };

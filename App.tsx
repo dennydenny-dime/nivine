@@ -13,7 +13,7 @@ import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage'
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
-import { SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail, setSubscriptionTier as persistSubscriptionTier } from './lib/subscription';
+import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail, setSubscriptionTier as persistSubscriptionTier } from './lib/subscription';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -60,6 +60,7 @@ const App: React.FC = () => {
   const [authReady, setAuthReady] = useState(false);
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
+  const [conversationCategory, setConversationCategory] = useState<CallCategory>('neural');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [trialExpiredNotice, setTrialExpiredNotice] = useState<string | null>(null);
@@ -68,9 +69,9 @@ const App: React.FC = () => {
   const isAdmin = isAdminEmail(normalizedEmail);
   const effectiveTier: SubscriptionTier = isAdmin ? 'elite' : subscriptionTier;
   const planAccess = getPlanAccess(effectiveTier);
-  const hasPaidAccess = isAdmin || subscriptionTier !== 'free';
   const isNewUser = effectiveTier === 'free';
-  const remainingCalls = getRemainingCalls(effectiveTier);
+  const neuralRemainingCalls = getRemainingCalls(effectiveTier, 'neural');
+  const coachingRemainingCalls = getRemainingCalls(effectiveTier, 'coaching');
 
   const redirectToPricing = useCallback((notice: string) => {
     setTrialExpiredNotice(notice);
@@ -174,15 +175,18 @@ const App: React.FC = () => {
     }
   }, [enterFullScreen]);
 
-  const startConversation = (persona: Persona) => {
+  const startConversation = (persona: Persona, category: CallCategory = 'neural') => {
+    const remainingCalls = category === 'coaching' ? coachingRemainingCalls : neuralRemainingCalls;
+
     if (remainingCalls !== null && remainingCalls <= 0) {
-      redirectToPricing('You have reached your monthly call limit for this plan. Please upgrade to continue.');
+      redirectToPricing(`You have reached your monthly ${category} call limit for this plan. Please upgrade to continue.`);
       return;
     }
 
-    consumeCall();
+    consumeCall(category);
     // Attempt to enter fullscreen as the user clicked a primary action button
     enterFullScreen();
+    setConversationCategory(category);
     setSelectedPersona(persona);
     setCurrentView(View.CONVERSATION);
     setTrialExpiredNotice(null);
@@ -205,7 +209,7 @@ const App: React.FC = () => {
   };
 
   const openLeaderboard = () => {
-    if (!hasPaidAccess) {
+    if (!planAccess.leaderboardEnabled) {
       setTrialExpiredNotice('Leaderboard is available on Premium plans. Tap to choose a plan.');
       setCurrentView(View.PRICING);
       return;
@@ -219,12 +223,22 @@ const App: React.FC = () => {
       setCurrentView(View.PRICING);
       return;
     }
+    if (coachingRemainingCalls !== null && coachingRemainingCalls <= 0) {
+      setTrialExpiredNotice('You have reached your monthly custom coach calls limit for this plan. Tap to choose a plan.');
+      setCurrentView(View.PRICING);
+      return;
+    }
     setCurrentView(View.CUSTOM_COACH);
   };
 
   const openMentalPerformance = () => {
     if (!planAccess.mentalPerformanceEnabled) {
       setTrialExpiredNotice('Mental Performance Coach is available on Premium plans. Tap to choose a plan.');
+      setCurrentView(View.PRICING);
+      return;
+    }
+    if (coachingRemainingCalls !== null && coachingRemainingCalls <= 0) {
+      setTrialExpiredNotice('You have reached your monthly coaching calls limit for this plan. Tap to choose a plan.');
       setCurrentView(View.PRICING);
       return;
     }
@@ -240,8 +254,8 @@ const App: React.FC = () => {
   };
 
   const openLearningModules = () => {
-    if (!hasPaidAccess) {
-      setTrialExpiredNotice('Learning Modules are available on Premium plans. Tap to choose a plan.');
+    if (!planAccess.learningModulesEnabled) {
+      setTrialExpiredNotice('Learning Modules are available on Elite and Team plans. Tap to choose a plan.');
       setCurrentView(View.PRICING);
       return;
     }
@@ -251,6 +265,7 @@ const App: React.FC = () => {
   const goBack = () => {
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
+    setConversationCategory('neural');
   };
 
   const handleLogout = async () => {
@@ -265,6 +280,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
+    setConversationCategory('neural');
     setTrialExpiredNotice(null);
     setSubscriptionTier('free');
   };
@@ -273,7 +289,7 @@ const App: React.FC = () => {
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
-    { key: View.LEARNING_MODULES, label: 'Learning Modules', onClick: openLearningModules, locked: isNewUser },
+    { key: View.LEARNING_MODULES, label: 'Learning Modules', onClick: openLearningModules, locked: isNewUser || !planAccess.learningModulesEnabled },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
     { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: isNewUser },
     {
@@ -282,7 +298,7 @@ const App: React.FC = () => {
       onClick: openLeaderboard,
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>,
       className: 'shadow-lg shadow-indigo-500/20',
-      locked: !hasPaidAccess
+      locked: !planAccess.leaderboardEnabled
     },
     { key: View.PRICING, label: 'Plans', onClick: openPricing },
     { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz }
@@ -375,16 +391,20 @@ const App: React.FC = () => {
         <div className="animate-in fade-in duration-300">
           {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
           {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
-          {currentView === View.APP && <MainAppPage onStart={startConversation} showTrialBanner={isNewUser} />}
+          {currentView === View.APP && <MainAppPage onStart={(persona) => startConversation(persona, 'neural')} showTrialBanner={isNewUser} />}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
           {currentView === View.LEARNING_MODULES && <LearningModulesPage />}
-          {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={startConversation} />}
+          {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={(persona) => startConversation(persona, 'coaching')} />}
           {currentView === View.MENTAL_PERFORMANCE && <MentalPerformanceCoachPage />}
           {currentView === View.CONVERSATION && selectedPersona && (
             <ConversationRoom
               persona={selectedPersona}
               onExit={goBack}
-              maxDurationMinutes={planAccess.maxMinutesPerCall}
+              maxDurationMinutes={
+                conversationCategory === 'coaching'
+                  ? planAccess.coachingMaxMinutesPerCall
+                  : planAccess.neuralMaxMinutesPerCall
+              }
             />
           )}
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}

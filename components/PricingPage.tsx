@@ -67,7 +67,7 @@ const individualPlans: Plan[] = [
     blurb: 'Everything you need to scale your learning',
     badge: 'Popular',
     highlight: true,
-    value: '30 calls · 10 mins each · All neural modules + quizzes + unlimited custom coaches',
+    value: '30 calls · 10 mins each · All neural modules + 20 custom coach calls · 5 mins each + quizzes + leaderboards (Learning modules locked)',
     cta: 'Buy Premium',
     usdPrice: 0.1,
     razorpayDescription: 'Premium monthly subscription',
