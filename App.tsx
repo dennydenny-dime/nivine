@@ -14,6 +14,7 @@ import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
 import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail, setSubscriptionTier as persistSubscriptionTier } from './lib/subscription';
+import { persistSubscriptionTierForEmail, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -131,6 +132,17 @@ const App: React.FC = () => {
       };
     }
     localStorage.setItem('tm_leaderboard_pool', JSON.stringify(pool));
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    const unsubscribe = subscribeToSubscriptionTierForEmail(currentUser.email, (remoteTier) => {
+      persistSubscriptionTier(remoteTier, currentUser.email || currentUser.id);
+      setSubscriptionTier(remoteTier);
+    });
+
+    return () => unsubscribe();
   }, [currentUser]);
 
   const enterFullScreen = useCallback(() => {
@@ -416,6 +428,11 @@ const App: React.FC = () => {
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
           {currentView === View.PRICING && <PricingPage onBack={goBack} onPurchaseSuccess={(tier) => {
             persistSubscriptionTier(tier, currentUser.email || currentUser.id);
+            if (currentUser.email) {
+              persistSubscriptionTierForEmail(currentUser.email, tier).catch(() => {
+                // Ignore remote persistence failures; local tier is still saved.
+              });
+            }
             setSubscriptionTier(tier);
             setTrialExpiredNotice(null);
             setCurrentView(View.LANDING);
