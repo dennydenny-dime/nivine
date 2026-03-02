@@ -42,7 +42,7 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     tier: 'premium',
     neuralMonthlyCallLimit: 30,
     neuralMaxMinutesPerCall: 10,
-    coachingMonthlyCallLimit: 20,
+    coachingMonthlyCallLimit: 24,
     coachingMaxMinutesPerCall: 5,
     quizzesEnabled: true,
     leaderboardEnabled: true,
