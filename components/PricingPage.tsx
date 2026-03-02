@@ -77,7 +77,7 @@ const individualPlans: Plan[] = [
     label: 'Elite',
     blurb: 'More power and flexibility for experts',
     badge: 'Best Value',
-    value: 'All features included',
+    value: '60 calls · 10 mins each · All neural modules, 540 minutes of custom coach calls + quizzes + leaderboards (Learning modules unlocked)',
     cta: 'Buy Elite',
     usdPrice: 25,
     razorpayDescription: 'Elite monthly subscription',
