@@ -43,7 +43,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onBack }) => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12 gap-6">
         <div>
           <h2 className="text-4xl font-extrabold tracking-tight">Global <span className="gradient-text">Rankings</span></h2>
-          <p className="text-slate-400 mt-2">Practice more to climb the world stage. Real users only.</p>
+          <p className="text-slate-400 mt-2">Practice more to climb the world stage. Real users only. Premium includes 30 neural module calls per month (10 mins each), custom coach calls, quizzes, and leaderboards.</p>
         </div>
         <button 
           onClick={onBack}

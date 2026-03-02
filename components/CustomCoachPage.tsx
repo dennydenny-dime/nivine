@@ -53,7 +53,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart }) => {
           Build Your <span className="synapse-gradient">Custom Coach</span>
         </h1>
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Configure personality, tone, language, and challenge level in a dedicated custom coach workflow.
+          Configure personality, tone, language, and challenge level in a dedicated custom coach workflow. Premium includes 20 custom coach calls each month, plus 30 neural module calls (10 mins each), quizzes, and leaderboards.
         </p>
       </div>
 
