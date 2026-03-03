@@ -59,12 +59,15 @@ type NavItem = {
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [showAuthBoard, setShowAuthBoard] = useState(false);
   const [currentView, setCurrentView] = useState<View>(View.LANDING);
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [conversationCategory, setConversationCategory] = useState<CallCategory>('neural');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [trialExpiredNotice, setTrialExpiredNotice] = useState<string | null>(null);
+
+  const isGuest = !currentUser;
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
   const isAdmin = isAdminEmail(normalizedEmail);
@@ -98,6 +101,7 @@ const App: React.FC = () => {
     const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
       if (firebaseUser) {
         setCurrentUser(mapFirebaseUser(firebaseUser));
+        setShowAuthBoard(false);
       } else {
         clearStoredSession();
         setCurrentUser(null);
@@ -108,6 +112,20 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!authReady || currentUser) {
+      return;
+    }
+
+    const promptTimer = window.setTimeout(() => {
+      setShowAuthBoard(true);
+    }, 60_000);
+
+    return () => {
+      window.clearTimeout(promptTimer);
+    };
+  }, [authReady, currentUser]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -269,6 +287,10 @@ const App: React.FC = () => {
   };
 
   const openPersonalDashboard = () => {
+    if (!currentUser) {
+      setShowAuthBoard(true);
+      return;
+    }
     setCurrentView(View.PERSONAL_DASHBOARD);
   };
 
@@ -335,14 +357,6 @@ const App: React.FC = () => {
     );
   }
 
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0B] text-[#EDEDED] selection:bg-indigo-500/30 px-4">
-        <AuthPage onLogin={setCurrentUser} />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-[#EDEDED] selection:bg-indigo-500/30">
       {/* Navigation - hidden in conversation mode if desired, but here we keep it for exit */}
@@ -367,21 +381,32 @@ const App: React.FC = () => {
                 )}
               </button>
 
-              <button
-                onClick={openPersonalDashboard}
-                className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border transition ${currentView === View.PERSONAL_DASHBOARD ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'bg-black/40 border-white/10 text-slate-100 hover:bg-white/5'}`}
-                title="Open personal dashboard"
-              >
-                <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
-                <span className="text-xs font-bold hidden sm:inline">{currentUser.name}</span>
-              </button>
+              {currentUser ? (
+                <>
+                  <button
+                    onClick={openPersonalDashboard}
+                    className={`flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border transition ${currentView === View.PERSONAL_DASHBOARD ? 'bg-indigo-600/20 border-indigo-500/50 text-white' : 'bg-black/40 border-white/10 text-slate-100 hover:bg-white/5'}`}
+                    title="Open personal dashboard"
+                  >
+                    <img src={currentUser.avatar} alt={currentUser.name} className="w-6 h-6 rounded-full" />
+                    <span className="text-xs font-bold hidden sm:inline">{currentUser.name}</span>
+                  </button>
 
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium hover:bg-white/5 transition-all text-slate-300"
-              >
-                Logout
-              </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium hover:bg-white/5 transition-all text-slate-300"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowAuthBoard(true)}
+                  className="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-semibold border border-indigo-400/40 bg-indigo-500/10 hover:bg-indigo-500/20 transition-all text-indigo-200"
+                >
+                  Sign In
+                </button>
+              )}
             </div>
           </div>
           <div className="premium-panel rounded-2xl p-1.5">
@@ -413,7 +438,7 @@ const App: React.FC = () => {
       <main className={`pt-40 md:pt-36 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
         <div className="animate-in fade-in duration-300">
           {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
-          {currentView === View.PERSONAL_DASHBOARD && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
+          {currentView === View.PERSONAL_DASHBOARD && currentUser && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
           {currentView === View.APP && (
             <MainAppPage
               onStart={(persona) => startConversation(persona, 'neural')}
@@ -438,6 +463,11 @@ const App: React.FC = () => {
           )}
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
           {currentView === View.PRICING && <PricingPage onBack={goBack} onPurchaseSuccess={(tier) => {
+            if (!currentUser) {
+              setShowAuthBoard(true);
+              return;
+            }
+
             persistSubscriptionTier(tier, currentUser.email || currentUser.id);
             persistSubscriptionTierForUser({ email: currentUser.email, id: currentUser.id }, tier).catch(() => {
               // Ignore remote persistence failures; local tier is still saved.
@@ -453,6 +483,12 @@ const App: React.FC = () => {
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-white/10 mt-auto">
         &copy; 2026 NODE AI. All rights reserved.
       </footer>
+
+      {isGuest && showAuthBoard && (
+        <div className="fixed inset-0 z-[120]">
+          <AuthPage onLogin={setCurrentUser} />
+        </div>
+      )}
     </div>
   );
 };
