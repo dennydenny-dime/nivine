@@ -22,8 +22,8 @@ const firebaseConfig = {
   appId: '1:986509381276:web:a0f790b186078bf1d82759'
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+export const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
 
 const buildFallbackAvatar = (firebaseUser: FirebaseSdkUser) =>
