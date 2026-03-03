@@ -13,8 +13,8 @@ import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage'
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
-import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail, setSubscriptionTier as persistSubscriptionTier } from './lib/subscription';
-import { fetchSubscriptionTierForUser, persistSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
+import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, isAdminEmail } from './lib/subscription';
+import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -130,18 +130,15 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser) return;
 
-    const fallbackTier = getSubscriptionTier(currentUser.email || currentUser.id);
-    setSubscriptionTier(fallbackTier);
+    setSubscriptionTier('free');
     localStorage.setItem('tm_current_user', JSON.stringify(currentUser));
 
     fetchSubscriptionTierForUser({ email: currentUser.email, id: currentUser.id })
-      .then((remoteTier) => {
-        if (!remoteTier) return;
-        persistSubscriptionTier(remoteTier, currentUser.email || currentUser.id);
-        setSubscriptionTier(remoteTier);
+      .then((dbTier) => {
+        setSubscriptionTier(dbTier);
       })
       .catch(() => {
-        // Keep local fallback tier when remote fetch fails.
+        setSubscriptionTier('free');
       });
 
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
@@ -166,9 +163,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.email) return;
 
-    const unsubscribe = subscribeToSubscriptionTierForEmail(currentUser.email, (remoteTier) => {
-      persistSubscriptionTier(remoteTier, currentUser.email || currentUser.id);
-      setSubscriptionTier(remoteTier);
+    const unsubscribe = subscribeToSubscriptionTierForEmail(currentUser.email, (dbTier) => {
+      setSubscriptionTier(dbTier);
     });
 
     return () => unsubscribe();
@@ -462,18 +458,20 @@ const App: React.FC = () => {
             />
           )}
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
-          {currentView === View.PRICING && <PricingPage onBack={goBack} onPurchaseSuccess={(tier) => {
+          {currentView === View.PRICING && <PricingPage onBack={goBack} currentUser={currentUser} onPurchaseSuccess={(_tier) => {
             if (!currentUser) {
               setShowAuthBoard(true);
               return;
             }
 
-            persistSubscriptionTier(tier, currentUser.email || currentUser.id);
-            persistSubscriptionTierForUser({ email: currentUser.email, id: currentUser.id }, tier).catch(() => {
-              // Ignore remote persistence failures; local tier is still saved.
-            });
-            setSubscriptionTier(tier);
-            setTrialExpiredNotice(null);
+            setTrialExpiredNotice('Payment received. Your subscription will unlock as soon as Razorpay webhook confirmation arrives.');
+            fetchSubscriptionTierForUser({ email: currentUser.email, id: currentUser.id })
+              .then((dbTier) => {
+                setSubscriptionTier(dbTier);
+              })
+              .catch(() => {
+                // Keep the current tier until the next sync cycle.
+              });
             setCurrentView(View.LANDING);
           }} />}
           {currentView === View.LEADERBOARD && <Leaderboard onBack={goBack} />}

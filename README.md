@@ -38,3 +38,37 @@ The frontend posts to `<VITE_BACKEND_API_URL>/chat` (or `/api/chat` when the env
 This repo now includes a built-in Vercel Serverless Function at `api/chat.ts`.
 If you deploy to Vercel, add `GEMINI_API_KEY` (or `API_KEY`) in your project Environment Variables so `/api/chat` can generate responses.
 
+
+## Server-side subscription source of truth
+
+This repo now includes API routes to keep subscription tier in Firestore and avoid browser-only state:
+
+- `POST /api/subscription`
+  - `action: "get"` reads from Firestore (`subscriptions` + `subscriptionsByUid`) and returns `{ tier }`.
+  - `action: "set"` writes tier server-side and requires `x-subscription-admin-secret` to match `SUBSCRIPTION_ADMIN_SECRET`.
+- `POST /api/razorpay-webhook`
+  - Verifies `x-razorpay-signature` using `RAZORPAY_WEBHOOK_SECRET`.
+  - Handles `payment.captured` and writes `{ tier, email/userId }` to Firestore.
+
+### Required environment variables
+
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY` (use `\\n` for newlines in hosted env var UIs)
+- `RAZORPAY_WEBHOOK_SECRET`
+- `SUBSCRIPTION_ADMIN_SECRET`
+- `VITE_BACKEND_API_URL` (optional, defaults to `/api`)
+
+### Razorpay notes required on checkout
+
+The frontend now sends these Razorpay `notes` so webhook can map payment to a user:
+
+- `planTier` (`premium` | `elite` | `team`)
+- `userEmail`
+- `userId`
+
+Configure Razorpay webhook URL to:
+
+`https://<your-domain>/api/razorpay-webhook`
+
+Enable at least `payment.captured` in Razorpay webhook events.
