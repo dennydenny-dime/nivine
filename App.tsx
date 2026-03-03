@@ -14,7 +14,7 @@ import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
 import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, getSubscriptionTier, isAdminEmail, setSubscriptionTier as persistSubscriptionTier } from './lib/subscription';
-import { persistSubscriptionTierForEmail, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
+import { fetchSubscriptionTierForUser, persistSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
@@ -112,8 +112,19 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser) return;
 
-    setSubscriptionTier(getSubscriptionTier(currentUser.email || currentUser.id));
+    const fallbackTier = getSubscriptionTier(currentUser.email || currentUser.id);
+    setSubscriptionTier(fallbackTier);
     localStorage.setItem('tm_current_user', JSON.stringify(currentUser));
+
+    fetchSubscriptionTierForUser({ email: currentUser.email, id: currentUser.id })
+      .then((remoteTier) => {
+        if (!remoteTier) return;
+        persistSubscriptionTier(remoteTier, currentUser.email || currentUser.id);
+        setSubscriptionTier(remoteTier);
+      })
+      .catch(() => {
+        // Keep local fallback tier when remote fetch fails.
+      });
 
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
     const existingIndex = pool.findIndex((entry: User) => entry.id === currentUser.id);
@@ -428,11 +439,9 @@ const App: React.FC = () => {
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
           {currentView === View.PRICING && <PricingPage onBack={goBack} onPurchaseSuccess={(tier) => {
             persistSubscriptionTier(tier, currentUser.email || currentUser.id);
-            if (currentUser.email) {
-              persistSubscriptionTierForEmail(currentUser.email, tier).catch(() => {
-                // Ignore remote persistence failures; local tier is still saved.
-              });
-            }
+            persistSubscriptionTierForUser({ email: currentUser.email, id: currentUser.id }, tier).catch(() => {
+              // Ignore remote persistence failures; local tier is still saved.
+            });
             setSubscriptionTier(tier);
             setTrialExpiredNotice(null);
             setCurrentView(View.LANDING);
