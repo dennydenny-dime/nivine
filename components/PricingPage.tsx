@@ -26,6 +26,7 @@ declare global {
 interface PricingPageProps {
   onBack: () => void;
   onPurchaseSuccess: (tier: SubscriptionTier) => void;
+  currentUser?: { id?: string; email?: string | null } | null;
 }
 
 type Plan = {
@@ -98,7 +99,7 @@ const teamPlans: Plan[] = [
   },
 ];
 
-const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess }) => {
+const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, currentUser }) => {
   const allPlans = [...individualPlans, ...teamPlans];
 
   const defaultRazorpayKeyId = 'rzp_live_SJfxhwyl0mfTHg';
@@ -195,6 +196,14 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess }) 
     };
   };
 
+  const getTierFromPlanLabel = (label: string): SubscriptionTier => {
+    const value = label.toLowerCase();
+    if (value.includes('premium')) return 'premium';
+    if (value.includes('elite')) return 'elite';
+    if (value.includes('team')) return 'team';
+    return 'free';
+  };
+
   const openRazorpayCheckout = async (plan: Plan, pricingConfig: PricingConfig) => {
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded || !window.Razorpay || !razorpayKeyId) {
@@ -211,16 +220,12 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess }) 
       notes: {
         availablePaymentOptions: 'Cards, Net Banking, and BHIM/UPI',
         localizedPrice: pricingConfig.displayPrice,
+        planTier: getTierFromPlanLabel(plan.label),
+        userEmail: currentUser?.email || '',
+        userId: currentUser?.id || '',
       },
       handler: () => {
-        const label = plan.label.toLowerCase();
-        let purchasedTier: SubscriptionTier = 'free';
-
-        if (label.includes('premium')) purchasedTier = 'premium';
-        else if (label.includes('elite')) purchasedTier = 'elite';
-        else if (label.includes('team')) purchasedTier = 'team';
-
-        onPurchaseSuccess(purchasedTier);
+        onPurchaseSuccess(getTierFromPlanLabel(plan.label));
         window.alert('Payment successful! Your subscription has been activated.');
       },
       theme: {
