@@ -26,6 +26,7 @@ declare global {
 interface PricingPageProps {
   onBack: () => void;
   onPurchaseSuccess: (tier: SubscriptionTier) => void;
+  onRequireSignIn?: () => void;
   currentUser?: { id?: string; email?: string | null } | null;
 }
 
@@ -99,7 +100,7 @@ const teamPlans: Plan[] = [
   },
 ];
 
-const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, currentUser }) => {
+const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, onRequireSignIn, currentUser }) => {
   const allPlans = [...individualPlans, ...teamPlans];
 
   const defaultRazorpayKeyId = 'rzp_live_SJfxhwyl0mfTHg';
@@ -239,6 +240,12 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, cu
 
   const handleBuyClick = async (plan: Plan) => {
     if (plan.usdPrice) {
+      if (!currentUser) {
+        window.alert(`Please sign in first to continue with the ${plan.label} plan.`);
+        onRequireSignIn?.();
+        return;
+      }
+
       const pricingConfig = await resolvePricingForPlan(plan);
       if (!pricingConfig) {
         return;

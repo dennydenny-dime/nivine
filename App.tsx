@@ -458,9 +458,10 @@ const App: React.FC = () => {
             />
           )}
           {currentView === View.QUIZ && <DailyQuiz onSeeLeaderboard={openLeaderboard} />}
-          {currentView === View.PRICING && <PricingPage onBack={goBack} currentUser={currentUser} onPurchaseSuccess={(_tier) => {
+          {currentView === View.PRICING && <PricingPage onBack={goBack} currentUser={currentUser} onRequireSignIn={() => {
+            setShowAuthBoard(true);
+          }} onPurchaseSuccess={(_tier) => {
             if (!currentUser) {
-              setShowAuthBoard(true);
               return;
             }
 
