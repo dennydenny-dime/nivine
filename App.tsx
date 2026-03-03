@@ -8,7 +8,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
-import { clearStoredSession, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
+import { clearStoredSession, firebaseApp, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
@@ -16,6 +16,7 @@ import LearningModulesPage from './components/LearningModulesPage';
 import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, isAdminEmail } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
+import { getDatabase, onDisconnect, onValue, push, ref, remove, serverTimestamp, set } from 'firebase/database';
 
 export const SynapseLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -66,6 +67,7 @@ const App: React.FC = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [trialExpiredNotice, setTrialExpiredNotice] = useState<string | null>(null);
+  const [onlineUsersCount, setOnlineUsersCount] = useState(0);
 
   const isGuest = !currentUser;
 
@@ -81,6 +83,34 @@ const App: React.FC = () => {
     setTrialExpiredNotice(notice);
     window.alert(notice);
     setCurrentView(View.PRICING);
+  }, []);
+
+
+  useEffect(() => {
+    const database = getDatabase(firebaseApp);
+    const connectionsRef = ref(database, 'presence/connections');
+    const connectedRef = ref(database, '.info/connected');
+
+    const unsubscribeConnections = onValue(connectionsRef, (snapshot) => {
+      setOnlineUsersCount(snapshot.exists() ? snapshot.size : 0);
+    });
+
+    let activeConnectionRef: ReturnType<typeof push> | null = null;
+    const unsubscribeConnected = onValue(connectedRef, (snapshot) => {
+      if (snapshot.val() !== true || activeConnectionRef) return;
+
+      activeConnectionRef = push(connectionsRef);
+      onDisconnect(activeConnectionRef).remove();
+      set(activeConnectionRef, { connectedAt: serverTimestamp() });
+    });
+
+    return () => {
+      unsubscribeConnections();
+      unsubscribeConnected();
+      if (activeConnectionRef) {
+        remove(activeConnectionRef);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -482,6 +512,10 @@ const App: React.FC = () => {
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-white/10 mt-auto">
         &copy; 2026 NODE AI. All rights reserved.
       </footer>
+
+      <div className="fixed bottom-2 right-3 text-xs font-semibold text-slate-400/90 pointer-events-none">
+        {onlineUsersCount}
+      </div>
 
       {isGuest && showAuthBoard && (
         <div className="fixed inset-0 z-[120]">
