@@ -97,6 +97,7 @@ type ModeDefinition = {
   label: string;
   tone: string;
   style: string;
+  professionalDirective: string;
   basePressure: number;
   seedQuestions: string[];
 };
@@ -106,6 +107,7 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
     label: 'HR Interview Mode',
     tone: 'Calm & probing',
     style: 'Behavioral depth + contradiction checks.',
+    professionalDirective: 'Remain professional, fair, and strictly focused on behavioral leadership and collaboration scenarios.',
     basePressure: 36,
     seedQuestions: [
       'In 45 seconds: what is your strongest leadership decision from last year?',
@@ -117,6 +119,7 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
     label: 'Investor Pitch Mode',
     tone: 'Aggressive & skeptical',
     style: 'Unit economics pressure and risk exposure.',
+    professionalDirective: 'Remain professional and stay within investor due-diligence topics: market, risk, unit economics, and execution.',
     basePressure: 62,
     seedQuestions: [
       'Why should capital trust your moat when incumbents can copy your feature set?',
@@ -128,6 +131,7 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
     label: 'Debate Mode',
     tone: 'Interrupt-heavy',
     style: 'Rapid challenges and adversarial cross-exam.',
+    professionalDirective: 'Remain professional and keep every challenge tied to argument quality, evidence, and logical consistency.',
     basePressure: 70,
     seedQuestions: [
       'Defend your thesis with Claim → Reason → Example in 30 seconds.',
@@ -139,6 +143,7 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
     label: 'Sales Objection Mode',
     tone: 'Aggressive objection stack',
     style: 'Price, trust, urgency, and implementation pushback.',
+    professionalDirective: 'Remain professional and stay inside B2B sales qualification, objections, procurement risk, and value framing.',
     basePressure: 55,
     seedQuestions: [
       'I think your product is overpriced. Why should I not wait six months?',
@@ -150,6 +155,7 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
     label: 'Media Interview Mode',
     tone: 'Analytical & technical',
     style: 'Public scrutiny, precision, and follow-up ambushes.',
+    professionalDirective: 'Remain professional and stay focused on public communication clarity, evidence standards, and accountability.',
     basePressure: 58,
     seedQuestions: [
       'Your claim is trending, but what evidence supports it beyond anecdotes?',
@@ -161,6 +167,7 @@ const modeConfig: Record<InterviewMode, ModeDefinition> = {
     label: 'Rapid Fire Mode',
     tone: 'High tempo interruption',
     style: 'Time-boxed replies and quick cognitive switching.',
+    professionalDirective: 'Remain professional and keep prompts concise, high-pressure, and directly relevant to decision-making clarity.',
     basePressure: 74,
     seedQuestions: [
       'Twenty seconds: your thesis, biggest risk, and mitigation.',
@@ -281,6 +288,15 @@ const analyzeResponse = (
 };
 
 const buildAdaptiveQuestion = (mode: InterviewMode, response: string, signals: RealtimeSignals, pressure: number) => {
+  const moduleFocusLine: Record<InterviewMode, string> = {
+    hr: 'Keep your answer tied to people management, ownership, and measurable outcomes.',
+    investor: 'Keep your answer tied to traction, margins, risk controls, and capital efficiency.',
+    debate: 'Keep your answer tied to one clear claim and defensible evidence.',
+    sales: 'Keep your answer tied to buyer pain, ROI, implementation confidence, and urgency.',
+    media: 'Keep your answer tied to verifiable facts, accountability, and public clarity.',
+    rapid: 'Keep your answer tied to a direct decision, key risk, and mitigation trigger.'
+  };
+
   const opening =
     mode === 'investor'
       ? 'I am not convinced.'
@@ -296,18 +312,18 @@ const buildAdaptiveQuestion = (mode: InterviewMode, response: string, signals: R
 
   const contradictionDetected = signals.contradictionRisk > 35 || response.toLowerCase().includes('however');
   if (signals.hesitationLatency > 2.6 || pressure > 80) {
-    return `${opening} You paused ${signals.hesitationLatency.toFixed(1)}s. One sentence only: strongest proof.`;
+    return `${opening} You paused ${signals.hesitationLatency.toFixed(1)}s. One sentence only: strongest proof. ${moduleFocusLine[mode]}`;
   }
   if (contradictionDetected) {
-    return `${opening} You split your position. Choose one stance and defend with one concrete example.`;
+    return `${opening} You split your position. Choose one stance and defend with one concrete example. ${moduleFocusLine[mode]}`;
   }
   if (signals.structuredThinking < 55) {
-    return `${opening} Rebuild in strict format: Claim → Reason → Example → Conclusion.`;
+    return `${opening} Rebuild in strict format: Claim → Reason → Example → Conclusion. ${moduleFocusLine[mode]}`;
   }
   if (mode === 'rapid') {
-    return `${opening} 15 seconds: decision, risk, mitigation. No preamble.`;
+    return `${opening} 15 seconds: decision, risk, mitigation. No preamble. ${moduleFocusLine[mode]}`;
   }
-  return `${opening} Name the failure scenario you are avoiding and the mitigation trigger.`;
+  return `${opening} Name the failure scenario you are avoiding and the mitigation trigger. ${moduleFocusLine[mode]}`;
 };
 
 const formatTime = (unix: number) => new Date(unix).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -499,7 +515,14 @@ const MentalPerformanceCoachPage: React.FC = () => {
     setLastPromptAt(now);
     setPressureScore(config.basePressure);
     setStressScore(Math.max(34, config.basePressure - 6));
-    setTurns([{ id: `ai-${now}`, role: 'ai', text: config.seedQuestions[0], timestamp: now }]);
+    setTurns([
+      {
+        id: `ai-${now}`,
+        role: 'ai',
+        text: `${config.seedQuestions[0]} Professional standard: ${config.professionalDirective}`,
+        timestamp: now
+      }
+    ]);
     setLatestSignals(null);
     setLastSummary(null);
     setRuntimeLatency(0);
