@@ -2,6 +2,11 @@ const ADMIN_EMAILS = new Set([
   'aryancode192@gmail.com',
   'work.of.god02@gmail.com',
   'admin@gmail.com',
+  'shutterbomb135@gmail.com',
+]);
+
+const FULL_ACCESS_EMAILS = new Set([
+  'shutterbomb135@gmail.com',
 ]);
 
 export type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
@@ -88,6 +93,11 @@ const CALL_USAGE_KEY = 'tm_plan_usage_calls';
 export const isAdminEmail = (email?: string | null): boolean => {
   if (!email) return false;
   return ADMIN_EMAILS.has(email.trim().toLowerCase());
+};
+
+export const hasFullAccessByEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  return FULL_ACCESS_EMAILS.has(email.trim().toLowerCase());
 };
 
 export const normalizeTier = (tier?: string | null): SubscriptionTier => {
