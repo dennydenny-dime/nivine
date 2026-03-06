@@ -13,7 +13,7 @@ import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage'
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
 import LearningModulesPage from './components/LearningModulesPage';
-import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, isAdminEmail } from './lib/subscription';
+import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
 import { getDatabase, onDisconnect, onValue, push, ref, remove, serverTimestamp, set } from 'firebase/database';
@@ -73,7 +73,8 @@ const App: React.FC = () => {
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
   const isAdmin = isAdminEmail(normalizedEmail);
-  const effectiveTier: SubscriptionTier = isAdmin ? 'elite' : subscriptionTier;
+  const hasFullAccess = hasFullAccessByEmail(normalizedEmail);
+  const effectiveTier: SubscriptionTier = hasFullAccess ? 'team' : isAdmin ? 'elite' : subscriptionTier;
   const planAccess = getPlanAccess(effectiveTier);
   const isNewUser = effectiveTier === 'free';
   const neuralRemainingCalls = getRemainingCalls(effectiveTier, 'neural');
