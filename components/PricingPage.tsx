@@ -123,8 +123,6 @@ const plans: Plan[] = [
   },
 ];
 
-const trustBadges = ['Trusted by 2,500+ candidates', '98% interview-readiness satisfaction', 'SOC 2-ready infrastructure'];
-
 const faqs = [
   {
     question: 'Can I switch plans at any time?',
@@ -464,17 +462,6 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, on
           );
         })}
       </div>
-
-      <section className="relative mt-12 rounded-2xl border border-slate-700/80 bg-slate-900/70 backdrop-blur-lg p-6 md:p-8">
-        <h3 className="text-slate-100 text-xl font-semibold">Trusted by candidates, career mentors, and hiring teams</h3>
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {trustBadges.map((badge) => (
-            <div key={badge} className="rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
-              {badge}
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="relative mt-10 rounded-2xl border border-slate-700/80 bg-slate-900/65 backdrop-blur-lg p-6 md:p-8">
         <h3 className="text-slate-100 text-2xl font-semibold">FAQ</h3>
