@@ -469,8 +469,7 @@ const App: React.FC = () => {
           {currentView === View.APP && (
             <MainAppPage
               onStart={(persona) => startConversation(persona, 'neural')}
-              showTrialBanner={isNewUser}
-              planNotice={'Premium includes 30 neural module calls per month (10 mins each), 120 minutes of custom coach calls, quizzes, and leaderboards.'}
+              planNotice={'Premium (Pro) is $18/month ($16/month billed yearly): 4 AI-powered mock interviews (25 minutes each), 2 custom AI coach sessions (15 minutes each), behavioral analysis, transcript, score breakdown, hiring recommendation, and PDF report export.'}
             />
           )}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}

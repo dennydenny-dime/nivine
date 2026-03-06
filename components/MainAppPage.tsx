@@ -5,11 +5,10 @@ import { SynapseLogo } from '../App';
 
 interface MainAppPageProps {
   onStart: (persona: Persona) => void;
-  showTrialBanner?: boolean;
   planNotice?: string;
 }
 
-const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, showTrialBanner = false, planNotice }) => {
+const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, planNotice }) => {
   const [language, setLanguage] = useState('English');
 
   const handlePresetStart = (p: Persona) => {
@@ -29,12 +28,6 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, showTrialBanner = fa
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Choose a neural training module and practice with focused scenarios in your target language.
         </p>
-
-        {showTrialBanner && (
-          <p className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2">
-            Free plan gives you limited monthly calls and shorter call duration. Upgrade for quizzes, custom coaches, and more.
-          </p>
-        )}
 
         {planNotice && (
           <p className="text-sm text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-4 py-2">
