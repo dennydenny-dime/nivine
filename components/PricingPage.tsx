@@ -66,8 +66,8 @@ const plans: Plan[] = [
     label: 'PRO',
     subtitle: 'Best for serious job seekers.',
     blurb: 'Build confidence with focused mock interviews and actionable guidance.',
-    monthlyUsdPrice: 12,
-    yearlyUsdPrice: 10,
+    monthlyUsdPrice: 18,
+    yearlyUsdPrice: 16,
     cta: 'Start Pro',
     razorpayDescription: 'Node AI Pro subscription',
     fallbackHref: 'mailto:sales@nodeai.app?subject=Start%20Pro%20Plan',
@@ -408,6 +408,7 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, on
       <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-6">
         {plans.map((plan) => {
           const price = billingCycle === 'monthly' ? plan.monthlyUsdPrice : plan.yearlyUsdPrice;
+          const yearlyTotal = plan.yearlyUsdPrice * 12;
 
           return (
             <article
@@ -435,6 +436,9 @@ const PricingPage: React.FC<PricingPageProps> = ({ onBack, onPurchaseSuccess, on
               <div className="mt-6">
                 <p className="text-5xl font-extrabold text-slate-100 tracking-tight">${price}</p>
                 <p className="text-sm text-slate-400 mt-1">per seat / month</p>
+                {billingCycle === 'yearly' ? (
+                  <p className="text-xs text-violet-200 mt-1">${yearlyTotal} total per year (${plan.yearlyUsdPrice} × 12)</p>
+                ) : null}
               </div>
 
               <button
