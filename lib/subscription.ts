@@ -7,6 +7,7 @@ const ADMIN_EMAILS = new Set([
 
 const FULL_ACCESS_EMAILS = new Set([
   'shutterbomb135@gmail.com',
+  'prathamesh4402@gmail.com',
 ]);
 
 export type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
