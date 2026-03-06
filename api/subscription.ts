@@ -2,6 +2,8 @@ import { getAdminDb } from './_firebaseAdmin';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 
+const PRIVILEGED_TEAM_EMAILS = new Set(['shutterbomb135@gmail.com']);
+
 const normalizeTier = (tier?: string | null): SubscriptionTier => {
   const normalized = (tier || '').trim().toLowerCase();
   if (normalized === 'premium' || normalized === 'elite' || normalized === 'team') return normalized;
@@ -17,6 +19,10 @@ const getTierForUser = async (payload: { email?: string | null; id?: string | nu
   const db = getAdminDb();
   const email = normalizeEmail(payload.email);
   const userId = (payload.id || '').trim();
+
+  if (email && PRIVILEGED_TEAM_EMAILS.has(email)) {
+    return 'team';
+  }
 
   const checks: Promise<SubscriptionTier>[] = [];
 
