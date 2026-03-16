@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -11,6 +11,25 @@ const systems = [
 ];
 
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
+  const rotatingWords = ['Think.', 'Speak.', 'Interview.'];
+  const [activeWordIndex, setActiveWordIndex] = useState(0);
+  const [isWordVisible, setIsWordVisible] = useState(true);
+
+  useEffect(() => {
+    const cycleTimer = window.setInterval(() => {
+      setIsWordVisible(false);
+
+      window.setTimeout(() => {
+        setActiveWordIndex((currentIndex) => (currentIndex + 1) % rotatingWords.length);
+        setIsWordVisible(true);
+      }, 300);
+    }, 2500);
+
+    return () => {
+      window.clearInterval(cycleTimer);
+    };
+  }, [rotatingWords.length]);
+
   return (
     <div className="space-y-20 pb-12">
       <section className="premium-noise relative left-1/2 right-1/2 -mx-[50vw] w-screen overflow-hidden px-8 py-24 text-center sm:px-14">
@@ -23,7 +42,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         <div className="relative mx-auto max-w-4xl">
           <p className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Node AI Intelligence Console</p>
           <h1 className="mt-9 text-5xl font-semibold leading-[0.95] text-[#ededed] sm:text-7xl">
-            Train How You Think.
+            Train How You{' '}
+            <span
+              className={`inline-block min-w-[9ch] border-b-4 border-[#7c3aed] pb-1 text-left transition-opacity duration-300 ${isWordVisible ? 'opacity-100' : 'opacity-0'}`}
+            >
+              {rotatingWords[activeWordIndex]}
+            </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-[#8a8f98] sm:text-lg">
             AI-powered cognitive interview analysis.
