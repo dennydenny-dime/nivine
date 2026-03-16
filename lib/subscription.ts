@@ -21,8 +21,6 @@ type PlanAccess = {
   quizzesEnabled: boolean;
   leaderboardEnabled: boolean;
   customCoachEnabled: boolean;
-  mentalPerformanceEnabled: boolean;
-  learningModulesEnabled: boolean;
   allNeuralModulesEnabled: boolean;
   unlimitedCustomCoaches: boolean;
 };
@@ -39,8 +37,6 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     quizzesEnabled: true,
     leaderboardEnabled: false,
     customCoachEnabled: false,
-    mentalPerformanceEnabled: false,
-    learningModulesEnabled: false,
     allNeuralModulesEnabled: false,
     unlimitedCustomCoaches: false,
   },
@@ -53,8 +49,6 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
-    mentalPerformanceEnabled: true,
-    learningModulesEnabled: false,
     allNeuralModulesEnabled: true,
     unlimitedCustomCoaches: false,
   },
@@ -67,8 +61,6 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
-    mentalPerformanceEnabled: true,
-    learningModulesEnabled: true,
     allNeuralModulesEnabled: true,
     unlimitedCustomCoaches: false,
   },
@@ -81,8 +73,6 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
-    mentalPerformanceEnabled: true,
-    learningModulesEnabled: true,
     allNeuralModulesEnabled: true,
     unlimitedCustomCoaches: true,
   },

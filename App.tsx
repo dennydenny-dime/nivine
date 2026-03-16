@@ -9,10 +9,8 @@ import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
 import { clearStoredSession, firebaseApp, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
-import MentalPerformanceCoachPage from './components/MentalPerformanceCoachPage';
 import PersonalDashboard from './components/PersonalDashboard';
 import InterviewIntelPage from './components/InterviewIntelPage';
-import LearningModulesPage from './components/LearningModulesPage';
 import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
@@ -42,10 +40,8 @@ enum View {
   PRICING = 'pricing',
   LEADERBOARD = 'leaderboard',
   CUSTOM_COACH = 'custom_coach',
-  MENTAL_PERFORMANCE = 'mental_performance',
   PERSONAL_DASHBOARD = 'personal_dashboard',
   INTERVIEW_INTEL = 'interview_intel',
-  LEARNING_MODULES = 'learning_modules',
 };
 
 type NavItem = {
@@ -299,20 +295,6 @@ const App: React.FC = () => {
     setCurrentView(View.CUSTOM_COACH);
   };
 
-  const openMentalPerformance = () => {
-    if (!planAccess.mentalPerformanceEnabled) {
-      setTrialExpiredNotice('Mental Performance Coach is available on Premium plans. Tap to choose a plan.');
-      setCurrentView(View.PRICING);
-      return;
-    }
-    if (coachingRemainingCalls !== null && coachingRemainingCalls <= 0) {
-      setTrialExpiredNotice('You have reached your monthly coaching calls limit for this plan. Tap to choose a plan.');
-      setCurrentView(View.PRICING);
-      return;
-    }
-    setCurrentView(View.MENTAL_PERFORMANCE);
-  };
-
   const openPersonalDashboard = () => {
     if (!currentUser) {
       setShowAuthBoard(true);
@@ -323,15 +305,6 @@ const App: React.FC = () => {
 
   const openInterviewIntel = () => {
     setCurrentView(View.INTERVIEW_INTEL);
-  };
-
-  const openLearningModules = () => {
-    if (!planAccess.learningModulesEnabled) {
-      setTrialExpiredNotice('Learning Modules are available on Elite and Team plans. Tap to choose a plan.');
-      setCurrentView(View.PRICING);
-      return;
-    }
-    setCurrentView(View.LEARNING_MODULES);
   };
 
   const goBack = () => {
@@ -361,9 +334,7 @@ const App: React.FC = () => {
     { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
-    { key: View.LEARNING_MODULES, label: 'Learning Modules', onClick: openLearningModules, locked: isNewUser || !planAccess.learningModulesEnabled },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
-    { key: View.MENTAL_PERFORMANCE, label: 'Mental Performance Coach', onClick: openMentalPerformance, locked: isNewUser },
     {
       key: View.LEADERBOARD,
       label: 'Leaderboard',
@@ -473,9 +444,7 @@ const App: React.FC = () => {
             />
           )}
           {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
-          {currentView === View.LEARNING_MODULES && <LearningModulesPage />}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={(persona) => startConversation(persona, 'coaching')} />}
-          {currentView === View.MENTAL_PERFORMANCE && <MentalPerformanceCoachPage />}
           {currentView === View.CONVERSATION && selectedPersona && (
             <ConversationRoom
               persona={selectedPersona}
