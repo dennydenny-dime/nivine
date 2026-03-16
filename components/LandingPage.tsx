@@ -41,10 +41,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
 
         <div className="relative mx-auto max-w-4xl">
           <p className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Node AI Intelligence Console</p>
-          <h1 className="mt-9 text-5xl font-semibold leading-[0.95] text-[#ededed] sm:text-7xl">
+          <h1 className="mt-9 text-4xl font-semibold leading-[0.95] text-[#ededed] sm:text-5xl lg:text-6xl sm:whitespace-nowrap">
             Train How You{' '}
             <span
-              className={`inline-block min-w-[9ch] border-b-4 border-[#7c3aed] pb-1 text-left transition-opacity duration-300 ${isWordVisible ? 'opacity-100' : 'opacity-0'}`}
+              className={`inline-block border-b-4 border-[#7c3aed] pb-1 transition-opacity duration-300 ${isWordVisible ? 'opacity-100' : 'opacity-0'}`}
             >
               {rotatingWords[activeWordIndex]}
             </span>
