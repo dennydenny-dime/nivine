@@ -343,7 +343,6 @@ const App: React.FC = () => {
       className: 'shadow-lg shadow-indigo-500/20',
       locked: !planAccess.leaderboardEnabled
     },
-    { key: View.PRICING, label: 'Plans', onClick: openPricing },
     { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz },
     { key: View.PRICING, label: 'Pricing', onClick: openPricing }
   ];
