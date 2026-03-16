@@ -22,6 +22,8 @@ export interface LeaderboardEntry {
   name: string;
   avatar: string;
   xp: number;
+  quizScore?: number;
+  quizzesCompleted?: number;
   rank: number;
   isCurrentUser?: boolean;
 }

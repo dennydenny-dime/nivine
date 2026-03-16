@@ -15,17 +15,20 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onBack }) => {
     // Get all real users from the pool
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
     
-    // Convert pool to leaderboard entries and sort by XP
+    // Only include users that completed at least one quiz and rank by quiz score.
     const sorted = pool
+      .filter((user: any) => (user.totalQuizzes || 0) > 0)
       .map((user: any) => ({
         id: user.id,
         name: user.name,
         avatar: user.avatar,
         xp: user.xp || 0,
+        quizScore: user.quizScore || 0,
+        quizzesCompleted: user.totalQuizzes || 0,
         rank: 0,
         isCurrentUser: user.email === currentUser.email
       }))
-      .sort((a: any, b: any) => b.xp - a.xp);
+      .sort((a: any, b: any) => b.quizScore - a.quizScore || b.xp - a.xp);
 
     // Assign ranks
     return sorted.map((entry: any, index: number) => ({ ...entry, rank: index + 1 }));
@@ -42,8 +45,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onBack }) => {
     <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12 gap-6">
         <div>
-          <h2 className="text-4xl font-extrabold tracking-tight">Global <span className="gradient-text">Rankings</span></h2>
-          <p className="text-slate-400 mt-2">Practice more to climb the world stage. Real users only. Premium includes 30 neural module calls per month (10 mins each), 120 minutes of custom coach calls, quizzes, and leaderboards.</p>
+          <h2 className="text-4xl font-extrabold tracking-tight">Quiz <span className="gradient-text">Leaderboard</span></h2>
+          <p className="text-slate-400 mt-2">Only learners who have completed a quiz appear here. Rankings are based on average quiz score, with XP as a tie-breaker.</p>
         </div>
         <button 
           onClick={onBack}
@@ -103,15 +106,15 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onBack }) => {
         <div className="lg:col-span-2">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl min-h-[400px]">
             <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Global Ranking ({totalCompetitors})</span>
-              <span className="text-xs font-bold text-indigo-400">Verified Sessions</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Quiz Ranking ({totalCompetitors})</span>
+              <span className="text-xs font-bold text-indigo-400">Completed Quizzes</span>
             </div>
             
             {globalRankings.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center px-6">
                 <div className="text-4xl mb-4">🏆</div>
                 <h3 className="text-lg font-bold text-slate-300">Leaderboard Empty</h3>
-                <p className="text-sm text-slate-500 mt-2 max-w-xs">Be the first to complete a Daily Quiz and claim the #1 spot in the world!</p>
+                <p className="text-sm text-slate-500 mt-2 max-w-xs">Complete your first Daily Quiz to appear on the leaderboard.</p>
               </div>
             ) : (
               <div className="max-h-[600px] overflow-y-auto scrollbar-hide">
@@ -141,12 +144,12 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onBack }) => {
                           <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">You</span>
                         )}
                       </h4>
-                      <p className="text-xs text-slate-500">Master Level {Math.floor(entry.xp / 1000)}</p>
+                      <p className="text-xs text-slate-500">{entry.quizzesCompleted} quizzes completed</p>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-lg font-black text-indigo-400">{entry.xp.toLocaleString()}</div>
-                      <div className="text-[9px] font-black uppercase text-slate-600 tracking-widest">Total XP</div>
+                      <div className="text-lg font-black text-indigo-400">{entry.quizScore.toFixed(1)}%</div>
+                      <div className="text-[9px] font-black uppercase text-slate-600 tracking-widest">Avg Quiz Score</div>
                     </div>
                   </div>
                 ))}
