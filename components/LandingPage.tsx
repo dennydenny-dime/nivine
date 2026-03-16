@@ -13,10 +13,11 @@ const systems = [
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   return (
     <div className="space-y-20 pb-12">
-      <section className="premium-panel premium-noise relative overflow-hidden rounded-[2.2rem] px-8 py-24 text-center sm:px-14">
+      <section className="premium-noise relative left-1/2 right-1/2 -mx-[50vw] w-screen overflow-hidden px-8 py-24 text-center sm:px-14">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-1/2 top-20 h-64 w-[40rem] -translate-x-1/2 bg-gradient-to-r from-transparent via-indigo-400/20 to-transparent blur-3xl" />
-          <div className="absolute left-1/2 top-2 h-80 w-80 -translate-x-1/2 rounded-full bg-violet-500/10 blur-3xl" />
+          <div className="aura-blob aura-blob-one" />
+          <div className="aura-blob aura-blob-two" />
+          <div className="aura-blob aura-blob-three" />
         </div>
 
         <div className="relative mx-auto max-w-4xl">
