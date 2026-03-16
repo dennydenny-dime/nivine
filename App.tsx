@@ -344,7 +344,8 @@ const App: React.FC = () => {
       locked: !planAccess.leaderboardEnabled
     },
     { key: View.PRICING, label: 'Plans', onClick: openPricing },
-    { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz }
+    { key: View.QUIZ, label: 'Quizzes', onClick: openQuiz },
+    { key: View.PRICING, label: 'Pricing', onClick: openPricing }
   ];
 
   if (!authReady) {
@@ -411,7 +412,7 @@ const App: React.FC = () => {
             <div className="flex gap-1.5 items-center overflow-x-auto md:overflow-visible scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
               {navItems.map((item) => (
                 <button
-                  key={item.key}
+                  key={`${item.key}-${item.label}`}
                   onClick={item.onClick}
                   className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-white/5 hover:text-white'} ${item.locked ? 'relative' : ''}`}
                 >
