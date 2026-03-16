@@ -3,6 +3,7 @@ const ADMIN_EMAILS = new Set([
   'work.of.god02@gmail.com',
   'admin@gmail.com',
   'shutterbomb135@gmail.com',
+  'deepti.baghel912gmail.com',
 ]);
 
 const FULL_ACCESS_EMAILS = new Set([
