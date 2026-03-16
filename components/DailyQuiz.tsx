@@ -351,6 +351,8 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
     if (userIndex !== -1) {
       pool[userIndex].xp = newTotalXP;
       pool[userIndex].totalQuizzes = newTotalQuizzes;
+      pool[userIndex].quizScore = updatedStats.avgRating;
+      pool[userIndex].lastQuizScore = quizResult.synapse_total_score;
       localStorage.setItem('tm_leaderboard_pool', JSON.stringify(pool));
     }
   };
