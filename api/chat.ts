@@ -1,3 +1,5 @@
+import { buildInterviewerSystem } from '../lib/interviewBehavior';
+
 type ChatHistoryItem = {
   speaker?: 'user' | 'ai' | string;
   text?: string;
@@ -51,7 +53,20 @@ const buildPrompt = (body: any): string => {
 
   const history = toHistoryText(body?.history);
 
-  return [
+  const interviewerSystemPrompt = buildInterviewerSystem({
+    personaDescription: typeof persona?.role === 'string' ? persona.role : body?.personaDescription,
+    personaName: typeof persona?.name === 'string' ? persona.name : body?.personaName,
+    primaryMood: typeof persona?.mood === 'string' ? persona.mood : body?.primaryMood,
+    communicationHardness:
+      typeof body?.communicationHardness === 'number'
+        ? body.communicationHardness
+        : typeof persona?.difficultyLevel === 'number'
+          ? persona.difficultyLevel
+          : undefined,
+    voiceType: body?.voiceType,
+  });
+
+  const basePrompt = [
     'You are an elite communication coach in a live spoken practice simulation.',
     `Persona name: ${personaName}`,
     `Persona role: ${personaRole}`,
@@ -72,6 +87,9 @@ const buildPrompt = (body: any): string => {
     '',
     `Latest user transcript: ${transcript}`,
   ].join('\n');
+
+  // Safe prompt injection: prepend interviewer behavior system prompt without altering Gemini call/streaming behavior.
+  return [interviewerSystemPrompt, '', '---', '', basePrompt].join('\n');
 };
 
 const extractTextFromChunk = (chunk: GeminiChunk): string => {
