@@ -1,3 +1,5 @@
+import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
+
 type ChatHistoryItem = {
   speaker?: 'user' | 'ai' | string;
   text?: string;
@@ -50,8 +52,43 @@ const buildPrompt = (body: any): string => {
     : [];
 
   const history = toHistoryText(body?.history);
+  const customCoachConfig: InterviewBehaviorConfig = {
+    personaDescription:
+      typeof body?.personaDescription === 'string'
+        ? body.personaDescription
+        : typeof persona?.role === 'string'
+          ? persona.role
+          : '',
+    personaName:
+      typeof body?.personaName === 'string'
+        ? body.personaName
+        : typeof persona?.name === 'string'
+          ? persona.name
+          : '',
+    primaryMood:
+      typeof body?.primaryMood === 'string'
+        ? body.primaryMood
+        : typeof persona?.mood === 'string'
+          ? persona.mood
+          : '',
+    communicationHardness:
+      typeof body?.communicationHardness === 'number'
+        ? body.communicationHardness
+        : typeof persona?.difficultyLevel === 'number'
+          ? persona.difficultyLevel
+          : undefined,
+    voiceType:
+      typeof body?.voiceType === 'string'
+        ? body.voiceType
+        : typeof persona?.gender === 'string'
+          ? persona.gender
+          : '',
+  };
+  const interviewerSystem = buildInterviewerSystem(customCoachConfig);
 
   return [
+    interviewerSystem,
+    '',
     'You are an elite communication coach in a live spoken practice simulation.',
     `Persona name: ${personaName}`,
     `Persona role: ${personaRole}`,
