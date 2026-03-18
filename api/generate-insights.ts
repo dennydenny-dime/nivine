@@ -19,7 +19,13 @@ const FALLBACK_RAW_DATA = [
 
 const SYSTEM_PROMPT = 'You are an expert interviewer. Convert the input into a short, actionable interview insight. Return JSON with category, title, description (2 lines), and action.';
 
-const getOpenAiApiKey = () => process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
+const getOpenAiApiKey = () =>
+  process.env.OPENAI_API_KEY ||
+  process.env.VITE_OPENAI_API_KEY ||
+  process.env.OPENAI_KEY;
+
+const missingApiKeyMessage =
+  'Missing OpenAI API key. Set OPENAI_API_KEY in your server environment (for local dev, add it to .env.local).';
 
 const normalizeInsight = (input: Partial<Insight>, fallbackSource: string): Insight => ({
   category: typeof input.category === 'string' && input.category.trim() ? input.category.trim() : 'Tips & Strategies',
@@ -93,7 +99,7 @@ export default async function handler(req: any, res: any) {
 
   const apiKey = getOpenAiApiKey();
   if (!apiKey) {
-    res.status(500).json({ error: 'Missing OPENAI_API_KEY environment variable.' });
+    res.status(500).json({ error: missingApiKeyMessage });
     return;
   }
 
