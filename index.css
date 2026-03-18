@@ -158,3 +158,78 @@ body {
     opacity: 0.42;
   }
 }
+
+
+.hero-shell {
+  background: linear-gradient(180deg, rgba(16, 18, 28, 0.92), rgba(10, 10, 11, 0.88));
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+}
+
+.testimonial-shell {
+  background:
+    radial-gradient(circle at 16% 24%, rgba(95, 119, 255, 0.12), transparent 34%),
+    radial-gradient(circle at 80% 18%, rgba(124, 58, 237, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(10, 16, 33, 0.96), rgba(7, 10, 20, 0.96));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
+}
+
+.testimonial-card {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.testimonial-underline {
+  position: relative;
+}
+
+.testimonial-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.18em;
+  height: 0.35em;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(95, 119, 255, 0.95), rgba(124, 58, 237, 0.9));
+  opacity: 0.9;
+  z-index: -1;
+  filter: blur(0.4px);
+}
+
+.testimonial-wave {
+  position: absolute;
+  top: 8%;
+  left: -8%;
+  width: 540px;
+  height: 540px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 50%, rgba(95, 119, 255, 0.2), rgba(95, 119, 255, 0.05) 42%, transparent 66%);
+  filter: blur(4px);
+  opacity: 0.9;
+}
+
+.testimonial-wave::before,
+.testimonial-wave::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: inherit;
+  border: 1px solid rgba(108, 125, 255, 0.22);
+}
+
+.testimonial-wave::after {
+  inset: 30%;
+  border-color: rgba(124, 58, 237, 0.18);
+}
+
+.testimonial-wave-secondary {
+  top: 20%;
+  left: 12%;
+  width: 360px;
+  height: 360px;
+  opacity: 0.45;
+  transform: rotate(18deg);
+}
