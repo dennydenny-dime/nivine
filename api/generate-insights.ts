@@ -67,6 +67,58 @@ const clampMaxItems = (value?: number) => {
   return Math.min(12, Math.max(4, Math.round(value)));
 };
 
+const tokenize = (value?: string | null) =>
+  String(value || '')
+    .toLowerCase()
+    .split(/[^a-z0-9+#]+/i)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+const CATEGORY_KEYWORDS: Record<Insight['category'], string[]> = {
+  'Hiring Trends': ['hiring', 'layoff', 'recruit', 'job', 'market', 'salary', 'remote', 'onsite', 'hybrid', 'headcount', 'talent'],
+  'Interview Questions': ['interview', 'question', 'behavioral', 'technical', 'system', 'coding', 'assessment', 'screen', 'round'],
+  'Company Insights': ['company', 'startup', 'enterprise', 'product', 'leadership', 'funding', 'strategy', 'team', 'organization'],
+  'Tips & Strategies': ['prepare', 'prep', 'candidate', 'resume', 'career', 'skill', 'coach', 'advice', 'strategy'],
+};
+
+const detectCategory = (
+  text: string,
+  preferredCategories?: Insight['category'][],
+): Insight['category'] => {
+  const haystack = tokenize(text);
+  const scores = (Object.keys(CATEGORY_KEYWORDS) as Insight['category'][]).map((category) => {
+    const matches = CATEGORY_KEYWORDS[category].reduce((count, keyword) => count + (haystack.some((token) => token.includes(keyword)) ? 1 : 0), 0);
+    const preferenceBoost = preferredCategories?.includes(category) ? 2 : 0;
+    return { category, score: matches + preferenceBoost };
+  });
+
+  scores.sort((left, right) => right.score - left.score);
+  return scores[0]?.score ? scores[0].category : preferredCategories?.[0] || 'Tips & Strategies';
+};
+
+const getRequestedCategories = (request: Required<GenerateInsightsRequest>): Insight['category'][] => {
+  const categories: Insight['category'][] = [];
+  if (request.includeHiringTrends) categories.push('Hiring Trends');
+  if (request.includeQuestions) categories.push('Interview Questions');
+  if (request.includeCompanySignals) categories.push('Company Insights');
+  if (request.includePrepAdvice) categories.push('Tips & Strategies');
+  return categories.length > 0 ? categories : ['Tips & Strategies'];
+};
+
+const buildNewsQuery = (request: Required<GenerateInsightsRequest>) => {
+  const queryParts = [
+    NEWS_QUERY,
+    request.focus,
+    request.role,
+    request.includeQuestions ? 'interview questions OR assessment' : '',
+    request.includeHiringTrends ? 'hiring trends OR layoffs OR recruiting' : '',
+    request.includeCompanySignals ? 'company news OR leadership OR funding' : '',
+    request.includePrepAdvice ? 'career advice OR interview prep' : '',
+  ].filter(Boolean);
+
+  return queryParts.join(' OR ');
+};
+
 const normalizeInsight = (input: Partial<Insight>, fallbackTitle: string): Insight => ({
   category: typeof input.category === 'string' && input.category.trim() ? input.category.trim() : 'Tips & Strategies',
   title: typeof input.title === 'string' && input.title.trim() ? input.title.trim() : fallbackTitle,
@@ -159,10 +211,16 @@ const createFallbackInsight = (rawItem: string): Insight => {
 const buildFallbackInsights = (rawData: string[], maxItems: number): Insight[] =>
   rawData.slice(0, maxItems).map((item) => createFallbackInsight(item));
 
-const mapArticleToInsight = (article: NewsDataArticle): Insight =>
+const mapArticleToInsight = (
+  article: NewsDataArticle,
+  preferredCategories?: Insight['category'][],
+): Insight =>
   normalizeInsight(
     {
-      category: 'Tips & Strategies',
+      category: detectCategory(
+        [article.title, article.description, article.content, ...(article.category || []), ...(article.keywords || [])].filter(Boolean).join(' '),
+        preferredCategories,
+      ),
       title: article.title || 'Interview market update',
       description: article.description || article.content || 'A live market headline related to interviews, hiring, and career readiness.',
       whyItMatters: 'This live headline may affect what employers emphasize in screenings, team fit discussions, and role expectations.',
@@ -175,15 +233,15 @@ const mapArticleToInsight = (article: NewsDataArticle): Insight =>
     'Interview market update',
   );
 
-const fetchLiveArticles = async (maxItems: number): Promise<NewsDataArticle[]> => {
+const fetchLiveArticles = async (request: Required<GenerateInsightsRequest>): Promise<NewsDataArticle[]> => {
   const apiKey = getNewsDataApiKey();
   const url = new URL(NEWSDATA_ENDPOINT);
   url.searchParams.set('apikey', apiKey);
-  url.searchParams.set('q', NEWS_QUERY);
+  url.searchParams.set('q', buildNewsQuery(request));
   url.searchParams.set('language', 'en');
   // NewsData rejects oversized `size` values on this endpoint, so keep the request
   // within the documented small-page range and trim locally after filtering.
-  url.searchParams.set('size', String(Math.min(Math.max(maxItems, 4), 10)));
+  url.searchParams.set('size', String(Math.min(Math.max(request.maxItems, 4), 10)));
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -199,7 +257,7 @@ const fetchLiveArticles = async (maxItems: number): Promise<NewsDataArticle[]> =
 
   const payload = await response.json();
   const results = Array.isArray(payload?.results) ? (payload.results as NewsDataArticle[]) : [];
-  const filteredResults = results.filter((article) => article.title || article.description || article.content).slice(0, maxItems);
+  const filteredResults = results.filter((article) => article.title || article.description || article.content).slice(0, request.maxItems);
 
   if (filteredResults.length === 0) {
     throw new Error('NewsData did not return any interview-related articles.');
@@ -272,10 +330,11 @@ const synthesizeWithOpenAI = async (
   articles: NewsDataArticle[],
 ): Promise<{ insights: Insight[]; overview?: string; notice?: string }> => {
   const apiKey = getOpenAIApiKey();
+  const preferredCategories = getRequestedCategories(request);
 
   if (!apiKey) {
     return {
-      insights: articles.map(mapArticleToInsight).slice(0, request.maxItems),
+      insights: articles.map((article) => mapArticleToInsight(article, preferredCategories)).slice(0, request.maxItems),
       notice: 'OPENAI_API_KEY is not configured, so the feed is showing direct NewsData summaries instead of AI reasoning.',
     };
   }
@@ -358,7 +417,7 @@ export default async function handler(req: any, res: any) {
   const sanitizedRawData = rawData.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0);
 
   try {
-    const articles = await fetchLiveArticles(maxItems);
+    const articles = await fetchLiveArticles(request);
     const reasoning = await synthesizeWithOpenAI(request, articles);
     res.status(200).json({ insights: reasoning.insights, overview: reasoning.overview, notice: reasoning.notice });
   } catch (error) {
