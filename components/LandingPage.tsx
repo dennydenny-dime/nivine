@@ -44,6 +44,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           <h1 className="mt-9 text-4xl font-semibold leading-[0.95] text-[#ededed] sm:text-5xl lg:text-6xl">
             <span className="inline-block text-left">
               <span className="block sm:whitespace-nowrap">Train How You</span>
+              <span className="relative mt-2 block h-[80px]">
+                <span
+                  className={`absolute left-0 top-0 inline-block border-b-4 border-[#7c3aed] pb-1 transition-opacity duration-300 ${isWordVisible ? 'opacity-100' : 'opacity-0'}`}
               <span className="mt-2 block h-[80px]">
                 <span
                   className={`inline-block border-b-4 border-[#7c3aed] pb-1 transition-opacity duration-300 ${isWordVisible ? 'opacity-100' : 'opacity-0'}`}
