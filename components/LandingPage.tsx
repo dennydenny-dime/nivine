@@ -84,7 +84,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </p>
           <button
             onClick={onEnterApp}
-            className="mt-11 rounded-xl border border-white/25 bg-white px-8 py-3 text-sm font-semibold tracking-wide text-[#0a0a0b] transition hover:scale-[1.01] hover:bg-[#f5f5f5]"
+            className="mt-11 rounded-xl border border-white/10 bg-[linear-gradient(90deg,#7c3aed_0%,#2563eb_100%)] px-8 py-3 text-sm font-bold tracking-wide text-white shadow-[0_0_20px_rgba(124,58,237,0.5)] transition-all duration-300 hover:scale-[1.01] hover:brightness-110 hover:shadow-[0_0_35px_rgba(124,58,237,0.8)]"
           >
             Enter Interview System
           </button>
