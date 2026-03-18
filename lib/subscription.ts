@@ -13,7 +13,7 @@ const FULL_ACCESS_EMAILS = new Set([
 
 export type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 
-type PlanAccess = {
+export type PlanAccess = {
   tier: SubscriptionTier;
   neuralMonthlyCallLimit: number | null;
   neuralMaxMinutesPerCall: number | null;
@@ -43,10 +43,10 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
   },
   premium: {
     tier: 'premium',
-    neuralMonthlyCallLimit: 30,
-    neuralMaxMinutesPerCall: 10,
-    coachingMonthlyCallLimit: 24,
-    coachingMaxMinutesPerCall: 5,
+    neuralMonthlyCallLimit: 4,
+    neuralMaxMinutesPerCall: 25,
+    coachingMonthlyCallLimit: 2,
+    coachingMaxMinutesPerCall: 15,
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
@@ -55,10 +55,10 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
   },
   elite: {
     tier: 'elite',
-    neuralMonthlyCallLimit: 60,
-    neuralMaxMinutesPerCall: 10,
-    coachingMonthlyCallLimit: 54,
-    coachingMaxMinutesPerCall: 10,
+    neuralMonthlyCallLimit: 8,
+    neuralMaxMinutesPerCall: 25,
+    coachingMonthlyCallLimit: 5,
+    coachingMaxMinutesPerCall: 15,
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
@@ -67,9 +67,9 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
   },
   team: {
     tier: 'team',
-    neuralMonthlyCallLimit: 150,
-    neuralMaxMinutesPerCall: 15,
-    coachingMonthlyCallLimit: 150,
+    neuralMonthlyCallLimit: null,
+    neuralMaxMinutesPerCall: null,
+    coachingMonthlyCallLimit: null,
     coachingMaxMinutesPerCall: 15,
     quizzesEnabled: true,
     leaderboardEnabled: true,

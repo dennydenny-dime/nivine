@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Persona, Gender, Mood } from '../types';
 import { COMMON_LANGUAGES, MOODS, getSystemApiKey } from '../constants';
 import { SynapseLogo } from '../App';
+import { PlanAccess, SubscriptionTier } from '../lib/subscription';
 
 interface CustomCoachPageProps {
   onStart: (persona: Persona) => void;
+  tier: SubscriptionTier;
+  planAccess: PlanAccess;
+  coachingRemainingCalls: number | null;
 }
 
-const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart }) => {
+const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart, tier, planAccess, coachingRemainingCalls }) => {
   const [step, setStep] = useState(1);
   const [customDescription, setCustomDescription] = useState('');
   const [gender, setGender] = useState<Gender>('Female');
@@ -21,6 +25,22 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart }) => {
     const apiKey = getSystemApiKey();
     setHasKey(!!apiKey && apiKey.length > 0);
   }, []);
+
+  const planSummary = useMemo(() => {
+    if (!planAccess.customCoachEnabled) {
+      return 'Upgrade to Pro or above to unlock Custom Coach sessions.';
+    }
+
+    if (planAccess.unlimitedCustomCoaches || coachingRemainingCalls === null) {
+      return 'Your plan includes custom coach access tailored to your organization setup.';
+    }
+
+    const sessionLabel = planAccess.coachingMonthlyCallLimit === 1 ? 'session' : 'sessions';
+    const remainingLabel = coachingRemainingCalls === 1 ? 'session' : 'sessions';
+    return `${planAccess.coachingMonthlyCallLimit} ${sessionLabel} per month · ${planAccess.coachingMaxMinutesPerCall} minutes each · ${coachingRemainingCalls} ${remainingLabel} remaining this month`;
+  }, [coachingRemainingCalls, planAccess]);
+
+  const tierLabel = tier === 'premium' ? 'Pro' : tier === 'elite' ? 'Elite' : tier === 'team' ? 'Teams' : 'Free';
 
   const handleStartSession = () => {
     if (!customDescription.trim() && !name.trim()) return;
@@ -55,6 +75,10 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart }) => {
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Configure personality, tone, language, and challenge level in a dedicated custom coach workflow built for focused interview practice.
         </p>
+        <div className="inline-flex flex-col gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/5">
+          <span className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-300/80">{tierLabel} plan access</span>
+          <span>{planSummary}</span>
+        </div>
       </div>
 
       <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl synapse-glow min-h-[500px] flex flex-col transition-all duration-500">

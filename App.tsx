@@ -471,7 +471,14 @@ const App: React.FC = () => {
               onStart={(persona) => startConversation(persona, 'neural')}
             />
           )}
-          {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={(persona) => startConversation(persona, 'coaching')} />}
+          {currentView === View.CUSTOM_COACH && (
+            <CustomCoachPage
+              onStart={(persona) => startConversation(persona, 'coaching')}
+              tier={effectiveTier}
+              planAccess={planAccess}
+              coachingRemainingCalls={coachingRemainingCalls}
+            />
+          )}
           {currentView === View.CONVERSATION && selectedPersona && (
             <ConversationRoom
               persona={selectedPersona}
