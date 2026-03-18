@@ -71,7 +71,7 @@ Authentication and subscription syncing are used to personalize access. User sta
 - Persist user-specific data locally for quick access.
 
 ### Interview Intel
-- Interview-oriented news and question discovery experience.
+- Interview-oriented live news feed and question discovery experience powered by NewsData.
 - Role and topic filtering to help users prepare for current conversation themes.
 
 ### Leaderboard and gamification
@@ -153,12 +153,12 @@ VITE_BACKEND_API_URL=http://localhost:3000/api
 VITE_NEWSDATA_API_KEY=your_newsdata_api_key
 ```
 
-#### Required for OpenAI-powered Interview Intel
+#### Required for live Interview Intel
 ```bash
-OPENAI_API_KEY=your_openai_api_key
+NEWSDATA_API_KEY=your_newsdata_api_key
 ```
 
-> Keep `OPENAI_API_KEY` server-side in `.env.local` or your deployment provider's secret manager. Do not prefix it with `VITE_` unless you intentionally want it exposed to the browser bundle.
+You can also use `VITE_NEWSDATA_API_KEY`, but keeping `NEWSDATA_API_KEY` server-side is safer because it avoids exposing the key in the browser bundle.
 
 #### Required for backend subscription + webhook flows
 ```bash
