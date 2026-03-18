@@ -51,12 +51,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                   {rotatingWords[activeWordIndex]}
                 </span>
               </span>
-          <h1 className="mt-9 text-4xl font-semibold leading-[0.95] text-[#ededed] sm:text-5xl lg:text-6xl sm:whitespace-nowrap">
-            Train How You{' '}
-            <span
-              className={`inline-block border-b-4 border-[#7c3aed] pb-1 transition-opacity duration-300 ${isWordVisible ? 'opacity-100' : 'opacity-0'}`}
-            >
-              {rotatingWords[activeWordIndex]}
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-[#8a8f98] sm:text-lg">
