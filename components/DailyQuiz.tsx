@@ -21,6 +21,47 @@ const CATEGORIES: { id: QuizCategory; icon: string; label: string }[] = [
 
 const DIFFICULTIES: Difficulty[] = ['Beginner', 'Intermediate', 'Expert'];
 
+const DIFFICULTY_META: Record<Difficulty, { icon: string; description: string; badge: string }> = {
+  Beginner: {
+    icon: '◌',
+    badge: 'Foundations',
+    description: 'Clear prompts, confidence-building pacing, and straightforward workplace situations.',
+  },
+  Intermediate: {
+    icon: '◈',
+    badge: 'Most popular',
+    description: 'Real workplace scenarios and nuanced challenges that sharpen judgment under pressure.',
+  },
+  Expert: {
+    icon: '✦',
+    badge: 'Elite mode',
+    description: 'High-stakes conversations with executive-level complexity, ambiguity, and scrutiny.',
+  },
+};
+
+const CATEGORY_META: Record<QuizCategory, { eyebrow: string; description: string }> = {
+  Interview: {
+    eyebrow: 'Career',
+    description: 'Mock interviews built to test clarity, executive presence, and structured thinking.',
+  },
+  Leadership: {
+    eyebrow: 'Management',
+    description: 'Practice decisive communication for feedback, alignment, and stakeholder trust.',
+  },
+  Sales: {
+    eyebrow: 'Growth',
+    description: 'Refine persuasion, discovery, and objection handling with commercial realism.',
+  },
+  Social: {
+    eyebrow: 'Networking',
+    description: 'Build rapport faster with social fluency, presence, and authentic momentum.',
+  },
+  'Conflict Resolution': {
+    eyebrow: 'Resolution',
+    description: 'Navigate tense dynamics with diplomacy, control, and outcome-focused language.',
+  },
+};
+
 const FILLER_WORDS = [
   'um',
   'uh',
@@ -606,84 +647,164 @@ All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLang
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {step === 'selection' && (
-        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="text-center">
-            <h2 className="text-4xl font-extrabold mb-4">Choose Your <span className="gradient-text">Practice Path</span></h2>
-            <p className="text-slate-400">Select a category and difficulty to begin your daily communication test. Premium includes 30 neural module calls per month (10 mins each), 120 minutes of custom coach calls, quizzes, and leaderboards.</p>
-          </div>
+        <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 sm:p-8 lg:p-10 backdrop-blur-xl shadow-[0_30px_120px_rgba(15,23,42,0.45)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-purple-500 blur-[120px] opacity-20" />
+          <div className="pointer-events-none absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-indigo-500 blur-[120px] opacity-20" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%)]" />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div>
-              <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-6">1. Configuration</h3>
+          <div className="relative space-y-10">
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-2xl space-y-4">
+                <span className="inline-flex items-center rounded-full border border-indigo-400/20 bg-indigo-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-indigo-300">
+                  Node AI · Practice Lab
+                </span>
+                <div className="space-y-3">
+                  <h2 className="text-4xl font-bold tracking-tight text-white">Choose your next <span className="bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent">practice path</span></h2>
+                  <p className="max-w-xl text-sm text-white/60">
+                    Configure a premium communication drill with realistic pressure, adaptive difficulty, and coaching-grade evaluation. Every option is tuned to help you perform with more clarity, confidence, and presence.
+                  </p>
+                </div>
+              </div>
 
-              <div className="mb-6">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Quiz Language</label>
-                <div className="relative">
-                  <select
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="w-full appearance-none bg-slate-900 border border-slate-700 text-white py-3 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-bold"
-                  >
-                    {COMMON_LANGUAGES.map((lang) => (
-                      <option key={lang} value={lang}>{lang}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-lg shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <p className="text-xs uppercase tracking-widest text-indigo-400">Category</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{CATEGORIES.find((cat) => cat.id === selectedCategory)?.label}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-lg shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <p className="text-xs uppercase tracking-widest text-indigo-400">Difficulty</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{selectedDifficulty}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-lg shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <p className="text-xs uppercase tracking-widest text-indigo-400">Language</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{selectedLanguage}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1.05fr_0.95fr]">
+              <div className="space-y-6">
+                <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 backdrop-blur-lg shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-indigo-400">01 · Configuration</p>
+                      <h3 className="mt-2 text-xl font-semibold text-white">Set the scenario parameters</h3>
+                    </div>
+                    <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/50">Adaptive session</div>
+                  </div>
+
+                  <div className="mb-6">
+                    <label className="mb-2 block text-xs uppercase tracking-widest text-indigo-400">Quiz language</label>
+                    <div className="relative">
+                      <select
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="w-full appearance-none rounded-2xl border border-white/10 bg-white/5 py-4 pl-4 pr-12 text-sm font-medium text-white backdrop-blur-lg transition-all duration-300 focus:border-indigo-400/70 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-[0_0_40px_rgba(99,102,241,0.12)]"
+                      >
+                        {COMMON_LANGUAGES.map((lang) => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white/50">
+                        <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4">
+                    {CATEGORIES.map((cat) => {
+                      const isSelected = selectedCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.id)}
+                          className={`group relative overflow-hidden rounded-[1.5rem] border p-5 text-left transition-all duration-300 active:scale-95 ${
+                            isSelected
+                              ? 'border-indigo-300/60 bg-gradient-to-br from-indigo-500/30 via-purple-500/20 to-fuchsia-500/20 text-white shadow-[0_0_50px_rgba(99,102,241,0.28)]'
+                              : 'border-white/10 bg-white/5 text-white/72 shadow-[0_0_40px_rgba(99,102,241,0.10)] hover:scale-105 hover:border-white/20 hover:bg-white/[0.07] hover:shadow-[0_12px_50px_rgba(99,102,241,0.18)]'
+                          }`}
+                        >
+                          <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'group-hover:opacity-100'}`} />
+                          <div className="relative flex items-start gap-4">
+                            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border text-xl backdrop-blur-md ${isSelected ? 'border-white/20 bg-white/15 shadow-[0_0_30px_rgba(129,140,248,0.35)]' : 'border-white/10 bg-black/10'}`}>
+                              {cat.icon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs uppercase tracking-widest text-indigo-400">{CATEGORY_META[cat.id].eyebrow}</p>
+                              <div className="mt-1 flex items-center justify-between gap-3">
+                                <span className="text-base font-semibold text-white">{cat.label}</span>
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${isSelected ? 'bg-white/15 text-white' : 'bg-white/5 text-white/45'}`}>
+                                  {isSelected ? 'Selected' : 'Available'}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm leading-6 text-white/60">{CATEGORY_META[cat.id].description}</p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${
-                      selectedCategory === cat.id
-                        ? 'bg-indigo-500/10 border-indigo-500 text-white shadow-lg shadow-indigo-500/10'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="text-2xl">{cat.icon}</span>
-                    <span className="font-bold">{cat.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+              <div className="space-y-6">
+                <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 backdrop-blur-lg shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <div className="mb-5">
+                    <p className="text-xs uppercase tracking-widest text-indigo-400">02 · Difficulty</p>
+                    <h3 className="mt-2 text-xl font-semibold text-white">Select the pressure level</h3>
+                    <p className="mt-2 text-sm text-white/60">Choose how demanding the challenge should feel. Selected modes glow with stronger intensity to signal your active training state.</p>
+                  </div>
 
-            <div>
-              <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-6">2. Select Difficulty</h3>
-              <div className="space-y-4">
-                {DIFFICULTIES.map((diff) => (
-                  <button
-                    key={diff}
-                    onClick={() => setSelectedDifficulty(diff)}
-                    className={`w-full p-6 rounded-2xl border transition-all flex justify-between items-center ${
-                      selectedDifficulty === diff
-                        ? 'bg-indigo-500 border-indigo-400 text-white scale-[1.02]'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="text-left">
-                      <div className="font-bold text-lg">{diff}</div>
-                      <div className="text-xs opacity-70">
-                        {diff === 'Beginner' && 'Standard scenarios, clear challenges.'}
-                        {diff === 'Intermediate' && 'Workplace complexities and nuanced goals.'}
-                        {diff === 'Expert' && 'High-stakes, high-pressure environments.'}
-                      </div>
-                    </div>
-                    {selectedDifficulty === diff && <span className="text-white">✓</span>}
-                  </button>
-                ))}
-              </div>
+                  <div className="space-y-4">
+                    {DIFFICULTIES.map((diff) => {
+                      const isSelected = selectedDifficulty === diff;
+                      return (
+                        <button
+                          key={diff}
+                          onClick={() => setSelectedDifficulty(diff)}
+                          className={`group relative w-full overflow-hidden rounded-[1.5rem] border p-5 text-left transition-all duration-300 active:scale-95 ${
+                            isSelected
+                              ? 'scale-[1.02] border-indigo-300/70 bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 text-white shadow-[0_0_55px_rgba(99,102,241,0.35)]'
+                              : 'border-white/10 bg-white/5 text-white/75 shadow-[0_0_40px_rgba(99,102,241,0.10)] hover:scale-105 hover:border-white/20 hover:shadow-[0_16px_55px_rgba(99,102,241,0.18)]'
+                          }`}
+                        >
+                          <div className={`absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.25),transparent_35%)] transition-opacity duration-300 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                          <div className="relative flex items-start justify-between gap-4">
+                            <div className="flex gap-4">
+                              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border text-lg font-semibold ${isSelected ? 'border-white/25 bg-white/15 shadow-[0_0_35px_rgba(255,255,255,0.18)]' : 'border-white/10 bg-black/10 text-indigo-200'}`}>
+                                {DIFFICULTY_META[diff].icon}
+                              </div>
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-lg font-semibold">{diff}</span>
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] ${isSelected ? 'bg-white/15 text-white' : 'bg-white/5 text-white/45'}`}>{DIFFICULTY_META[diff].badge}</span>
+                                </div>
+                                <p className={`mt-2 text-sm leading-6 ${isSelected ? 'text-white/85' : 'text-white/60'}`}>{DIFFICULTY_META[diff].description}</p>
+                              </div>
+                            </div>
+                            <div className={`mt-1 flex h-7 w-7 items-center justify-center rounded-full border text-sm ${isSelected ? 'border-white/30 bg-white/15 text-white shadow-[0_0_25px_rgba(255,255,255,0.25)]' : 'border-white/10 bg-white/5 text-white/40'}`}>
+                              ✓
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              <button
-                onClick={generateQuiz}
-                className="w-full mt-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl font-bold text-lg hover:from-indigo-500 hover:to-purple-500 transition-all shadow-xl shadow-indigo-500/25"
-              >
-                Start Challenge
-              </button>
+                <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 backdrop-blur-lg shadow-[0_0_40px_rgba(99,102,241,0.15)]">
+                  <p className="text-xs uppercase tracking-widest text-indigo-400">Launch</p>
+                  <h3 className="mt-2 text-xl font-semibold text-white">Start the premium challenge</h3>
+                  <p className="mt-2 text-sm text-white/60">Your quiz is generated around the chosen category, difficulty, and language. Everything else remains identical under the hood.</p>
+
+                  <button
+                    onClick={generateQuiz}
+                    className="mt-6 w-full rounded-[1.5rem] border border-white/20 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-5 text-lg font-semibold text-white transition-all duration-300 hover:scale-105 hover:shadow-[0_0_100px_rgba(139,92,246,0.75)] active:scale-95 shadow-[0_0_80px_rgba(139,92,246,0.6)]"
+                  >
+                    Start Challenge
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
