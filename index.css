@@ -181,6 +181,49 @@ body {
   backdrop-filter: blur(14px);
 }
 
+.testimonial-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.core-module-card {
+  position: relative;
+  overflow: hidden;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.core-module-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--module-accent, rgba(95, 119, 255, 0.9));
+}
+
+.module-accent-blue {
+  --module-accent: linear-gradient(90deg, rgba(37, 99, 235, 0.96), rgba(96, 165, 250, 0.88));
+}
+
+.module-accent-purple {
+  --module-accent: linear-gradient(90deg, rgba(124, 58, 237, 0.96), rgba(168, 85, 247, 0.88));
+}
+
+.module-accent-green {
+  --module-accent: linear-gradient(90deg, rgba(34, 197, 94, 0.96), rgba(74, 222, 128, 0.88));
+}
+
+.core-module-icon-placeholder {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 .testimonial-underline {
   position: relative;
 }
@@ -211,6 +254,22 @@ body {
   opacity: 0.9;
 }
 
+.testimonial-wave-arc {
+  top: 50%;
+  left: -18%;
+  width: 560px;
+  height: 560px;
+  border-radius: 999px;
+  background: none;
+  border: 1px solid rgba(95, 119, 255, 0.18);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  filter: blur(0);
+  opacity: 0.8;
+  transform: translateY(-50%) rotate(-10deg);
+  animation: testimonialArcFloat 11s ease-in-out infinite;
+}
+
 .testimonial-wave::before,
 .testimonial-wave::after {
   content: '';
@@ -226,10 +285,41 @@ body {
 }
 
 .testimonial-wave-secondary {
-  top: 20%;
-  left: 12%;
-  width: 360px;
-  height: 360px;
-  opacity: 0.45;
-  transform: rotate(18deg);
+  top: 52%;
+  left: -6%;
+  width: 420px;
+  height: 420px;
+  border-color: rgba(124, 58, 237, 0.22);
+  opacity: 0.6;
+  transform: translateY(-50%) rotate(12deg);
+  animation-duration: 14s;
+}
+
+.testimonial-wave-arc::before,
+.testimonial-wave-arc::after {
+  inset: 12%;
+  border-style: solid;
+  border-width: 1px;
+  border-color: rgba(95, 119, 255, 0.16);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.testimonial-wave-arc::after {
+  inset: 24%;
+  border-color: rgba(124, 58, 237, 0.24);
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+@keyframes testimonialArcFloat {
+  0%,
+  100% {
+    transform: translateY(-50%) rotate(-10deg) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(calc(-50% - 10px)) rotate(-5deg) scale(1.03);
+    opacity: 0.85;
+  }
 }

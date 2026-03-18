@@ -5,9 +5,9 @@ interface LandingPageProps {
 }
 
 const systems = [
-  ['Cognitive Load Mapping', 'Detects latency, verbal drag, and thought compression in live responses.'],
-  ['Pressure Signal Tracking', 'Models composure drift and confidence oscillation under hostile questioning.'],
-  ['Narrative Precision Index', 'Measures structure discipline, relevance density, and result clarity.'],
+  ['Cognitive Load Mapping', 'Detects latency, verbal drag, and thought compression in live responses.', 'module-accent-blue'],
+  ['Pressure Signal Tracking', 'Models composure drift and confidence oscillation under hostile questioning.', 'module-accent-purple'],
+  ['Narrative Precision Index', 'Measures structure discipline, relevance density, and result clarity.', 'module-accent-green'],
 ];
 
 const testimonials = [
@@ -92,18 +92,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       <section className="testimonial-shell premium-noise relative overflow-hidden rounded-[28px] border border-white/8 px-8 py-12 sm:px-10 lg:px-12 lg:py-16">
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-full max-w-xl">
-          <div className="testimonial-wave" />
-          <div className="testimonial-wave testimonial-wave-secondary" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-full max-w-xl overflow-hidden">
+          <div className="testimonial-wave testimonial-wave-arc" />
+          <div className="testimonial-wave testimonial-wave-arc testimonial-wave-secondary" />
         </div>
 
-        <div className="relative grid gap-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)] lg:items-center">
-          <div className="relative z-10 max-w-xl">
+        <div className="relative grid gap-10 lg:min-h-[500px] lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
+          <div className="relative z-10 flex max-w-xl flex-col justify-center lg:min-h-[360px]">
             <h2 className="text-4xl font-semibold leading-tight text-[#ededed] sm:text-5xl">
               See what candidates are{' '}
               <span className="testimonial-underline inline-block text-[#ededed]">saying</span>
             </h2>
-            <div className="mt-12">
+            <div className="mt-10">
               <p className="text-[11px] uppercase tracking-[0.32em] text-slate-500">Featured In</p>
               <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-slate-500 sm:text-base">
                 {featuredCompanies.map((company) => (
@@ -114,7 +114,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
 
           <div className="relative z-10 min-h-[420px]">
-            <div className="grid gap-5 sm:grid-cols-3 sm:grid-rows-2">
+            <div className="grid gap-5 sm:grid-cols-[repeat(3,minmax(300px,1fr))] sm:items-start">
               {testimonials.map(({ initials, name, handle, quote, position }) => (
                 <article
                   key={handle}
@@ -125,11 +125,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                       {initials}
                     </div>
                     <div>
-                      <p className="text-base font-semibold text-[#ededed]">{name}</p>
-                      <p className="text-sm text-slate-400">{handle}</p>
+                      <p className="text-[15px] font-semibold text-[#ededed]">{name}</p>
+                      <p className="text-[13px] text-slate-400">{handle}</p>
                     </div>
                   </div>
-                  <p className="mt-5 text-sm leading-6 text-slate-300">“{quote}”</p>
+                  <p className="testimonial-quote mt-5 text-[13px] leading-5 text-slate-300">“{quote}”</p>
                 </article>
               ))}
             </div>
@@ -138,9 +138,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        {systems.map(([title, copy]) => (
-          <article key={title} className="premium-panel rounded-2xl p-6 transition duration-300 hover:border-white/20">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Core Module</p>
+        {systems.map(([title, copy, accentClass]) => (
+          <article
+            key={title}
+            className={`core-module-card ${accentClass} rounded-2xl p-6 transition duration-300 hover:border-white/20`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Core Module</p>
+              <div
+                aria-hidden="true"
+                className="core-module-icon-placeholder flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+              >
+                <span className="h-4 w-4 rounded-full border border-white/30 bg-white/10" />
+              </div>
+            </div>
             <h3 className="mt-3 text-lg font-semibold text-[#ededed]">{title}</h3>
             <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">{copy}</p>
           </article>
