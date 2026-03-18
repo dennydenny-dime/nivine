@@ -5,10 +5,9 @@ import { SynapseLogo } from '../App';
 
 interface MainAppPageProps {
   onStart: (persona: Persona) => void;
-  planNotice?: string;
 }
 
-const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, planNotice }) => {
+const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
   const [language, setLanguage] = useState('English');
 
   const handlePresetStart = (p: Persona) => {
@@ -28,12 +27,6 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart, planNotice }) => {
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Choose a neural training module and practice with focused scenarios in your target language.
         </p>
-
-        {planNotice && (
-          <p className="text-sm text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-4 py-2">
-            {planNotice}
-          </p>
-        )}
 
         <div className="relative inline-block w-64 mt-4">
           <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Target Practice Language</label>
