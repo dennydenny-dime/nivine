@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { Persona, TranscriptionItem } from '../types';
-import { getConversationHistoryKey } from '../lib/userStorage';
+import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, extractPastResultsFromHistory } from '../lib/candidateMemory';
+import { getConversationHistoryKey, getUserConversationHistory } from '../lib/userStorage';
 import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
@@ -142,6 +143,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
+  const candidateMemoryPrompt = React.useMemo(() => {
+    const history = getUserConversationHistory();
+    const profile = buildCandidateMemoryProfile(extractPastResultsFromHistory(history));
+    return buildCandidateMemoryPrompt(profile);
+  }, []);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -227,13 +233,16 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         await outputAudioContextRef.current.resume();
 
         const hardness = persona.difficultyLevel || 5;
-        const systemInstruction = buildCoachSystemPrompt({
+        const systemInstruction = [
+          buildCoachSystemPrompt({
           personaName: persona.name,
           description: persona.role,
           mood: persona.mood,
           hardness,
           language: currentLanguage,
-        });
+          }),
+          candidateMemoryPrompt,
+        ].filter(Boolean).join('\n\n');
 
         const sessionPromise = ai.live.connect({
           model: 'gemini-2.5-flash-native-audio-preview-12-2025',
