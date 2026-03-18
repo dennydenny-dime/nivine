@@ -5,6 +5,9 @@ type Insight = {
   title: string;
   description: string;
   action: string;
+  source?: string;
+  link?: string;
+  publishedAt?: string;
 };
 
 type ApiResponse = {
@@ -12,13 +15,6 @@ type ApiResponse = {
   error?: string;
   notice?: string;
 };
-
-const rawData = [
-  'Google is focusing more on system design interviews',
-  'Startups are reducing hiring rounds',
-  'Candidates struggle with behavioral questions',
-  'Companies prefer candidates with real project experience',
-];
 
 const filters = ['All', 'Hiring Trends', 'Interview Questions', 'Company Insights', 'Tips & Strategies'] as const;
 
@@ -38,6 +34,19 @@ const categoryToFilter = (category: string): Filter => {
   if (normalized.includes('question') || normalized.includes('behavioral') || normalized.includes('technical')) return 'Interview Questions';
   if (normalized.includes('company') || normalized.includes('employer')) return 'Company Insights';
   return 'Tips & Strategies';
+};
+
+const formatPublishedAt = (value?: string) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
 };
 
 const InterviewIntelPage: React.FC = () => {
@@ -61,14 +70,14 @@ const InterviewIntelPage: React.FC = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ rawData }),
+          body: JSON.stringify({}),
           signal: controller.signal,
         });
 
         const payload = (await response.json()) as ApiResponse;
 
         if (!response.ok) {
-          throw new Error(payload.error || 'Failed to generate interview insights.');
+          throw new Error(payload.error || 'Failed to load interview intel feed.');
         }
 
         setInsights(payload.insights || []);
@@ -104,22 +113,22 @@ const InterviewIntelPage: React.FC = () => {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-4">
               <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">
-                Premium intelligence stream
+                Live NewsData feed
               </span>
               <div className="space-y-3">
                 <h1 className="text-4xl font-black tracking-tight text-white md:text-6xl">Interview Intel ⚡</h1>
                 <p className="max-w-2xl text-sm leading-7 text-slate-300 md:text-lg">
-                  Real-time insights to crack your next interview. We turn raw hiring chatter into structured, actionable prep you can scan in seconds.
+                  Live interview, hiring, and career-prep headlines powered by NewsData so you can prep against what employers are discussing right now.
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-left sm:grid-cols-4 lg:w-[30rem]">
               {[
-                { label: 'Signals', value: `${insights.length || rawData.length}` },
+                { label: 'Signals', value: `${insights.length}` },
                 { label: 'Filters', value: '4' },
-                { label: 'Latency', value: '< 5s' },
-                { label: 'Mode', value: notice ? 'Fallback' : 'AI' },
+                { label: 'Source', value: 'NewsData' },
+                { label: 'Mode', value: notice ? 'Fallback' : 'Live' },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                   <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{stat.label}</p>
@@ -132,7 +141,7 @@ const InterviewIntelPage: React.FC = () => {
 
         {notice && (
           <section className="rounded-[1.5rem] border border-amber-400/30 bg-amber-400/10 p-5 text-amber-50 backdrop-blur-xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-200">Live AI temporarily unavailable</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-200">Live feed notice</p>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-amber-50/90">{notice}</p>
           </section>
         )}
@@ -178,35 +187,63 @@ const InterviewIntelPage: React.FC = () => {
         ) : error ? (
           <section className="rounded-[1.5rem] border border-rose-500/30 bg-rose-500/10 p-6 text-rose-100 backdrop-blur-xl">
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-rose-200">Insight stream unavailable</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">We couldn’t generate Interview Intel right now.</h2>
+            <h2 className="mt-3 text-2xl font-bold text-white">We couldn’t load the live Interview Intel feed.</h2>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-rose-100/90">{error}</p>
           </section>
         ) : (
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {visibleInsights.map((insight, index) => (
-              <article
-                key={`${insight.title}-${index}`}
-                className="group relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-2xl transition duration-300 hover:-translate-y-1.5 hover:scale-[1.01] hover:border-cyan-300/30 hover:shadow-[0_20px_80px_rgba(6,182,212,0.18)]"
-              >
-                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${cardAccents[index % cardAccents.length]} opacity-80 transition duration-300 group-hover:opacity-100`} />
-                <div className="pointer-events-none absolute -right-10 top-8 h-24 w-24 rounded-full bg-white/10 blur-3xl opacity-0 transition duration-300 group-hover:opacity-100" />
+            {visibleInsights.map((insight, index) => {
+              const publishedLabel = formatPublishedAt(insight.publishedAt);
 
-                <div className="relative space-y-5">
-                  <span className="inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                    {insight.category}
-                  </span>
+              return (
+                <article
+                  key={`${insight.title}-${index}`}
+                  className="group relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-2xl transition duration-300 hover:-translate-y-1.5 hover:scale-[1.01] hover:border-cyan-300/30 hover:shadow-[0_20px_80px_rgba(6,182,212,0.18)]"
+                >
+                  <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${cardAccents[index % cardAccents.length]} opacity-80 transition duration-300 group-hover:opacity-100`} />
+                  <div className="pointer-events-none absolute -right-10 top-8 h-24 w-24 rounded-full bg-white/10 blur-3xl opacity-0 transition duration-300 group-hover:opacity-100" />
 
-                  <div>
-                    <h3 className="text-2xl font-bold tracking-tight text-white">{insight.title}</h3>
-                    <p className="mt-3 text-sm leading-7 text-slate-300">{insight.description}</p>
+                  <div className="relative space-y-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                        {insight.category}
+                      </span>
+                      {insight.source && (
+                        <span className="inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] font-medium text-slate-300">
+                          {insight.source}
+                        </span>
+                      )}
+                      {publishedLabel && (
+                        <span className="inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] font-medium text-slate-300">
+                          {publishedLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-2xl font-bold tracking-tight text-white">{insight.title}</h3>
+                      <p className="mt-3 text-sm leading-7 text-slate-300">{insight.description}</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                      <span className="font-semibold text-cyan-200">👉 Prep move:</span> {insight.action}
+                    </div>
+
+                    {insight.link && (
+                      <a
+                        href={insight.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-200 transition hover:text-cyan-100"
+                      >
+                        Read source
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    )}
                   </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                    <span className="font-semibold text-cyan-200">👉 Action:</span> {insight.action}
-                  </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </section>
         )}
 

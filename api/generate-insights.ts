@@ -3,11 +3,19 @@ type Insight = {
   title: string;
   description: string;
   action: string;
+  source?: string;
+  link?: string;
+  publishedAt?: string;
 };
 
-type OpenAIMessage = {
-  role: 'system' | 'user';
-  content: string;
+type NewsDataArticle = {
+  title?: string | null;
+  description?: string | null;
+  link?: string | null;
+  source_id?: string | null;
+  pubDate?: string | null;
+  keywords?: string[] | null;
+  category?: string[] | null;
 };
 
 const FALLBACK_RAW_DATA = [
@@ -17,13 +25,14 @@ const FALLBACK_RAW_DATA = [
   'Companies prefer candidates with real project experience',
 ];
 
-const SYSTEM_PROMPT = 'You are an expert interviewer. Convert the input into a short, actionable interview insight. Return JSON with category, title, description (2 lines), and action.';
+const DEFAULT_NEWSDATA_API_KEY = 'pub_be997e9b8cca467ab32475524e55e7f2';
+const NEWSDATA_ENDPOINT = 'https://newsdata.io/api/1/latest';
+const NEWS_QUERY = 'interview OR hiring OR recruiter OR career';
 
-const getOpenAiApiKey = () =>
-  process.env.OPENAI_API_KEY ||
-  process.env.VITE_OPENAI_API_KEY ||
-  process.env.OPENAI_KEY;
-
+const getNewsDataApiKey = () =>
+  process.env.NEWSDATA_API_KEY ||
+  process.env.VITE_NEWSDATA_API_KEY ||
+  DEFAULT_NEWSDATA_API_KEY;
 
 const normalizeInsight = (input: Partial<Insight>, fallbackSource: string): Insight => ({
   category: typeof input.category === 'string' && input.category.trim() ? input.category.trim() : 'Tips & Strategies',
@@ -36,14 +45,10 @@ const normalizeInsight = (input: Partial<Insight>, fallbackSource: string): Insi
     typeof input.action === 'string' && input.action.trim()
       ? input.action.trim()
       : 'Turn this theme into one concrete talking point before your next interview.',
+  source: typeof input.source === 'string' && input.source.trim() ? input.source.trim() : undefined,
+  link: typeof input.link === 'string' && input.link.trim() ? input.link.trim() : undefined,
+  publishedAt: typeof input.publishedAt === 'string' && input.publishedAt.trim() ? input.publishedAt.trim() : undefined,
 });
-
-const parseInsight = (content: string, fallbackSource: string): Insight => {
-  const fenced = content.match(/```json\s*([\s\S]*?)```/i);
-  const candidate = fenced?.[1] || content;
-  const parsed = JSON.parse(candidate) as Partial<Insight>;
-  return normalizeInsight(parsed, fallbackSource);
-};
 
 const createFallbackInsight = (rawItem: string): Insight => {
   const normalized = rawItem.trim();
@@ -95,51 +100,92 @@ const createFallbackInsight = (rawItem: string): Insight => {
 
 const buildFallbackInsights = (rawData: string[]): Insight[] => rawData.map((item) => createFallbackInsight(item));
 
-const isQuotaError = (details: string) => {
-  const normalized = details.toLowerCase();
-  return normalized.includes('insufficient_quota') || normalized.includes('exceeded your current quota');
+const pickCategory = (article: NewsDataArticle): Insight['category'] => {
+  const haystack = [
+    article.title,
+    article.description,
+    article.source_id,
+    ...(article.keywords || []),
+    ...(article.category || []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (haystack.includes('interview') || haystack.includes('behavioral') || haystack.includes('technical')) return 'Interview Questions';
+  if (haystack.includes('hiring') || haystack.includes('recruit') || haystack.includes('job market')) return 'Hiring Trends';
+  if (haystack.includes('company') || haystack.includes('employer') || haystack.includes('startup')) return 'Company Insights';
+  return 'Tips & Strategies';
 };
 
-const createInsight = async (rawItem: string, apiKey: string): Promise<Insight> => {
-  const messages: OpenAIMessage[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: rawItem },
-  ];
+const buildAction = (article: NewsDataArticle): string => {
+  const haystack = [article.title, article.description, ...(article.keywords || [])]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+  if (haystack.includes('layoff') || haystack.includes('slowdown') || haystack.includes('hiring freeze')) {
+    return 'Prepare a concise value pitch that shows why you can deliver impact quickly in a tighter hiring market.';
+  }
+
+  if (haystack.includes('ai') || haystack.includes('automation')) {
+    return 'Add one example of how you use AI or automation responsibly to improve quality, speed, or decision-making.';
+  }
+
+  if (haystack.includes('behavioral') || haystack.includes('leadership')) {
+    return 'Refresh STAR stories that show conflict management, ownership, and measurable outcomes.';
+  }
+
+  if (haystack.includes('engineer') || haystack.includes('technical') || haystack.includes('system design')) {
+    return 'Rehearse one technical story that explains your architecture choices, trade-offs, and impact in plain language.';
+  }
+
+  return 'Turn this headline into a 30-second prep talking point that connects the news to your recent work and interview goals.';
+};
+
+const mapArticleToInsight = (article: NewsDataArticle): Insight =>
+  normalizeInsight(
+    {
+      category: pickCategory(article),
+      title: article.title || 'Interview market update',
+      description: article.description || 'A live market headline related to interviews, hiring, and career readiness.',
+      action: buildAction(article),
+      source: article.source_id || undefined,
+      link: article.link || undefined,
+      publishedAt: article.pubDate || undefined,
     },
-    body: JSON.stringify({
-      model: 'gpt-4.1-mini',
-      temperature: 0.4,
-      response_format: { type: 'json_object' },
-      messages,
-    }),
+    'Interview market update',
+  );
+
+const fetchLiveInsights = async (): Promise<Insight[]> => {
+  const apiKey = getNewsDataApiKey();
+  const url = new URL(NEWSDATA_ENDPOINT);
+  url.searchParams.set('apikey', apiKey);
+  url.searchParams.set('q', NEWS_QUERY);
+  url.searchParams.set('language', 'en');
+  url.searchParams.set('size', '9');
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
   });
 
   if (!response.ok) {
     const details = await response.text();
-
-    if (response.status === 429 && isQuotaError(details)) {
-      throw new Error(
-        'OpenAI project quota is unavailable for this API key. The API billing/project balance can be exhausted even when your usage dashboard shows 0 for a different project or date range.',
-      );
-    }
-
-    throw new Error(`OpenAI request failed (${response.status}): ${details}`);
+    throw new Error(`NewsData request failed (${response.status}): ${details}`);
   }
 
   const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content;
+  const results = Array.isArray(payload?.results) ? (payload.results as NewsDataArticle[]) : [];
+  const filteredResults = results.filter((article) => article.title || article.description);
 
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('OpenAI response did not contain structured insight content.');
+  if (filteredResults.length === 0) {
+    throw new Error('NewsData did not return any interview-related articles.');
   }
 
-  return parseInsight(content, rawItem);
+  return filteredResults.map(mapArticleToInsight);
 };
 
 export default async function handler(req: any, res: any) {
@@ -160,23 +206,14 @@ export default async function handler(req: any, res: any) {
   const rawData = Array.isArray(req.body?.rawData) && req.body.rawData.length > 0 ? req.body.rawData : FALLBACK_RAW_DATA;
   const sanitizedRawData = rawData.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0);
 
-  const apiKey = getOpenAiApiKey();
-  if (!apiKey) {
-    res.status(200).json({
-      insights: buildFallbackInsights(sanitizedRawData),
-      notice: 'OpenAI API key is missing, so sample interview insights are being shown instead of live AI-generated ones.',
-    });
-    return;
-  }
-
   try {
-    const insights = await Promise.all(sanitizedRawData.map((item) => createInsight(item, apiKey)));
+    const insights = await fetchLiveInsights();
     res.status(200).json({ insights });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to generate insights.';
+    const message = error instanceof Error ? error.message : 'Unable to load the live news feed.';
     res.status(200).json({
       insights: buildFallbackInsights(sanitizedRawData),
-      notice: `${message} Showing sample interview insights while live generation is unavailable.`,
+      notice: `${message} Showing fallback interview prep signals instead.`,
     });
   }
 }
