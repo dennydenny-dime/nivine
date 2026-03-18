@@ -89,6 +89,28 @@ export interface TranscriptionItem {
   timestamp: number;
 }
 
+export interface InterviewEvaluationEligibleResult {
+  eligible: true;
+  scores: {
+    clarity: number;
+    confidence: number;
+    structure: number;
+    depth: number;
+    overall: number;
+  };
+  strengths: string[];
+  weaknesses: string[];
+  summary: string;
+  improvement_suggestions: string[];
+}
+
+export interface InterviewEvaluationIneligibleResult {
+  eligible: false;
+  message: string;
+}
+
+export type InterviewEvaluationResult = InterviewEvaluationEligibleResult | InterviewEvaluationIneligibleResult;
+
 export interface NeuralSpeechScoreCard {
   overallScore: number;
   totalWords: number;
@@ -99,6 +121,7 @@ export interface NeuralSpeechScoreCard {
   clarityScore: number;
   concisenessScore: number;
   summary: string;
+  evaluation: InterviewEvaluationResult;
 }
 
 export interface ConversationHistoryItem {

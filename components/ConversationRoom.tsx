@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { Persona, TranscriptionItem } from '../types';
+import { getConversationHistoryKey } from '../lib/userStorage';
+import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 
@@ -170,14 +172,17 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           id: Date.now().toString(),
           date: new Date().toISOString(),
           persona,
-          transcriptions
+          transcriptions,
+          scoreCard: buildNeuralSpeechScoreCard(transcriptions),
         };
-        
-        const storedHistory = localStorage.getItem('tm_conversation_history');
+
+        const conversationHistoryKey = getConversationHistoryKey();
+        const storedHistory = localStorage.getItem(conversationHistoryKey) ?? localStorage.getItem('tm_conversation_history');
         const history = storedHistory ? JSON.parse(storedHistory) : [];
         // Keep last 50 sessions to manage storage size
         const updatedHistory = [historyItem, ...history].slice(0, 50);
-        
+
+        localStorage.setItem(conversationHistoryKey, JSON.stringify(updatedHistory));
         localStorage.setItem('tm_conversation_history', JSON.stringify(updatedHistory));
       } catch (e) {
         console.error("Failed to save conversation history", e);
