@@ -10,6 +10,8 @@ const systems = [
   ['Narrative Precision Index', 'Measures structure discipline, relevance density, and result clarity.'],
 ];
 
+const accentColors = ['#2563eb', '#7c3aed', '#22c55e'];
+
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const rotatingWords = ['Think.', 'Speak.', 'Interview.'];
   const [activeWordIndex, setActiveWordIndex] = useState(0);
@@ -58,7 +60,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </p>
           <button
             onClick={onEnterApp}
-            className="mt-11 rounded-xl border border-white/25 bg-white px-8 py-3 text-sm font-semibold tracking-wide text-[#0a0a0b] transition hover:scale-[1.01] hover:bg-[#f5f5f5]"
+            className="mt-11 rounded-xl border border-white/10 bg-[linear-gradient(90deg,#7c3aed_0%,#2563eb_100%)] px-8 py-3 text-sm font-bold tracking-wide text-white shadow-[0_0_20px_rgba(124,58,237,0.5)] transition-all duration-300 hover:scale-[1.01] hover:brightness-110 hover:shadow-[0_0_35px_rgba(124,58,237,0.8)]"
           >
             Enter Interview System
           </button>
@@ -66,8 +68,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        {systems.map(([title, copy]) => (
-          <article key={title} className="premium-panel rounded-2xl p-6 transition duration-300 hover:border-white/20">
+        {systems.map(([title, copy], idx) => (
+          <article
+            key={title}
+            className="relative overflow-hidden rounded-[16px] border p-6 transition duration-300 hover:-translate-y-0.5 hover:border-white/15"
+            style={{
+              backgroundColor: '#1a1a2e',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderTopColor: accentColors[idx],
+              borderTopWidth: '1px',
+            }}
+          >
+            <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+              <div
+                className="h-5 w-5 rounded-md border border-white/20"
+                style={{ backgroundColor: `${accentColors[idx]}22`, borderColor: `${accentColors[idx]}66` }}
+              />
+            </div>
             <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Core Module</p>
             <h3 className="mt-3 text-lg font-semibold text-[#ededed]">{title}</h3>
             <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">{copy}</p>

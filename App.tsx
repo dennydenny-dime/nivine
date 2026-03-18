@@ -443,18 +443,26 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="premium-panel rounded-2xl p-1.5">
-            <div className="flex gap-1.5 items-center overflow-x-auto md:overflow-visible scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-              {navItems.map((item) => (
-                <button
-                  key={`${item.key}-${item.label}`}
-                  onClick={item.onClick}
-                  className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-white/5 hover:text-white'} ${item.locked ? 'relative' : ''}`}
-                >
-                  {item.icon}
-                  {item.label}
-                  {item.locked && <span className="text-[10px] text-amber-300">🔒</span>}
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex gap-1.5 items-center overflow-x-auto md:overflow-visible scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                {navItems.map((item) => (
+                  <button
+                    key={`${item.key}-${item.label}`}
+                    onClick={item.onClick}
+                    className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-white/5 hover:text-white'} ${item.locked ? 'relative' : ''}`}
+                  >
+                    {item.icon}
+                    {item.label}
+                    {item.locked && <span className="text-[10px] text-amber-300">🔒</span>}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={openApp}
+                className="shrink-0 rounded-full border border-white bg-white/5 px-4 py-2 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/10 hover:shadow-[0_0_12px_rgba(255,255,255,0.2)] md:text-sm"
+              >
+                Try NODE AI
+              </button>
             </div>
           </div>
           {trialExpiredNotice && (
