@@ -181,7 +181,9 @@ const fetchLiveArticles = async (maxItems: number): Promise<NewsDataArticle[]> =
   url.searchParams.set('apikey', apiKey);
   url.searchParams.set('q', NEWS_QUERY);
   url.searchParams.set('language', 'en');
-  url.searchParams.set('size', String(Math.max(maxItems * 2, 10)));
+  // NewsData rejects oversized `size` values on this endpoint, so keep the request
+  // within the documented small-page range and trim locally after filtering.
+  url.searchParams.set('size', String(Math.min(Math.max(maxItems, 4), 10)));
 
   const response = await fetch(url.toString(), {
     method: 'GET',
