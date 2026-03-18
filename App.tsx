@@ -53,11 +53,23 @@ type NavItem = {
   locked?: boolean;
 };
 
+const getViewFromPath = (pathname: string): View => {
+  if (pathname === '/interview-intel') return View.INTERVIEW_INTEL;
+  return View.LANDING;
+};
+
+const syncPathname = (view: View) => {
+  const nextPath = view === View.INTERVIEW_INTEL ? '/interview-intel' : '/';
+  if (window.location.pathname !== nextPath) {
+    window.history.pushState({}, '', nextPath);
+  }
+};
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [showAuthBoard, setShowAuthBoard] = useState(false);
-  const [currentView, setCurrentView] = useState<View>(View.LANDING);
+  const [currentView, setCurrentView] = useState<View>(() => getViewFromPath(window.location.pathname));
   const [selectedPersona, setSelectedPersona] = useState<Persona | null>(null);
   const [conversationCategory, setConversationCategory] = useState<CallCategory>('neural');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -79,9 +91,20 @@ const App: React.FC = () => {
   const redirectToPricing = useCallback((notice: string) => {
     setTrialExpiredNotice(notice);
     window.alert(notice);
+    syncPathname(View.PRICING);
     setCurrentView(View.PRICING);
   }, []);
 
+
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentView(getViewFromPath(window.location.pathname));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     const database = getDatabase(firebaseApp);
@@ -257,6 +280,7 @@ const App: React.FC = () => {
   };
 
   const openApp = () => {
+    syncPathname(View.APP);
     setCurrentView(View.APP);
   };
 
@@ -265,33 +289,40 @@ const App: React.FC = () => {
       redirectToPricing('Quizzes are available on Premium and above plans.');
       return;
     }
+    syncPathname(View.QUIZ);
     setCurrentView(View.QUIZ);
   };
 
   const openPricing = () => {
+    syncPathname(View.PRICING);
     setCurrentView(View.PRICING);
   };
 
   const openLeaderboard = () => {
     if (!planAccess.leaderboardEnabled) {
       setTrialExpiredNotice('Leaderboard is available on Premium plans. Tap to choose a plan.');
+      syncPathname(View.PRICING);
       setCurrentView(View.PRICING);
       return;
     }
+    syncPathname(View.LEADERBOARD);
     setCurrentView(View.LEADERBOARD);
   };
 
   const openCustomCoach = () => {
     if (!planAccess.customCoachEnabled) {
       setTrialExpiredNotice('Custom Coach is available on Premium plans. Tap to choose a plan.');
+      syncPathname(View.PRICING);
       setCurrentView(View.PRICING);
       return;
     }
     if (coachingRemainingCalls !== null && coachingRemainingCalls <= 0) {
       setTrialExpiredNotice('You have reached your monthly custom coach calls limit for this plan. Tap to choose a plan.');
+      syncPathname(View.PRICING);
       setCurrentView(View.PRICING);
       return;
     }
+    syncPathname(View.CUSTOM_COACH);
     setCurrentView(View.CUSTOM_COACH);
   };
 
@@ -300,14 +331,17 @@ const App: React.FC = () => {
       setShowAuthBoard(true);
       return;
     }
+    syncPathname(View.PERSONAL_DASHBOARD);
     setCurrentView(View.PERSONAL_DASHBOARD);
   };
 
   const openInterviewIntel = () => {
+    syncPathname(View.INTERVIEW_INTEL);
     setCurrentView(View.INTERVIEW_INTEL);
   };
 
   const goBack = () => {
+    syncPathname(View.LANDING);
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
     setConversationCategory('neural');
@@ -323,6 +357,7 @@ const App: React.FC = () => {
     clearStoredSession();
     localStorage.removeItem('tm_current_user');
     setCurrentUser(null);
+    syncPathname(View.LANDING);
     setCurrentView(View.LANDING);
     setSelectedPersona(null);
     setConversationCategory('neural');
@@ -331,7 +366,7 @@ const App: React.FC = () => {
   };
 
   const navItems: NavItem[] = [
-    { key: View.LANDING, label: 'Home', onClick: () => setCurrentView(View.LANDING) },
+    { key: View.LANDING, label: 'Home', onClick: goBack },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
     { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
@@ -472,6 +507,7 @@ const App: React.FC = () => {
               .catch(() => {
                 // Keep the current tier until the next sync cycle.
               });
+            syncPathname(View.LANDING);
             setCurrentView(View.LANDING);
           }} />}
           {currentView === View.LEADERBOARD && <Leaderboard onBack={goBack} />}

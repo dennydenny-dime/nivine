@@ -1,370 +1,210 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
-type NewsItem = {
-  id: string;
+type Insight = {
+  category: string;
   title: string;
   description: string;
-  source: string;
-  publishedAt: string;
-  url: string;
-  image: string;
-  tags: string[];
+  action: string;
 };
 
-type InterviewQuestion = {
-  id: string;
-  role: 'SDE' | 'HR' | 'MBA' | 'Product';
-  category: 'Behavioral' | 'Technical' | 'HR' | 'Case Study';
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  company: string;
-  question: string;
-  year: number;
-  source: string;
-  upvotes: number;
+type ApiResponse = {
+  insights?: Insight[];
+  error?: string;
 };
 
-
-const KEYWORDS = [
-  'hiring trends',
-  'job market',
-  'tech hiring',
-  'interview process',
-  'campus placements',
-  'layoffs and hiring',
-  'AI jobs',
-  'recruitment strategy',
+const rawData = [
+  'Google is focusing more on system design interviews',
+  'Startups are reducing hiring rounds',
+  'Candidates struggle with behavioral questions',
+  'Companies prefer candidates with real project experience',
 ];
 
-const RAIL_MOTION_CONFIG = {
-  floatDurations: [7.5, 9, 10.5],
-  driftOffsets: [6, 10, 14],
-};
+const filters = ['All', 'Hiring Trends', 'Interview Questions', 'Company Insights', 'Tips & Strategies'] as const;
 
-const sampleNews: NewsItem[] = [
-  {
-    id: 'n1',
-    title: 'AI jobs surge as companies rebuild talent pipelines in 2026',
-    description: 'Top companies report increasing interview loops for AI product and platform roles after Q1 planning.',
-    source: 'Hiring Weekly',
-    publishedAt: '2026-02-24T08:00:00.000Z',
-    url: '#',
-    image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1000&q=80',
-    tags: ['AI jobs', 'tech hiring', 'recruitment strategy'],
-  },
-  {
-    id: 'n2',
-    title: 'Campus placements return stronger for software + analytics roles',
-    description: 'Universities across India and the US show improved offer ratios compared to the prior year.',
-    source: 'Campus Pulse',
-    publishedAt: '2026-02-23T12:30:00.000Z',
-    url: '#',
-    image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1000&q=80',
-    tags: ['campus placements', 'job market'],
-  },
-  {
-    id: 'n3',
-    title: 'Layoffs and hiring happen in parallel across cloud and cybersecurity',
-    description: 'Leaders cite selective hiring for high-impact teams while reducing low-priority program budgets.',
-    source: 'Market Ledger',
-    publishedAt: '2026-02-22T19:20:00.000Z',
-    url: '#',
-    image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1000&q=80',
-    tags: ['layoffs and hiring', 'hiring trends'],
-  },
-  {
-    id: 'n4',
-    title: 'Interview process redesign: fewer rounds, deeper practical tests',
-    description: 'Enterprises experiment with role simulations to cut time-to-hire and increase signal quality.',
-    source: 'Talent Ops Daily',
-    publishedAt: '2026-02-21T17:10:00.000Z',
-    url: '#',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1000&q=80',
-    tags: ['interview process', 'recruitment strategy'],
-  },
+type Filter = (typeof filters)[number];
+
+const cardAccents = [
+  'from-cyan-400/20 via-sky-500/10 to-transparent',
+  'from-violet-400/20 via-fuchsia-500/10 to-transparent',
+  'from-emerald-400/20 via-teal-500/10 to-transparent',
+  'from-amber-300/20 via-orange-500/10 to-transparent',
 ];
 
-const NEWS_API_BASE_URL = 'https://newsdata.io/api/1/latest';
-const NEWS_API_KEY = import.meta.env.VITE_NEWSDATA_API_KEY || 'pub_7036d83e247c4c828bcaf283093192a5';
+const categoryToFilter = (category: string): Filter => {
+  const normalized = category.toLowerCase();
 
-type NewsDataArticle = {
-  article_id?: string;
-  title?: string;
-  description?: string;
-  source_id?: string;
-  pubDate?: string;
-  link?: string;
-  image_url?: string;
-  keywords?: string[];
+  if (normalized.includes('trend') || normalized.includes('hiring')) return 'Hiring Trends';
+  if (normalized.includes('question') || normalized.includes('behavioral') || normalized.includes('technical')) return 'Interview Questions';
+  if (normalized.includes('company') || normalized.includes('employer')) return 'Company Insights';
+  return 'Tips & Strategies';
 };
-
-type NewsDataResponse = {
-  results?: NewsDataArticle[];
-};
-
-const sampleQuestions: InterviewQuestion[] = [
-  {
-    id: 'q1',
-    role: 'SDE',
-    category: 'Technical',
-    difficulty: 'Hard',
-    company: 'Google',
-    question: 'Design a distributed rate limiter for global traffic spikes with strict fairness guarantees.',
-    year: 2026,
-    source: 'Community verified',
-    upvotes: 341,
-  },
-  {
-    id: 'q2',
-    role: 'SDE',
-    category: 'Behavioral',
-    difficulty: 'Medium',
-    company: 'Amazon',
-    question: 'Tell me about a time you disagreed with a design decision and what changed after your pushback.',
-    year: 2025,
-    source: 'Candidate report',
-    upvotes: 277,
-  },
-  {
-    id: 'q3',
-    role: 'MBA',
-    category: 'Case Study',
-    difficulty: 'Hard',
-    company: 'McKinsey',
-    question: 'A digital lender is losing customers to fintechs. Build a 2-year retention and growth strategy.',
-    year: 2026,
-    source: 'Prep panel',
-    upvotes: 198,
-  },
-  {
-    id: 'q4',
-    role: 'HR',
-    category: 'HR',
-    difficulty: 'Easy',
-    company: 'Deloitte',
-    question: 'How do you measure hiring quality in the first 90 days of onboarding?',
-    year: 2026,
-    source: 'Recruiter share',
-    upvotes: 154,
-  },
-];
-
-
-const prettyDate = (input: string) =>
-  new Date(input).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 
 const InterviewIntelPage: React.FC = () => {
-  const [keyword, setKeyword] = useState<string>('all');
-  const [news, setNews] = useState<NewsItem[]>(sampleNews);
-  const [newsLoading, setNewsLoading] = useState<boolean>(false);
-  const [newsError, setNewsError] = useState<string>('');
-  const [roleFilter, setRoleFilter] = useState<string>('All');
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [activeFilter, setActiveFilter] = useState<Filter>('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const activeKeyword = keyword === 'all' ? 'hiring trends OR job market OR interview process' : keyword;
-    const queryParams = new URLSearchParams({
-      apikey: NEWS_API_KEY,
-      q: activeKeyword,
-      language: 'en',
-      size: '10',
-    });
     const controller = new AbortController();
 
-    const fetchNews = async () => {
+    const loadInsights = async () => {
       try {
-        setNewsLoading(true);
-        setNewsError('');
+        setLoading(true);
+        setError(null);
 
-        const response = await fetch(`${NEWS_API_BASE_URL}?${queryParams.toString()}`, {
+        const response = await fetch('/api/generate-insights', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ rawData }),
           signal: controller.signal,
         });
 
+        const payload = (await response.json()) as ApiResponse;
+
         if (!response.ok) {
-          throw new Error(`News API request failed (${response.status})`);
+          throw new Error(payload.error || 'Failed to generate interview insights.');
         }
 
-        const data = (await response.json()) as NewsDataResponse;
-        const normalizedResults = (data.results || [])
-          .filter((article) => article.title)
-          .map((article, index) => ({
-            id: article.article_id || `live-${index}`,
-            title: article.title || 'Untitled article',
-            description: article.description || 'No summary available for this article.',
-            source: article.source_id || 'NewsData',
-            publishedAt: article.pubDate || new Date().toISOString(),
-            url: article.link || '#',
-            image: article.image_url || 'https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=1000&q=80',
-            tags: article.keywords?.length ? article.keywords.slice(0, 3) : [activeKeyword],
-          }));
-
-        if (normalizedResults.length > 0) {
-          setNews(normalizedResults);
-          return;
-        }
-
-        setNews(sampleNews);
-        setNewsError('No live stories returned. Showing sample news instead.');
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setNews(sampleNews);
-        setNewsError('Could not load live news right now. Showing sample news instead.');
+        setInsights(payload.insights || []);
+      } catch (fetchError) {
+        if (controller.signal.aborted) return;
+        setError(fetchError instanceof Error ? fetchError.message : 'Unable to load interview intel right now.');
       } finally {
         if (!controller.signal.aborted) {
-          setNewsLoading(false);
+          setLoading(false);
         }
       }
     };
 
-    fetchNews();
+    loadInsights();
 
     return () => controller.abort();
-  }, [keyword]);
+  }, []);
 
-  const filteredNews = useMemo(() => {
-    if (keyword === 'all') return news;
-    return news.filter((article) => article.tags.includes(keyword));
-  }, [keyword, news]);
-
-  const filteredQuestions = useMemo(() => {
-    if (roleFilter === 'All') return sampleQuestions;
-    return sampleQuestions.filter((q) => q.role === roleFilter);
-  }, [roleFilter]);
-
-  const featuredNews = filteredNews[0];
-  const railNews = filteredNews.slice(1);
-
-  const getRailCardMotionStyle = (index: number): React.CSSProperties => {
-    const floatDuration = RAIL_MOTION_CONFIG.floatDurations[index % RAIL_MOTION_CONFIG.floatDurations.length];
-    const driftOffset = RAIL_MOTION_CONFIG.driftOffsets[index % RAIL_MOTION_CONFIG.driftOffsets.length];
-    const animationDelay = `${index * 0.45}s`;
-
-    return {
-      '--intel-rail-float-duration': `${floatDuration}s`,
-      '--intel-rail-drift-offset': `${driftOffset}px`,
-      '--intel-rail-delay': animationDelay,
-    } as React.CSSProperties;
-  };
+  const visibleInsights = useMemo(() => {
+    if (activeFilter === 'All') return insights;
+    return insights.filter((insight) => categoryToFilter(insight.category) === activeFilter);
+  }, [activeFilter, insights]);
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 p-6 md:p-8">
-        <div className="absolute -top-12 -right-8 w-40 h-40 bg-indigo-500/20 blur-3xl rounded-full" />
-        <div className="relative z-10">
-          <p className="text-xs uppercase tracking-[0.22em] text-indigo-300 mb-3">Interview Intelligence Hub</p>
-          <h1 className="text-2xl md:text-4xl font-black text-white leading-tight">Live-style Interview News + Questions</h1>
-          <p className="mt-3 text-slate-300 max-w-3xl">
-            Built for backend-first architecture: News API ingestion via CRON and a curated interview-question database served fast from your own data layer.
-          </p>
-        </div>
-      </section>
+    <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#050816] px-5 py-6 shadow-[0_30px_120px_rgba(0,0,0,0.45)] md:px-8 md:py-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_30%),radial-gradient(circle_at_top_right,rgba(129,140,248,0.14),transparent_32%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.1),transparent_36%)]" />
+      <div className="pointer-events-none absolute -left-16 top-20 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-10 top-12 h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl" />
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl font-bold">📰 Interview News</h2>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setKeyword('all')}
-              className={`px-3 py-1.5 rounded-full text-xs border ${keyword === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}
-            >
-              All
-            </button>
-            {KEYWORDS.map((k) => (
-              <button
-                key={k}
-                onClick={() => setKeyword(k)}
-                className={`px-3 py-1.5 rounded-full text-xs border ${keyword === k ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-4 space-y-1">
-          {newsLoading && <p className="text-xs text-indigo-300">Loading live stories from NewsData…</p>}
-          {newsError && <p className="text-xs text-amber-300">{newsError}</p>}
-        </div>
-
-        {featuredNews && (
-          <article className="group relative overflow-hidden rounded-2xl border border-slate-800 min-h-[300px] md:min-h-[360px] mb-5">
-            <img
-              src={featuredNews.image}
-              alt={featuredNews.title}
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
-            <div className="relative z-10 p-5 md:p-7 h-full flex flex-col justify-end gap-2">
-              <p className="text-xs uppercase tracking-[0.18em] text-red-300">Featured Story</p>
-              <h3 className="text-xl md:text-3xl font-extrabold text-white max-w-3xl">{featuredNews.title}</h3>
-              <p className="text-sm md:text-base text-slate-200 max-w-2xl">{featuredNews.description}</p>
-              <p className="text-xs text-slate-300">{featuredNews.source} • {prettyDate(featuredNews.publishedAt)}</p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {featuredNews.tags.map((tag) => (
-                  <span key={tag} className="text-[10px] px-2 py-1 rounded-full border border-slate-500/60 text-slate-100 bg-slate-900/50">{tag}</span>
-                ))}
+      <div className="relative z-10 space-y-8">
+        <section className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/5 p-6 backdrop-blur-2xl md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl space-y-4">
+              <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">
+                Premium intelligence stream
+              </span>
+              <div className="space-y-3">
+                <h1 className="text-4xl font-black tracking-tight text-white md:text-6xl">Interview Intel ⚡</h1>
+                <p className="max-w-2xl text-sm leading-7 text-slate-300 md:text-lg">
+                  Real-time insights to crack your next interview. We turn raw hiring chatter into structured, actionable prep you can scan in seconds.
+                </p>
               </div>
-              <a href={featuredNews.url} className="inline-flex items-center text-red-200 text-sm mt-1 hover:text-red-100">Read source →</a>
             </div>
-          </article>
-        )}
 
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">More Like This</h3>
-          <div className="flex gap-4 overflow-x-auto pb-2 pr-2 snap-x snap-mandatory">
-            {railNews.map((article, index) => (
-              <article
-                key={article.id}
-                style={getRailCardMotionStyle(index)}
-                className="intel-rail-card group relative min-w-[240px] sm:min-w-[280px] md:min-w-[320px] h-[180px] rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/70 snap-start transition duration-300 hover:scale-[1.03] hover:border-red-400/70"
+            <div className="grid grid-cols-2 gap-3 text-left sm:grid-cols-4 lg:w-[30rem]">
+              {[
+                { label: 'Signals', value: `${insights.length || rawData.length}` },
+                { label: 'Filters', value: '4' },
+                { label: 'Latency', value: '< 5s' },
+                { label: 'Mode', value: 'AI' },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{stat.label}</p>
+                  <p className="mt-2 text-2xl font-bold text-white">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-wrap gap-3">
+          {filters.map((filter) => {
+            const active = activeFilter === filter;
+            return (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setActiveFilter(filter)}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all duration-300 ${
+                  active
+                    ? 'border-cyan-300/50 bg-cyan-400/15 text-white shadow-[0_0_30px_rgba(34,211,238,0.18)]'
+                    : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:bg-white/10 hover:text-white'
+                }`}
               >
-                <img src={article.image} alt={article.title} className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
-                <div className="relative h-full p-4 flex flex-col justify-end">
-                  <p className="text-[11px] text-slate-300">{article.source} • {prettyDate(article.publishedAt)}</p>
-                  <h4 className="text-sm font-bold text-white leading-snug">{article.title}</h4>
-                  <a href={article.url} className="text-xs text-red-200 opacity-0 group-hover:opacity-100 transition-opacity mt-1">Open story →</a>
+                {filter}
+              </button>
+            );
+          })}
+        </section>
+
+        {loading ? (
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-2xl animate-pulse"
+              >
+                <div className="h-5 w-28 rounded-full bg-white/10" />
+                <div className="mt-5 h-7 w-3/4 rounded-xl bg-white/10" />
+                <div className="mt-4 space-y-2">
+                  <div className="h-4 rounded-full bg-white/10" />
+                  <div className="h-4 w-11/12 rounded-full bg-white/10" />
+                  <div className="h-4 w-4/5 rounded-full bg-white/10" />
+                </div>
+                <div className="mt-6 h-12 rounded-2xl bg-white/10" />
+              </div>
+            ))}
+          </section>
+        ) : error ? (
+          <section className="rounded-[1.5rem] border border-rose-500/30 bg-rose-500/10 p-6 text-rose-100 backdrop-blur-xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-rose-200">Insight stream unavailable</p>
+            <h2 className="mt-3 text-2xl font-bold text-white">We couldn’t generate Interview Intel right now.</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-rose-100/90">{error}</p>
+          </section>
+        ) : (
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {visibleInsights.map((insight, index) => (
+              <article
+                key={`${insight.title}-${index}`}
+                className="group relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-2xl transition duration-300 hover:-translate-y-1.5 hover:scale-[1.01] hover:border-cyan-300/30 hover:shadow-[0_20px_80px_rgba(6,182,212,0.18)]"
+              >
+                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${cardAccents[index % cardAccents.length]} opacity-80 transition duration-300 group-hover:opacity-100`} />
+                <div className="pointer-events-none absolute -right-10 top-8 h-24 w-24 rounded-full bg-white/10 blur-3xl opacity-0 transition duration-300 group-hover:opacity-100" />
+
+                <div className="relative space-y-5">
+                  <span className="inline-flex rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
+                    {insight.category}
+                  </span>
+
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight text-white">{insight.title}</h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-300">{insight.description}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                    <span className="font-semibold text-cyan-200">👉 Action:</span> {insight.action}
+                  </div>
                 </div>
               </article>
             ))}
-          </div>
-        </div>
-      </section>
+          </section>
+        )}
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 md:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">📚 Previously Asked Questions</h2>
-            <select
-              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-sm"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              {['All', 'SDE', 'HR', 'MBA', 'Product'].map((role) => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-3 max-h-[460px] overflow-auto pr-1">
-            {filteredQuestions.map((q) => (
-              <div key={q.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-xs text-slate-400">{q.company} • {q.role} • {q.category} • {q.year}</p>
-                <p className="text-sm md:text-base text-white mt-1">{q.question}</p>
-                <div className="flex flex-wrap gap-2 mt-2 text-xs">
-                  <span className="px-2 py-1 rounded-full bg-slate-800 text-slate-200">Difficulty: {q.difficulty}</span>
-                  <span className="px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-200">⬆ {q.upvotes}</span>
-                  <span className="px-2 py-1 rounded-full border border-slate-700 text-slate-300">{q.source}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-slate-400 mt-4">Supports both curated DB and community-submitted workflow with admin review.</p>
-      </section>
-
+        {!loading && !error && visibleInsights.length === 0 && (
+          <section className="rounded-[1.5rem] border border-white/10 bg-white/5 p-6 text-slate-200 backdrop-blur-xl">
+            No insights matched the selected filter. Try another lens.
+          </section>
+        )}
+      </div>
     </div>
   );
 };
