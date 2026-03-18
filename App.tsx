@@ -263,7 +263,11 @@ const App: React.FC = () => {
     const remainingCalls = category === 'coaching' ? coachingRemainingCalls : neuralRemainingCalls;
 
     if (remainingCalls !== null && remainingCalls <= 0) {
-      redirectToPricing(`You have reached your monthly ${category} call limit for this plan. Please upgrade to continue.`);
+      if (effectiveTier === 'free') {
+        redirectToPricing('Your free interview training sessions for this month are finished. Choose a plan to continue your interview training.');
+      } else {
+        setTrialExpiredNotice(`You have reached your monthly ${category} session limit. Access will resume with your next monthly reset.`);
+      }
       return;
     }
 
@@ -283,7 +287,7 @@ const App: React.FC = () => {
 
   const openQuiz = () => {
     if (!planAccess.quizzesEnabled) {
-      redirectToPricing('Quizzes are available on Premium and above plans.');
+      openPricing();
       return;
     }
     syncPathname(View.QUIZ);
@@ -297,9 +301,7 @@ const App: React.FC = () => {
 
   const openLeaderboard = () => {
     if (!planAccess.leaderboardEnabled) {
-      setTrialExpiredNotice('Leaderboard is available on Premium plans. Tap to choose a plan.');
-      syncPathname(View.PRICING);
-      setCurrentView(View.PRICING);
+      openPricing();
       return;
     }
     syncPathname(View.LEADERBOARD);
@@ -308,15 +310,15 @@ const App: React.FC = () => {
 
   const openCustomCoach = () => {
     if (!planAccess.customCoachEnabled) {
-      setTrialExpiredNotice('Custom Coach is available on Premium plans. Tap to choose a plan.');
-      syncPathname(View.PRICING);
-      setCurrentView(View.PRICING);
+      openPricing();
       return;
     }
     if (coachingRemainingCalls !== null && coachingRemainingCalls <= 0) {
-      setTrialExpiredNotice('You have reached your monthly custom coach calls limit for this plan. Tap to choose a plan.');
-      syncPathname(View.PRICING);
-      setCurrentView(View.PRICING);
+      if (effectiveTier === 'free') {
+        redirectToPricing('Your free interview training sessions for this month are finished. Choose a plan to continue your interview training.');
+      } else {
+        setTrialExpiredNotice('You have reached your monthly custom coach session limit. Access will resume with your next monthly reset.');
+      }
       return;
     }
     syncPathname(View.CUSTOM_COACH);
@@ -467,7 +469,6 @@ const App: React.FC = () => {
           {currentView === View.APP && (
             <MainAppPage
               onStart={(persona) => startConversation(persona, 'neural')}
-              planNotice={'Premium (Pro) is $18/month ($16/month billed yearly): 4 AI-powered mock interviews (25 minutes each), 2 custom AI coach sessions (15 minutes each), behavioral analysis, transcript, score breakdown, hiring recommendation, and PDF report export.'}
             />
           )}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={(persona) => startConversation(persona, 'coaching')} />}
