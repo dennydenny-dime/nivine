@@ -30,7 +30,8 @@ The conversation room opens a live audio session with Gemini. The app:
 - connects to Gemini live audio generation,
 - keeps the AI in character using a persona-specific system prompt,
 - plays generated voice responses back in real time,
-- stores the transcript locally when the session ends.
+- stores the transcript locally when the session ends,
+- runs a separate post-session evaluation pass that scores clarity, confidence, structure, and depth when the session is at least 3.5 minutes long.
 
 The system prompt adjusts behavior based on persona, tone, language, and difficulty level so the practice can feel supportive, formal, skeptical, or high-pressure.
 
