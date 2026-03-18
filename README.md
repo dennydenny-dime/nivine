@@ -153,6 +153,13 @@ VITE_BACKEND_API_URL=http://localhost:3000/api
 VITE_NEWSDATA_API_KEY=your_newsdata_api_key
 ```
 
+#### Required for OpenAI-powered Interview Intel
+```bash
+OPENAI_API_KEY=your_openai_api_key
+```
+
+> Keep `OPENAI_API_KEY` server-side in `.env.local` or your deployment provider's secret manager. Do not prefix it with `VITE_` unless you intentionally want it exposed to the browser bundle.
+
 #### Required for backend subscription + webhook flows
 ```bash
 FIREBASE_PROJECT_ID=your_project_id
