@@ -53,35 +53,35 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
           <SynapseLogo className="w-24 h-24 sm:w-32 sm:h-32 relative synapse-glow mb-4 transform group-hover:scale-105 transition duration-500 shadow-2xl shadow-white/5" />
         </div>
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight">
-          Master Your <span className="synapse-gradient">Communication</span>
+          Every Answer. <span className="synapse-gradient">Engineered.</span>
         </h1>
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Choose a neural training module and practice with focused scenarios in your target language.
+          Choose your interviewer and start training with AI-powered real-time feedback.
         </p>
-
-        <div className="relative inline-block w-64 mt-4">
-          <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Target Practice Language</label>
-          <div className="relative">
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full appearance-none bg-slate-900 border border-slate-700 text-white py-3 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-bold text-center"
-            >
-              {COMMON_LANGUAGES.map((lang) => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-4xl font-bold text-white text-left">Neural Training Modules</h2>
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{language} Mode</span>
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <label className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">
+              Target Practice Language
+            </label>
+            <div className="relative">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="min-w-[140px] appearance-none rounded-lg border border-white/10 bg-[#1a1a2e] py-2 pl-3 pr-9 text-sm font-medium text-white shadow-[0_10px_30px_rgba(15,23,42,0.25)] transition-all focus:outline-none focus:border-white/20 focus:ring-1 focus:ring-white/10"
+              >
+                {COMMON_LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="space-y-4">
           {PRESET_PERSONAS.map((p, idx) => {
