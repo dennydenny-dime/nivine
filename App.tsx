@@ -10,7 +10,7 @@ import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
 import { clearStoredSession, firebaseApp, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import PersonalDashboard from './components/PersonalDashboard';
-import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
+import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
 import { getDatabase, onDisconnect, onValue, push, ref, remove, serverTimestamp, set } from 'firebase/database';
@@ -81,9 +81,13 @@ const App: React.FC = () => {
   const hasFullAccess = hasFullAccessByEmail(normalizedEmail);
   const effectiveTier: SubscriptionTier = hasFullAccess ? 'team' : isAdmin ? 'elite' : subscriptionTier;
   const planAccess = getPlanAccess(effectiveTier);
-  const isNewUser = effectiveTier === 'free';
   const neuralRemainingCalls = getRemainingCalls(effectiveTier, 'neural');
   const coachingRemainingCalls = getRemainingCalls(effectiveTier, 'coaching');
+  const coachingResetHoursRemaining = getCoachingResetHoursRemaining(effectiveTier);
+
+  const freeCoachingUpgradeNotice = coachingResetHoursRemaining > 0
+    ? 'Your complimentary 7-minute Custom Coach session has been used. Your next free session will be available 24 hours after your last one started. Upgrade to Pro to continue practicing right away.'
+    : 'You have used your complimentary Custom Coach access for now. Your next free 7-minute session renews 24 hours after use. Upgrade to Pro to keep practicing without waiting.';
 
   const redirectToPricing = useCallback((notice: string) => {
     setTrialExpiredNotice(notice);
@@ -264,7 +268,9 @@ const App: React.FC = () => {
 
     if (remainingCalls !== null && remainingCalls <= 0) {
       if (effectiveTier === 'free') {
-        redirectToPricing('Your free interview training sessions for this month are finished. Choose a plan to continue your interview training.');
+        redirectToPricing(category === 'coaching'
+          ? freeCoachingUpgradeNotice
+          : 'Your free interview training sessions for this month are finished. Choose a plan to continue your interview training.');
       } else {
         setTrialExpiredNotice(`You have reached your monthly ${category} session limit. Access will resume with your next monthly reset.`);
       }
@@ -315,7 +321,7 @@ const App: React.FC = () => {
     }
     if (coachingRemainingCalls !== null && coachingRemainingCalls <= 0) {
       if (effectiveTier === 'free') {
-        redirectToPricing('Your free interview training sessions for this month are finished. Choose a plan to continue your interview training.');
+        redirectToPricing(freeCoachingUpgradeNotice);
       } else {
         setTrialExpiredNotice('You have reached your monthly custom coach session limit. Access will resume with your next monthly reset.');
       }
@@ -363,7 +369,7 @@ const App: React.FC = () => {
   const navItems: NavItem[] = [
     { key: View.LANDING, label: 'Home', onClick: goBack },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
-    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
+    { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: !planAccess.customCoachEnabled },
     {
       key: View.LEADERBOARD,
       label: 'Leaderboard',
@@ -477,6 +483,7 @@ const App: React.FC = () => {
               tier={effectiveTier}
               planAccess={planAccess}
               coachingRemainingCalls={coachingRemainingCalls}
+              coachingResetHoursRemaining={coachingResetHoursRemaining}
             />
           )}
           {currentView === View.CONVERSATION && selectedPersona && (

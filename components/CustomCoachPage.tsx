@@ -9,9 +9,16 @@ interface CustomCoachPageProps {
   tier: SubscriptionTier;
   planAccess: PlanAccess;
   coachingRemainingCalls: number | null;
+  coachingResetHoursRemaining?: number;
 }
 
-const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart, tier, planAccess, coachingRemainingCalls }) => {
+const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
+  onStart,
+  tier,
+  planAccess,
+  coachingRemainingCalls,
+  coachingResetHoursRemaining = 0,
+}) => {
   const [step, setStep] = useState(1);
   const [customDescription, setCustomDescription] = useState('');
   const [gender, setGender] = useState<Gender>('Female');
@@ -33,6 +40,12 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart, tier, planAc
 
     if (planAccess.unlimitedCustomCoaches || coachingRemainingCalls === null) {
       return 'Your plan includes custom coach access tailored to your organization setup.';
+    }
+
+    if (planAccess.coachingResetHours) {
+      return coachingRemainingCalls > 0
+        ? `1 complimentary Custom Coach session every 24 hours · ${planAccess.coachingMaxMinutesPerCall} minutes per session · Ready to use now`
+        : `1 complimentary Custom Coach session every 24 hours · ${planAccess.coachingMaxMinutesPerCall} minutes per session · Next free session unlocks 24 hours after your last one`;
     }
 
     const sessionLabel = planAccess.coachingMonthlyCallLimit === 1 ? 'session' : 'sessions';
@@ -79,6 +92,18 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({ onStart, tier, planAc
           <span className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-300/80">{tierLabel} plan access</span>
           <span>{planSummary}</span>
         </div>
+        {tier === 'free' && (
+          <div className="max-w-2xl rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-50 shadow-lg shadow-amber-500/5">
+            <p className="font-semibold">
+              Free plan users receive 1 complimentary Custom Coach session of 7 minutes every 24 hours.
+            </p>
+            <p className="mt-1 text-amber-100/90">
+              {coachingResetHoursRemaining > 0
+                ? 'Your next free session will resume 24 hours after your last session started. Upgrade to Pro to continue practicing immediately.'
+                : 'Your complimentary session is available now. Upgrade to Pro for longer sessions and uninterrupted practice.'}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl synapse-glow min-h-[500px] flex flex-col transition-all duration-500">

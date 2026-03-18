@@ -19,6 +19,7 @@ export type PlanAccess = {
   neuralMaxMinutesPerCall: number | null;
   coachingMonthlyCallLimit: number | null;
   coachingMaxMinutesPerCall: number | null;
+  coachingResetHours: number | null;
   quizzesEnabled: boolean;
   leaderboardEnabled: boolean;
   customCoachEnabled: boolean;
@@ -33,11 +34,12 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     tier: 'free',
     neuralMonthlyCallLimit: 6,
     neuralMaxMinutesPerCall: 5,
-    coachingMonthlyCallLimit: 0,
-    coachingMaxMinutesPerCall: 0,
+    coachingMonthlyCallLimit: 1,
+    coachingMaxMinutesPerCall: 7,
+    coachingResetHours: 24,
     quizzesEnabled: true,
     leaderboardEnabled: false,
-    customCoachEnabled: false,
+    customCoachEnabled: true,
     allNeuralModulesEnabled: false,
     unlimitedCustomCoaches: false,
   },
@@ -47,6 +49,7 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     neuralMaxMinutesPerCall: 25,
     coachingMonthlyCallLimit: 2,
     coachingMaxMinutesPerCall: 15,
+    coachingResetHours: null,
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
@@ -59,6 +62,7 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     neuralMaxMinutesPerCall: 25,
     coachingMonthlyCallLimit: 5,
     coachingMaxMinutesPerCall: 15,
+    coachingResetHours: null,
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
@@ -71,6 +75,7 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     neuralMaxMinutesPerCall: null,
     coachingMonthlyCallLimit: null,
     coachingMaxMinutesPerCall: 15,
+    coachingResetHours: null,
     quizzesEnabled: true,
     leaderboardEnabled: true,
     customCoachEnabled: true,
@@ -149,16 +154,17 @@ type UsagePayload = {
   month: string;
   neuralCallsUsed: number;
   coachingCallsUsed: number;
+  coachingLastUsedAt: string | null;
 };
 
 const readUsage = (): UsagePayload => {
-  const defaultUsage = { month: getUsageMonthKey(), neuralCallsUsed: 0, coachingCallsUsed: 0 };
+  const defaultUsage = { month: getUsageMonthKey(), neuralCallsUsed: 0, coachingCallsUsed: 0, coachingLastUsedAt: null };
 
   try {
     const raw = localStorage.getItem(CALL_USAGE_KEY);
     if (!raw) return defaultUsage;
 
-    const parsed = JSON.parse(raw) as UsagePayload;
+    const parsed = JSON.parse(raw) as Partial<UsagePayload>;
     if (
       !parsed ||
       typeof parsed.neuralCallsUsed !== 'number' ||
@@ -168,11 +174,21 @@ const readUsage = (): UsagePayload => {
       return defaultUsage;
     }
 
+    const coachingLastUsedAt = typeof parsed.coachingLastUsedAt === 'string' ? parsed.coachingLastUsedAt : null;
+
     if (parsed.month !== getUsageMonthKey()) {
-      return defaultUsage;
+      return {
+        ...defaultUsage,
+        coachingLastUsedAt,
+      };
     }
 
-    return parsed;
+    return {
+      month: parsed.month,
+      neuralCallsUsed: parsed.neuralCallsUsed,
+      coachingCallsUsed: parsed.coachingCallsUsed,
+      coachingLastUsedAt,
+    };
   } catch {
     return defaultUsage;
   }
@@ -180,6 +196,17 @@ const readUsage = (): UsagePayload => {
 
 const writeUsage = (usage: UsagePayload) => {
   localStorage.setItem(CALL_USAGE_KEY, JSON.stringify(usage));
+};
+
+const getHoursUntilCoachingReset = (lastUsedAt: string | null, resetHours: number): number => {
+  if (!lastUsedAt) return 0;
+
+  const lastUsedTime = new Date(lastUsedAt).getTime();
+  if (Number.isNaN(lastUsedTime)) return 0;
+
+  const resetTime = lastUsedTime + resetHours * 60 * 60 * 1000;
+  const remainingMs = resetTime - Date.now();
+  return remainingMs > 0 ? remainingMs / (60 * 60 * 1000) : 0;
 };
 
 export const getCallsUsedThisMonth = (category: CallCategory = 'neural'): number => {
@@ -191,7 +218,21 @@ export const getRemainingCalls = (tier: SubscriptionTier, category: CallCategory
   const plan = getPlanAccess(tier);
   const limit = category === 'coaching' ? plan.coachingMonthlyCallLimit : plan.neuralMonthlyCallLimit;
   if (limit === null) return null;
+
+  if (category === 'coaching' && plan.coachingResetHours) {
+    const usage = readUsage();
+    const hoursUntilReset = getHoursUntilCoachingReset(usage.coachingLastUsedAt, plan.coachingResetHours);
+    return hoursUntilReset > 0 ? 0 : limit;
+  }
+
   return Math.max(0, limit - getCallsUsedThisMonth(category));
+};
+
+export const getCoachingResetHoursRemaining = (tier: SubscriptionTier): number => {
+  const plan = getPlanAccess(tier);
+  if (!plan.coachingResetHours) return 0;
+  const usage = readUsage();
+  return getHoursUntilCoachingReset(usage.coachingLastUsedAt, plan.coachingResetHours);
 };
 
 export const consumeCall = (category: CallCategory = 'neural') => {
@@ -200,6 +241,7 @@ export const consumeCall = (category: CallCategory = 'neural') => {
     month: getUsageMonthKey(),
     neuralCallsUsed: usage.neuralCallsUsed + (category === 'neural' ? 1 : 0),
     coachingCallsUsed: usage.coachingCallsUsed + (category === 'coaching' ? 1 : 0),
+    coachingLastUsedAt: category === 'coaching' ? new Date().toISOString() : usage.coachingLastUsedAt,
   };
   writeUsage(updated);
 };
