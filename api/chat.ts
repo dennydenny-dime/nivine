@@ -1,4 +1,5 @@
 import { buildInterviewerSystem } from '../lib/interviewBehavior';
+import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
 
 type ChatHistoryItem = {
   speaker?: 'user' | 'ai' | string;
@@ -90,6 +91,40 @@ const buildPrompt = (body: any): string => {
 
   // Safe prompt injection: prepend interviewer behavior system prompt without altering Gemini call/streaming behavior.
   return [interviewerSystemPrompt, '', '---', '', basePrompt].join('\n');
+};
+
+const getInterviewBehaviorConfig = (body: any): InterviewBehaviorConfig => {
+  const persona = body?.persona || {};
+
+  const communicationHardness =
+    typeof body?.communicationHardness === 'number'
+      ? body.communicationHardness
+      : typeof persona?.difficultyLevel === 'number'
+      ? persona.difficultyLevel
+      : undefined;
+
+  return {
+    personaDescription:
+      typeof body?.personaDescription === 'string'
+        ? body.personaDescription
+        : typeof persona?.role === 'string'
+        ? persona.role
+        : undefined,
+    personaName:
+      typeof body?.personaName === 'string'
+        ? body.personaName
+        : typeof persona?.name === 'string'
+        ? persona.name
+        : undefined,
+    primaryMood:
+      typeof body?.primaryMood === 'string'
+        ? body.primaryMood
+        : typeof persona?.mood === 'string'
+        ? persona.mood
+        : undefined,
+    communicationHardness,
+    voiceType: typeof body?.voiceType === 'string' ? body.voiceType : undefined,
+  };
 };
 
 const extractTextFromChunk = (chunk: GeminiChunk): string => {
@@ -228,7 +263,8 @@ export default async function handler(req: any, res: any) {
   const streamMode = req.query?.stream === '1' || req.body?.stream === true;
 
   try {
-    const prompt = buildPrompt(req.body);
+    const behaviorSystem = buildInterviewerSystem(getInterviewBehaviorConfig(req.body));
+    const prompt = `${behaviorSystem}\n\n${buildPrompt(req.body)}`;
 
     if (streamMode) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
