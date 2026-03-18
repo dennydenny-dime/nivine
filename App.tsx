@@ -79,7 +79,8 @@ const App: React.FC = () => {
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
   const isAdmin = isAdminEmail(normalizedEmail);
   const hasFullAccess = hasFullAccessByEmail(normalizedEmail);
-  const effectiveTier: SubscriptionTier = hasFullAccess ? 'team' : isAdmin ? 'elite' : subscriptionTier;
+  const hasUnlimitedAccess = isAdmin || hasFullAccess;
+  const effectiveTier: SubscriptionTier = hasUnlimitedAccess ? 'team' : subscriptionTier;
   const planAccess = getPlanAccess(effectiveTier);
   const neuralRemainingCalls = getRemainingCalls(effectiveTier, 'neural');
   const coachingRemainingCalls = getRemainingCalls(effectiveTier, 'coaching');
