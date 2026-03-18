@@ -484,6 +484,7 @@ const App: React.FC = () => {
               planAccess={planAccess}
               coachingRemainingCalls={coachingRemainingCalls}
               coachingResetHoursRemaining={coachingResetHoursRemaining}
+              showPlanAccess={!isAdmin}
             />
           )}
           {currentView === View.CONVERSATION && selectedPersona && (
