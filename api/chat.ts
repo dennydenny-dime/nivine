@@ -1,4 +1,4 @@
-import { buildInterviewerSystem } from '../lib/interviewBehavior';
+import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, type PastInterviewResult } from '../lib/candidateMemory';
 import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
 
 type ChatHistoryItem = {
@@ -53,19 +53,8 @@ const buildPrompt = (body: any): string => {
     : [];
 
   const history = toHistoryText(body?.history);
-
-  const interviewerSystemPrompt = buildInterviewerSystem({
-    personaDescription: typeof persona?.role === 'string' ? persona.role : body?.personaDescription,
-    personaName: typeof persona?.name === 'string' ? persona.name : body?.personaName,
-    primaryMood: typeof persona?.mood === 'string' ? persona.mood : body?.primaryMood,
-    communicationHardness:
-      typeof body?.communicationHardness === 'number'
-        ? body.communicationHardness
-        : typeof persona?.difficultyLevel === 'number'
-          ? persona.difficultyLevel
-          : undefined,
-    voiceType: body?.voiceType,
-  });
+  const pastResults = Array.isArray(body?.pastResults) ? body.pastResults as PastInterviewResult[] : [];
+  const candidateMemory = buildCandidateMemoryPrompt(buildCandidateMemoryProfile(pastResults));
 
   const basePrompt = [
     'You are an elite communication coach in a live spoken practice simulation.',
@@ -84,13 +73,13 @@ const buildPrompt = (body: any): string => {
     '',
     roleDirectives.length > 0 ? `Role directives:\n${roleDirectives.map((d) => `- ${d}`).join('\n')}` : 'Role directives: none',
     '',
+    candidateMemory ? `${candidateMemory}\n` : '',
     `Conversation history:\n${history}`,
     '',
     `Latest user transcript: ${transcript}`,
   ].join('\n');
 
-  // Safe prompt injection: prepend interviewer behavior system prompt without altering Gemini call/streaming behavior.
-  return [interviewerSystemPrompt, '', '---', '', basePrompt].join('\n');
+  return basePrompt;
 };
 
 const getInterviewBehaviorConfig = (body: any): InterviewBehaviorConfig => {
