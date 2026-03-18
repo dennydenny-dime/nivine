@@ -10,6 +10,7 @@ type Insight = {
 type ApiResponse = {
   insights?: Insight[];
   error?: string;
+  notice?: string;
 };
 
 const rawData = [
@@ -44,6 +45,7 @@ const InterviewIntelPage: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -52,6 +54,7 @@ const InterviewIntelPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        setNotice(null);
 
         const response = await fetch('/api/generate-insights', {
           method: 'POST',
@@ -69,6 +72,7 @@ const InterviewIntelPage: React.FC = () => {
         }
 
         setInsights(payload.insights || []);
+        setNotice(payload.notice || null);
       } catch (fetchError) {
         if (controller.signal.aborted) return;
         setError(fetchError instanceof Error ? fetchError.message : 'Unable to load interview intel right now.');
@@ -115,7 +119,7 @@ const InterviewIntelPage: React.FC = () => {
                 { label: 'Signals', value: `${insights.length || rawData.length}` },
                 { label: 'Filters', value: '4' },
                 { label: 'Latency', value: '< 5s' },
-                { label: 'Mode', value: 'AI' },
+                { label: 'Mode', value: notice ? 'Fallback' : 'AI' },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                   <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{stat.label}</p>
@@ -125,6 +129,13 @@ const InterviewIntelPage: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {notice && (
+          <section className="rounded-[1.5rem] border border-amber-400/30 bg-amber-400/10 p-5 text-amber-50 backdrop-blur-xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amber-200">Live AI temporarily unavailable</p>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-amber-50/90">{notice}</p>
+          </section>
+        )}
 
         <section className="flex flex-wrap gap-3">
           {filters.map((filter) => {
