@@ -10,6 +10,7 @@ interface CustomCoachPageProps {
   planAccess: PlanAccess;
   coachingRemainingCalls: number | null;
   coachingResetHoursRemaining?: number;
+  showPlanAccess?: boolean;
 }
 
 const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
@@ -18,6 +19,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
   planAccess,
   coachingRemainingCalls,
   coachingResetHoursRemaining = 0,
+  showPlanAccess = true,
 }) => {
   const [step, setStep] = useState(1);
   const [customDescription, setCustomDescription] = useState('');
@@ -88,10 +90,12 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
         <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
           Configure personality, tone, language, and challenge level in a dedicated custom coach workflow built for focused interview practice.
         </p>
-        <div className="inline-flex flex-col gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/5">
-          <span className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-300/80">{tierLabel} plan access</span>
-          <span>{planSummary}</span>
-        </div>
+        {showPlanAccess && (
+          <div className="inline-flex flex-col gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/5">
+            <span className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-300/80">{tierLabel} plan access</span>
+            <span>{planSummary}</span>
+          </div>
+        )}
         {tier === 'free' && (
           <div className="max-w-2xl rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-50 shadow-lg shadow-amber-500/5">
             <p className="font-semibold">
