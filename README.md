@@ -14,13 +14,12 @@ Users can:
 - create custom coaching experiences,
 - complete AI-generated daily communication quizzes,
 - review saved session history and progress,
-- monitor interview-related news and question trends,
 - unlock additional limits and tools through subscription plans.
 
 ## How it works
 
 ### 1. Landing and entry
-The landing page introduces the product as an interview intelligence console and routes the user into the main training experience.
+The landing page introduces the product and routes the user into the main training experience.
 
 ### 2. Choose a training mode
 Inside the app, users select a practice language and launch a preset persona-based training module. Personas represent different interview or business communication styles such as recruiters, investors, managers, and strict evaluators.
@@ -69,10 +68,6 @@ Authentication and subscription syncing are used to personalize access. User sta
 - Review prior sessions.
 - Track quiz and speaking activity over time.
 - Persist user-specific data locally for quick access.
-
-### Interview Intel
-- Interview-oriented live news feed powered by NewsData with OpenAI reasoning on top.
-- Role, topic, and mode filtering to surface hiring trends, likely interview questions, company signals, and prep moves.
 
 ### Leaderboard and gamification
 - Quiz participation and XP-based leaderboard behavior.
@@ -150,16 +145,7 @@ GEMINI_API_KEY=your_gemini_api_key
 VITE_FIREBASE_API_KEY=your_firebase_web_api_key
 VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
 VITE_BACKEND_API_URL=http://localhost:3000/api
-VITE_NEWSDATA_API_KEY=your_newsdata_api_key
 ```
-
-#### Required for live Interview Intel
-```bash
-NEWSDATA_API_KEY=your_newsdata_api_key
-OPENAI_API_KEY=your_openai_api_key
-```
-
-You can also use `VITE_NEWSDATA_API_KEY`, but keeping `NEWSDATA_API_KEY` server-side is safer because it avoids exposing the key in the browser bundle. `OPENAI_API_KEY` lets the server transform raw headlines into candidate-focused reasoning such as hiring trends, likely interview questions, company signals, and prep recommendations.
 
 #### Required for backend subscription + webhook flows
 ```bash
@@ -186,9 +172,6 @@ npm run build
 
 ### `POST /api/chat`
 Generates a persona-aware coaching response from transcript input and can stream tokens back to the frontend.
-
-### `POST /api/generate-insights`
-Fetches live interview-related headlines from NewsData, then uses OpenAI to filter and reason over them into structured insights for the Interview Intel page.
 
 ### `POST /api/subscription`
 - `action: "get"` reads the current subscription tier.

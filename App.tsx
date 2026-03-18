@@ -10,7 +10,6 @@ import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
 import { clearStoredSession, firebaseApp, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import PersonalDashboard from './components/PersonalDashboard';
-import InterviewIntelPage from './components/InterviewIntelPage';
 import { CallCategory, SubscriptionTier, consumeCall, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
@@ -41,7 +40,6 @@ enum View {
   LEADERBOARD = 'leaderboard',
   CUSTOM_COACH = 'custom_coach',
   PERSONAL_DASHBOARD = 'personal_dashboard',
-  INTERVIEW_INTEL = 'interview_intel',
 };
 
 type NavItem = {
@@ -53,13 +51,12 @@ type NavItem = {
   locked?: boolean;
 };
 
-const getViewFromPath = (pathname: string): View => {
-  if (pathname === '/interview-intel') return View.INTERVIEW_INTEL;
+const getViewFromPath = (_pathname: string): View => {
   return View.LANDING;
 };
 
-const syncPathname = (view: View) => {
-  const nextPath = view === View.INTERVIEW_INTEL ? '/interview-intel' : '/';
+const syncPathname = (_view: View) => {
+  const nextPath = '/';
   if (window.location.pathname !== nextPath) {
     window.history.pushState({}, '', nextPath);
   }
@@ -335,10 +332,6 @@ const App: React.FC = () => {
     setCurrentView(View.PERSONAL_DASHBOARD);
   };
 
-  const openInterviewIntel = () => {
-    syncPathname(View.INTERVIEW_INTEL);
-    setCurrentView(View.INTERVIEW_INTEL);
-  };
 
   const goBack = () => {
     syncPathname(View.LANDING);
@@ -368,7 +361,6 @@ const App: React.FC = () => {
   const navItems: NavItem[] = [
     { key: View.LANDING, label: 'Home', onClick: goBack },
     { key: View.APP, label: 'Neural Training Modules', onClick: openApp },
-    { key: View.INTERVIEW_INTEL, label: 'Interview Intel', onClick: openInterviewIntel },
     { key: View.CUSTOM_COACH, label: 'Custom Coach', onClick: openCustomCoach, locked: isNewUser },
     {
       key: View.LEADERBOARD,
@@ -478,7 +470,6 @@ const App: React.FC = () => {
               planNotice={'Premium (Pro) is $18/month ($16/month billed yearly): 4 AI-powered mock interviews (25 minutes each), 2 custom AI coach sessions (15 minutes each), behavioral analysis, transcript, score breakdown, hiring recommendation, and PDF report export.'}
             />
           )}
-          {currentView === View.INTERVIEW_INTEL && <InterviewIntelPage />}
           {currentView === View.CUSTOM_COACH && <CustomCoachPage onStart={(persona) => startConversation(persona, 'coaching')} />}
           {currentView === View.CONVERSATION && selectedPersona && (
             <ConversationRoom
