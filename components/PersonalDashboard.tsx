@@ -36,6 +36,7 @@ const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUser, onCo
   const userHistory: ConversationHistoryItem[] = getUserConversationHistory(currentUser.id);
   const latestSession = userHistory[0];
   const score = latestSession?.scoreCard;
+  const evaluation = score?.evaluation;
 
   const confidenceScore = score?.confidenceScore ?? 0;
   const clarityScore = score?.clarityScore ?? 0;
@@ -44,7 +45,9 @@ const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUser, onCo
   const speakingSpeed = latestSession
     ? Math.round((score?.totalWords ?? 0) / Math.max(1, (latestSession.transcriptions.at(-1)?.timestamp ?? Date.now()) - latestSession.transcriptions[0].timestamp) * 60000)
     : 0;
-  const structureScore = Math.max(0, Math.min(100, Math.round((score?.concisenessScore ?? 0) * 9.5)));
+  const structureScore = evaluation?.eligible
+    ? evaluation.scores.structure * 10
+    : Math.max(0, Math.min(100, Math.round((score?.concisenessScore ?? 0) * 9.5)));
 
   return (
     <section className="premium-panel rounded-[2rem] p-6 sm:p-8">
@@ -108,6 +111,46 @@ const PersonalDashboard: React.FC<PersonalDashboardProps> = ({ currentUser, onCo
           ? `${new Date(latestSession.date).toLocaleDateString()} · ${latestSession.persona.name} · overall ${score?.overallScore ?? '--'} · clarity ${clarityScore} · confidence ${confidenceScore}`
           : 'No session data yet. Complete one AI interview to populate your profile.'}
       </div>
+
+      {evaluation && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Post-session interview evaluation</p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+              {evaluation.eligible ? evaluation.summary : evaluation.message}
+            </p>
+            {evaluation.eligible && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">Strengths</p>
+                  <ul className="mt-2 space-y-2 text-sm text-slate-300">
+                    {evaluation.strengths.map((item) => <li key={item}>• {item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">Improvement suggestions</p>
+                  <ul className="mt-2 space-y-2 text-sm text-slate-300">
+                    {evaluation.improvement_suggestions.map((item) => <li key={item}>• {item}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {evaluation.eligible && (
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Interview rubric</p>
+              <div className="mt-3 space-y-3 text-sm text-slate-300">
+                <div className="flex items-center justify-between"><span>Clarity</span><span>{evaluation.scores.clarity}/10</span></div>
+                <div className="flex items-center justify-between"><span>Confidence</span><span>{evaluation.scores.confidence}/10</span></div>
+                <div className="flex items-center justify-between"><span>Structure</span><span>{evaluation.scores.structure}/10</span></div>
+                <div className="flex items-center justify-between"><span>Depth</span><span>{evaluation.scores.depth}/10</span></div>
+                <div className="border-t border-white/10 pt-3 flex items-center justify-between font-semibold text-slate-100"><span>Overall</span><span>{evaluation.scores.overall}/10</span></div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div className="rounded-xl border border-white/10 bg-black/20 p-3"><p className="text-xs text-slate-500">Total XP</p><p className="mt-1 text-xl font-semibold"><AnimatedMetric value={userStats.totalXP} /></p></div>
