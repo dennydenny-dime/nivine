@@ -206,16 +206,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
         </section>
 
-        <section className="neural-sphere-shell premium-noise relative overflow-hidden rounded-[28px] border border-white/10 px-4 py-10 sm:px-6 lg:px-10 lg:py-14">
+        <section className="relative overflow-hidden px-0 py-6 sm:py-8 lg:py-10">
           <div className="pointer-events-none absolute inset-0">
             <div className="neural-sphere-glow neural-sphere-glow-left" />
             <div className="neural-sphere-glow neural-sphere-glow-right" />
           </div>
-          <div className="relative flex flex-col items-center justify-center gap-6">
-            <div className="text-center">
-              <p className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Neural Response Map</p>
-              <h2 className="mt-4 text-2xl font-semibold text-white sm:text-3xl">Live cognitive network activity.</h2>
-            </div>
+          <div className="relative flex items-center justify-center">
             <div className="neural-sphere-frame">
               <svg viewBox="0 0 640 640" className="neural-sphere-svg" aria-hidden="true">
                 <defs>
