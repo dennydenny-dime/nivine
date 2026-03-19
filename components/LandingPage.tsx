@@ -4,15 +4,6 @@ import BackgroundOrb from './BackgroundOrb';
 interface LandingPageProps {
   onEnterApp: () => void;
 }
-
-const systems = [
-  ['Cognitive Load Mapping', 'Detects latency, verbal drag, and thought compression in live responses.'],
-  ['Pressure Signal Tracking', 'Models composure drift and confidence oscillation under hostile questioning.'],
-  ['Narrative Precision Index', 'Measures structure discipline, relevance density, and result clarity.'],
-];
-
-const accentColors = ['#2563eb', '#7c3aed', '#22c55e'];
-
 const metrics = [
   { label: 'Clarity Score', value: '87%', width: '87%', color: '#22c55e' },
   { label: 'Confidence', value: '74%', width: '74%', color: '#60a5fa' },
