@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -26,10 +26,50 @@ const stats = [
 ];
 
 
+
+const neuralSphereNodes = Array.from({ length: 132 }, (_, index) => {
+  const total = 132;
+  const y = 1 - (index / (total - 1)) * 2;
+  const radius = Math.sqrt(Math.max(0, 1 - y * y));
+  const theta = Math.PI * (3 - Math.sqrt(5)) * index;
+  const x = Math.cos(theta) * radius;
+  const z = Math.sin(theta) * radius;
+  const depthScale = 0.56 + ((z + 1) / 2) * 0.52;
+
+  return {
+    id: index,
+    x,
+    y,
+    z,
+    px: x * 248,
+    py: y * 248,
+    depthScale,
+    size: 1.8 + ((z + 1) / 2) * 3.4,
+  };
+});
+
+const neuralSphereEdges = neuralSphereNodes.flatMap((node, index) => {
+  const candidateEdges = neuralSphereNodes
+    .slice(index + 1)
+    .map((target) => {
+      const dx = node.x - target.x;
+      const dy = node.y - target.y;
+      const dz = node.z - target.z;
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      return { from: node, to: target, distance };
+    })
+    .filter(({ distance }) => distance < 0.33)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 5);
+
+  return candidateEdges;
+});
+
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const rotatingWords = ['Think.', 'Speak.', 'Interview.'];
   const [activeWordIndex, setActiveWordIndex] = useState(0);
   const [isWordVisible, setIsWordVisible] = useState(true);
+  const neuralSphere = useMemo(() => ({ nodes: neuralSphereNodes, edges: neuralSphereEdges }), []);
 
   useEffect(() => {
     const cycleTimer = window.setInterval(() => {
@@ -162,6 +202,73 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="neural-sphere-shell premium-noise relative overflow-hidden rounded-[28px] border border-white/10 px-4 py-10 sm:px-6 lg:px-10 lg:py-14">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="neural-sphere-glow neural-sphere-glow-left" />
+            <div className="neural-sphere-glow neural-sphere-glow-right" />
+          </div>
+          <div className="relative flex flex-col items-center justify-center gap-6">
+            <div className="text-center">
+              <p className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Neural Response Map</p>
+              <h2 className="mt-4 text-2xl font-semibold text-white sm:text-3xl">Live cognitive network activity.</h2>
+            </div>
+            <div className="neural-sphere-frame">
+              <svg viewBox="0 0 640 640" className="neural-sphere-svg" aria-hidden="true">
+                <defs>
+                  <radialGradient id="neuralSphereCore" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="rgba(134, 183, 255, 0.3)" />
+                    <stop offset="65%" stopColor="rgba(37, 99, 235, 0.08)" />
+                    <stop offset="100%" stopColor="rgba(37, 99, 235, 0)" />
+                  </radialGradient>
+                  <filter id="neuralSphereGlow" x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur stdDeviation="3.2" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <circle cx="320" cy="320" r="214" fill="url(#neuralSphereCore)" />
+
+                {neuralSphere.edges.map((edge, edgeIndex) => {
+                  const opacity = Math.min(edge.from.depthScale, edge.to.depthScale) * 0.34;
+                  return (
+                    <line
+                      key={`${edge.from.id}-${edge.to.id}-${edgeIndex}`}
+                      x1={320 + edge.from.px}
+                      y1={320 + edge.from.py}
+                      x2={320 + edge.to.px}
+                      y2={320 + edge.to.py}
+                      className="neural-sphere-link"
+                      style={{ opacity }}
+                    />
+                  );
+                })}
+
+                {neuralSphere.nodes.map((node) => (
+                  <g key={node.id} filter="url(#neuralSphereGlow)">
+                    <circle
+                      cx={320 + node.px}
+                      cy={320 + node.py}
+                      r={node.size * 1.9}
+                      className="neural-sphere-node-glow"
+                      style={{ opacity: node.depthScale * 0.36 }}
+                    />
+                    <circle
+                      cx={320 + node.px}
+                      cy={320 + node.py}
+                      r={node.size}
+                      className="neural-sphere-node"
+                      style={{ opacity: 0.58 + node.depthScale * 0.42 }}
+                    />
+                  </g>
+                ))}
+              </svg>
             </div>
           </div>
         </section>
