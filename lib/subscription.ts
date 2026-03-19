@@ -38,7 +38,7 @@ const PLAN_ACCESS: Record<SubscriptionTier, PlanAccess> = {
     coachingMaxMinutesPerCall: 7,
     coachingResetHours: 24,
     quizzesEnabled: true,
-    leaderboardEnabled: false,
+    leaderboardEnabled: true,
     customCoachEnabled: true,
     allNeuralModulesEnabled: false,
     unlimitedCustomCoaches: false,
