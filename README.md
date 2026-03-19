@@ -87,7 +87,7 @@ Authentication and subscription syncing are used to personalize access. User sta
 ## Subscription model
 
 The app includes four plan tiers:
-- **Free**: limited neural interview calls and quiz access.
+- **Free**: limited neural interview calls with quiz and leaderboard access.
 - **Premium**: more calls, coaching access, leaderboard, and custom coach support.
 - **Elite**: higher monthly limits and longer coaching sessions.
 - **Team**: highest limits with broader access and unlimited custom coach creation.
