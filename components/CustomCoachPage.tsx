@@ -238,7 +238,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
                   <div className="bg-slate-950/50 border border-slate-800/50 p-4 rounded-2xl mt-4">
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center text-[10px]">✨</span>
-                      <span><b>Synapse Ready:</b> The coach will automatically detect and respond to any language shifts during your session.</span>
+                      <span><b>Synapse Ready:</b> The coach stays in the selected language and only switches when you explicitly ask it to.</span>
                     </div>
                   </div>
 
