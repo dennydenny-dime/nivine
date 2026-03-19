@@ -72,8 +72,7 @@ const plans: Plan[] = [
     razorpayDescription: 'Node AI Pro subscription',
     fallbackHref: 'mailto:sales@nodeai.app?subject=Start%20Pro%20Plan',
     features: [
-      { text: '4 AI-powered mock interviews (25 minutes each)', icon: 'spark' },
-      { text: 'Custom AI Coach access (2 sessions of 15 minutes each)', icon: 'coach' },
+      { text: '4 Custom AI Coach interviews (25 minutes each)', icon: 'coach' },
       { text: 'Behavioral & communication analysis', icon: 'chart' },
       { text: 'Interview transcript', icon: 'doc' },
       { text: 'Performance score breakdown', icon: 'chart' },
@@ -93,8 +92,7 @@ const plans: Plan[] = [
     razorpayDescription: 'Node AI Elite subscription',
     fallbackHref: 'mailto:sales@nodeai.app?subject=Go%20Elite%20Plan',
     features: [
-      { text: '8 AI-powered mock interviews (25 minutes each)', icon: 'spark' },
-      { text: 'Custom AI Coach access (5 sessions of 15 minutes each)', icon: 'coach' },
+      { text: '8 Custom AI Coach interviews (25 minutes each)', icon: 'coach' },
       { text: 'Advanced behavioral analysis', icon: 'chart' },
       { text: 'Detailed recruiter-style evaluation', icon: 'doc' },
       { text: 'Performance insights dashboard', icon: 'chart' },
