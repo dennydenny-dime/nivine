@@ -18,6 +18,14 @@ const metrics = [
   { label: 'Response Speed', value: 'Fast', width: '92%', color: '#a78bfa' },
 ];
 
+
+const stats = [
+  { value: '10,000+', label: 'Candidates Trained' },
+  { value: '95%', label: 'Confidence Improvement' },
+  { value: '500+', label: 'Interview Scenarios' },
+];
+
+
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const rotatingWords = ['Think.', 'Speak.', 'Interview.'];
   const [activeWordIndex, setActiveWordIndex] = useState(0);
@@ -157,6 +165,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             </div>
           </div>
         </section>
+
+        <section
+          className="w-screen border-y px-6 py-[60px]"
+          style={{
+            background: '#0f0f1a',
+            borderColor: 'rgba(255,255,255,0.06)',
+            marginLeft: 'calc(50% - 50vw)',
+            marginRight: 'calc(50% - 50vw)',
+          }}
+        >
+          <div className="mx-auto flex max-w-6xl flex-col divide-y divide-white/10 md:flex-row md:divide-x md:divide-y-0">
+            {stats.map((stat) => (
+              <div key={stat.label} className="flex-1 px-6 py-8 text-center md:py-0">
+                <div className="text-[32px] font-bold leading-none text-white">{stat.value}</div>
+                <div className="mt-3 text-[14px] text-[#8a8f98]">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
 
         <section className="grid gap-4 md:grid-cols-3">
           {systems.map(([title, copy], idx) => (
