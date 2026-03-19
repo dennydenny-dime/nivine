@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Persona, Gender, Mood } from '../types';
 import { COMMON_LANGUAGES, MOODS, getSystemApiKey } from '../constants';
-import { SynapseLogo } from '../App';
 import { PlanAccess, SubscriptionTier } from '../lib/subscription';
 
 interface CustomCoachPageProps {
@@ -80,10 +79,6 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
   return (
     <div className="animate-in fade-in duration-1000">
       <div className="text-center mb-12 space-y-6 flex flex-col items-center">
-        <div className="relative group">
-          <div className="absolute -inset-4 bg-white/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
-          <SynapseLogo className="w-24 h-24 sm:w-32 sm:h-32 relative synapse-glow mb-4 transform group-hover:scale-105 transition duration-500 shadow-2xl shadow-white/5" />
-        </div>
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight">
           Build Your <span className="synapse-gradient">Custom Coach</span>
         </h1>
@@ -91,7 +86,12 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
           Configure personality, tone, language, and challenge level in a dedicated custom coach workflow built for focused interview practice.
         </p>
         {showPlanAccess && (
-          <div className="inline-flex flex-col gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm text-cyan-100 shadow-lg shadow-cyan-500/5">
+          <div className="inline-flex flex-col gap-2 rounded-2xl px-5 py-3 text-sm text-cyan-100 shadow-lg"
+            style={{
+              background: '#1a0a2e',
+              border: '1px solid rgba(124,58,237,0.4)',
+              boxShadow: '0 10px 30px rgba(124,58,237,0.08)',
+            }}>
             <span className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-300/80">{tierLabel} plan access</span>
             <span>{planSummary}</span>
           </div>
