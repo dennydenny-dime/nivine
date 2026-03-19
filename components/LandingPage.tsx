@@ -16,6 +16,14 @@ const stats = [
   { value: '500+', label: 'Interview Scenarios' },
 ];
 
+const systems: Array<[string, string]> = [
+  ['Neural Interviews', 'Run realistic mock interviews with specialized AI interviewers tailored to different roles and tones.'],
+  ['Custom Coach', 'Get focused communication drills, coaching prompts, and targeted speaking feedback between interviews.'],
+  ['Performance Tracking', 'Review your progress with measurable signals so you can improve confidence, pacing, and clarity over time.'],
+];
+
+const accentColors = ['#5f77ff', '#8b5cf6', '#ec4899'];
+
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const rotatingWords = ['Think.', 'Speak.', 'Interview.'];
   const [activeWordIndex, setActiveWordIndex] = useState(0);
