@@ -453,8 +453,17 @@ const App: React.FC = () => {
                     className={`px-3 py-2 md:px-4 rounded-xl text-xs md:text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${currentView === item.key ? `bg-indigo-600 text-white ${item.className ?? ''}` : 'text-slate-300 hover:bg-white/5 hover:text-white'} ${item.locked ? 'relative' : ''}`}
                   >
                     {item.icon}
-                    {item.label}
-                    {item.locked && <span className="text-[10px] text-amber-300">🔒</span>}
+                    <span className="inline-flex items-start gap-1.5">
+                      <span>{item.label}</span>
+                      {item.locked && (
+                        <span
+                          className="relative -top-1 inline-flex rounded-full bg-[#7c3aed] px-1.5 py-0.5 text-[10px] leading-none text-white"
+                          aria-hidden="true"
+                        >
+                          Pro
+                        </span>
+                      )}
+                    </span>
                   </button>
                 ))}
               </div>
