@@ -4,29 +4,11 @@ import BackgroundOrb from './BackgroundOrb';
 interface LandingPageProps {
   onEnterApp: () => void;
 }
-
-const systems = [
-  ['Cognitive Load Mapping', 'Detects latency, verbal drag, and thought compression in live responses.'],
-  ['Pressure Signal Tracking', 'Models composure drift and confidence oscillation under hostile questioning.'],
-  ['Narrative Precision Index', 'Measures structure discipline, relevance density, and result clarity.'],
-];
-
-const accentColors = ['#2563eb', '#7c3aed', '#22c55e'];
-
 const metrics = [
   { label: 'Clarity Score', value: '87%', width: '87%', color: '#22c55e' },
   { label: 'Confidence', value: '74%', width: '74%', color: '#60a5fa' },
   { label: 'Response Speed', value: 'Fast', width: '92%', color: '#a78bfa' },
 ];
-
-
-const stats = [
-  { value: '10,000+', label: 'Candidates Trained' },
-  { value: '95%', label: 'Confidence Improvement' },
-  { value: '500+', label: 'Interview Scenarios' },
-];
-
-
 
 
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
@@ -170,51 +152,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
         </section>
 
-
-        <section
-          className="w-screen border-y px-6 py-[60px]"
-          style={{
-            background: '#0f0f1a',
-            borderColor: 'rgba(255,255,255,0.06)',
-            marginLeft: 'calc(50% - 50vw)',
-            marginRight: 'calc(50% - 50vw)',
-          }}
-        >
-          <div className="mx-auto flex max-w-6xl flex-col divide-y divide-white/10 md:flex-row md:divide-x md:divide-y-0">
-            {stats.map((stat) => (
-              <div key={stat.label} className="flex-1 px-6 py-8 text-center md:py-0">
-                <div className="text-[32px] font-bold leading-none text-white">{stat.value}</div>
-                <div className="mt-3 text-[14px] text-[#8a8f98]">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-
-        <section className="grid gap-4 md:grid-cols-3">
-          {systems.map(([title, copy], idx) => (
-            <article
-              key={title}
-              className="relative overflow-hidden rounded-[16px] border p-6 transition duration-300 hover:-translate-y-0.5 hover:border-white/15"
-              style={{
-                backgroundColor: '#1a1a2e',
-                borderColor: 'rgba(255,255,255,0.08)',
-                borderTopColor: accentColors[idx],
-                borderTopWidth: '1px',
-              }}
-            >
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-                <div
-                  className="h-5 w-5 rounded-md border border-white/20"
-                  style={{ backgroundColor: `${accentColors[idx]}22`, borderColor: `${accentColors[idx]}66` }}
-                />
-              </div>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Core Module</p>
-              <h3 className="mt-3 text-lg font-semibold text-[#ededed]">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">{copy}</p>
-            </article>
-          ))}
-        </section>
       </div>
     </>
   );
