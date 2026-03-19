@@ -78,26 +78,54 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
 
   return (
     <div className="animate-in fade-in duration-1000">
+      <style>{`
+        .custom-coach-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 10px;
+          border-radius: 9999px;
+          background: linear-gradient(90deg, rgba(99,102,241,0.95), rgba(168,85,247,0.95));
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 30px rgba(99,102,241,0.18);
+        }
+        .custom-coach-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 22px;
+          height: 22px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg, #ffffff, #c7d2fe);
+          border: 2px solid rgba(99,102,241,0.95);
+          box-shadow: 0 0 0 6px rgba(99,102,241,0.15), 0 0 28px rgba(129,140,248,0.65);
+          cursor: pointer;
+        }
+        .custom-coach-slider::-moz-range-thumb {
+          width: 22px;
+          height: 22px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg, #ffffff, #c7d2fe);
+          border: 2px solid rgba(99,102,241,0.95);
+          box-shadow: 0 0 0 6px rgba(99,102,241,0.15), 0 0 28px rgba(129,140,248,0.65);
+          cursor: pointer;
+        }
+      `}</style>
       <div className="text-center mb-12 space-y-6 flex flex-col items-center">
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight">
-          Build Your <span className="synapse-gradient">Custom Coach</span>
-        </h1>
-        <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Configure personality, tone, language, and challenge level in a dedicated custom coach workflow built for focused interview practice.
+        <div className="space-y-4">
+          <p className="text-xs uppercase tracking-[0.35em] text-indigo-400">Custom Coach Studio</p>
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">
+            Build Your <span className="synapse-gradient">Custom Coach</span>
+          </h1>
+        </div>
+        <p className="text-lg md:text-xl text-white/60 max-w-3xl mx-auto leading-relaxed">
+          Shape the personality, communication style, and challenge level of a dedicated AI coach in a premium workspace designed for focused interview practice.
         </p>
         {showPlanAccess && (
-          <div className="inline-flex flex-col gap-2 rounded-2xl px-5 py-3 text-sm text-cyan-100 shadow-lg"
-            style={{
-              background: '#1a0a2e',
-              border: '1px solid rgba(124,58,237,0.4)',
-              boxShadow: '0 10px 30px rgba(124,58,237,0.08)',
-            }}>
-            <span className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-300/80">{tierLabel} plan access</span>
+          <div className="inline-flex max-w-3xl flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-white/80 shadow-[0_20px_80px_rgba(79,70,229,0.18)] backdrop-blur-xl">
+            <span className="text-[11px] font-black uppercase tracking-[0.32em] text-indigo-400">{tierLabel} plan access</span>
             <span>{planSummary}</span>
           </div>
         )}
         {tier === 'free' && (
-          <div className="max-w-2xl rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-50 shadow-lg shadow-amber-500/5">
+          <div className="max-w-2xl rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-50 shadow-lg shadow-amber-500/10 backdrop-blur-xl">
             <p className="font-semibold">
               Free plan users receive 1 complimentary Custom Coach session of 7 minutes every 24 hours.
             </p>
@@ -110,73 +138,78 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
         )}
       </div>
 
-      <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl synapse-glow min-h-[500px] flex flex-col transition-all duration-500">
-        <div className="flex items-center justify-between mb-8">
+      <div className="relative max-w-4xl mx-auto overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-[0_0_80px_rgba(99,102,241,0.15)] backdrop-blur-xl min-h-[560px] flex flex-col transition-all duration-500">
+        <div className="pointer-events-none absolute -left-12 -top-12 h-56 w-56 rounded-full bg-purple-500 opacity-20 blur-[120px]" />
+        <div className="pointer-events-none absolute -bottom-16 -right-8 h-64 w-64 rounded-full bg-indigo-500 opacity-20 blur-[120px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+        <div className="relative z-10 flex items-center justify-between mb-10 gap-4">
           <div>
-            <h2 className="text-2xl font-semibold">Custom Coach</h2>
-            <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Network Config Step {step} / 2</p>
+            <p className="text-xs uppercase tracking-[0.32em] text-indigo-400 mb-3">Configuration flow</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">Custom Coach</h2>
+            <p className="text-sm text-white/60 mt-2">Network Config Step {step} / 2</p>
           </div>
-          <div className="flex gap-2">
-            <div className={`w-3 h-1.5 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-blue-500 w-6' : 'bg-slate-700'}`}></div>
-            <div className={`w-3 h-1.5 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-blue-500 w-6' : 'bg-slate-700'}`}></div>
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/10 px-3 py-2 backdrop-blur-md">
+            <div className={`h-2 rounded-full transition-all duration-500 ${step >= 1 ? 'w-10 bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_18px_rgba(99,102,241,0.55)]' : 'w-6 bg-white/10'}`}></div>
+            <div className={`h-2 rounded-full transition-all duration-500 ${step >= 2 ? 'w-10 bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_18px_rgba(99,102,241,0.55)]' : 'w-6 bg-white/10'}`}></div>
           </div>
         </div>
 
-        <div className="flex-1">
+        <div className="relative z-10 flex-1">
           {!hasKey ? (
             <div className="h-full flex flex-col justify-center items-center text-center p-6 space-y-6">
-              <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-3xl animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.2)]">🔑</div>
+              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl animate-pulse border border-white/10 bg-white/5 shadow-[0_0_30px_rgba(99,102,241,0.24)] backdrop-blur-xl">🔑</div>
               <div>
-                <h3 className="text-xl font-bold mb-2">Connect API Key to Start Engine</h3>
-                <p className="text-sm text-slate-400 leading-relaxed max-w-xs">Engine startup is blocked because no API key was found in the environment variables.</p>
+                <h3 className="text-2xl font-bold tracking-tight text-white mb-2">Connect API Key to Start Engine</h3>
+                <p className="text-sm text-white/60 leading-relaxed max-w-xs">Engine startup is blocked because no API key was found in the environment variables.</p>
               </div>
-              <div className="p-4 bg-slate-950 rounded-lg text-[10px] font-mono text-slate-500 break-all border border-slate-800 text-left">
-                <p className="mb-2 font-bold text-slate-400">Vercel Configuration:</p>
-                Add <span className="text-indigo-400">VITE_API_KEY</span>, <span className="text-indigo-400">GEMINI_API_KEY</span>, or <span className="text-indigo-400">REACT_APP_API_KEY</span> to your Project Settings.
+              <div className="max-w-md rounded-2xl border border-white/10 bg-black/20 p-4 text-[10px] font-mono text-white/60 break-all text-left backdrop-blur-md">
+                <p className="mb-2 font-bold text-white/80">Vercel Configuration:</p>
+                Add <span className="text-indigo-300">VITE_API_KEY</span>, <span className="text-indigo-300">GEMINI_API_KEY</span>, or <span className="text-indigo-300">REACT_APP_API_KEY</span> to your Project Settings.
               </div>
             </div>
           ) : (
             <div className="space-y-6 h-full flex flex-col">
               {step === 1 && (
-                <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-1">
-                  <div>
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Coach Description & Role</label>
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col flex-1">
+                  <div className="rounded-3xl border border-white/10 bg-black/10 p-5 backdrop-blur-md">
+                    <label className="block text-xs uppercase tracking-[0.32em] text-indigo-400 mb-3">Coach Description & Role</label>
                     <textarea
                       placeholder="Describe the person you are talking to and the context of the conversation..."
                       value={customDescription}
                       onChange={(e) => setCustomDescription(e.target.value)}
-                      rows={3}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-700 resize-none"
+                      rows={4}
+                      className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-white/25 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition-all duration-300 resize-none"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Persona Name</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="rounded-3xl border border-white/10 bg-black/10 p-5 backdrop-blur-md">
+                      <label className="block text-xs uppercase tracking-[0.32em] text-indigo-400 mb-3">Persona Name</label>
                       <input
                         type="text"
                         placeholder="e.g. Sarah"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-700"
+                        className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-white/25 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition-all duration-300"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Primary Mood</label>
+                    <div className="rounded-3xl border border-white/10 bg-black/10 p-5 backdrop-blur-md">
+                      <label className="block text-xs uppercase tracking-[0.32em] text-indigo-400 mb-3">Primary Mood</label>
                       <select
                         value={mood}
                         onChange={(e) => setMood(e.target.value as Mood)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm appearance-none"
+                        className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white appearance-none focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition-all duration-300"
                       >
                         {MOODS.map((m) => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Communication Hardness (1-10)</label>
-                      <span className="text-[10px] font-bold text-blue-400">{difficultyLevel} - {getIntensityLabel(difficultyLevel)}</span>
+                  <div className="rounded-3xl border border-white/10 bg-black/10 p-5 backdrop-blur-md">
+                    <div className="flex flex-col gap-2 md:flex-row md:justify-between md:items-center mb-4">
+                      <label className="text-xs uppercase tracking-[0.32em] text-indigo-400">Communication Hardness (1-10)</label>
+                      <span className="text-xs font-semibold text-white/80">{difficultyLevel} · <span className="text-indigo-300">{getIntensityLabel(difficultyLevel)}</span></span>
                     </div>
                     <input
                       type="range"
@@ -184,22 +217,22 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
                       max="10"
                       value={difficultyLevel}
                       onChange={(e) => setDifficultyLevel(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      className="custom-coach-slider w-full cursor-pointer transition-all duration-300"
                     />
                   </div>
 
-                  <div className="mt-auto pt-4 border-t border-slate-800">
-                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Voice Frequency (Gender)</label>
-                    <div className="flex bg-slate-950 border border-slate-800 rounded-xl p-1">
+                  <div className="mt-auto rounded-3xl border border-white/10 bg-black/10 p-5 backdrop-blur-md">
+                    <label className="block text-xs uppercase tracking-[0.32em] text-indigo-400 mb-3">Voice Frequency (Gender)</label>
+                    <div className="flex bg-white/5 border border-white/10 rounded-2xl p-1.5 gap-1.5">
                       <button
                         onClick={() => setGender('Male')}
-                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${gender === 'Male' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-400'}`}
+                        className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${gender === 'Male' ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-[0_10px_30px_rgba(99,102,241,0.35)]' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}`}
                       >
                         <span className="text-lg">♂</span> Masculine
                       </button>
                       <button
                         onClick={() => setGender('Female')}
-                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${gender === 'Female' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-400'}`}
+                        className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${gender === 'Female' ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-[0_10px_30px_rgba(99,102,241,0.35)]' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}`}
                       >
                         <span className="text-lg">♀</span> Feminine
                       </button>
@@ -209,7 +242,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
                   <button
                     onClick={() => setStep(2)}
                     disabled={!customDescription.trim() || !name.trim()}
-                    className="w-full py-4 bg-blue-600 rounded-xl font-bold text-lg hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 font-bold text-lg text-white transition-all duration-300 shadow-[0_20px_60px_rgba(99,102,241,0.35)] hover:scale-[1.01] hover:shadow-[0_20px_80px_rgba(99,102,241,0.45)] disabled:opacity-50 disabled:hover:scale-100"
                   >
                     Finalize Setup →
                   </button>
@@ -218,35 +251,36 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
 
               {step === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 flex-1 flex flex-col">
-                  <div className="text-center py-4">
-                    <div className="w-16 h-16 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl synapse-glow">🌍</div>
-                    <h3 className="text-xl font-bold">Linguistic Origin</h3>
-                    <p className="text-sm text-slate-400 mt-2">The synapse will initialize in this language, but understands all dialects.</p>
+                  <div className="text-center py-6 rounded-3xl border border-white/10 bg-black/10 backdrop-blur-md">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-white/10 bg-white/5 text-indigo-300 shadow-[0_0_30px_rgba(99,102,241,0.25)]">🌍</div>
+                    <p className="text-xs uppercase tracking-[0.32em] text-indigo-400 mb-3">Language Layer</p>
+                    <h3 className="text-2xl font-bold tracking-tight text-white">Linguistic Origin</h3>
+                    <p className="text-sm text-white/60 mt-2">The synapse will initialize in this language, but understands all dialects.</p>
                   </div>
 
-                  <div className="flex-1 flex flex-col justify-center">
+                  <div className="flex-1 flex flex-col justify-center rounded-3xl border border-white/10 bg-black/10 p-6 backdrop-blur-md">
                     <select
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all appearance-none text-center text-lg font-medium"
+                      className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-4 text-center text-lg font-medium text-white appearance-none focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition-all duration-300"
                     >
                       {COMMON_LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
                     </select>
-                    <p className="text-[10px] text-slate-500 text-center mt-3 uppercase tracking-widest font-black">Dynamic Polyglot Engine: Active</p>
+                    <p className="text-[11px] text-white/45 text-center mt-4 uppercase tracking-[0.32em] font-black">Dynamic Polyglot Engine: Active</p>
                   </div>
 
-                  <div className="bg-slate-950/50 border border-slate-800/50 p-4 rounded-2xl mt-4">
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
-                      <span className="flex-shrink-0 w-6 h-6 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center text-[10px]">✨</span>
-                      <span><b>Synapse Ready:</b> The coach stays in the selected language and only switches when you explicitly ask it to.</span>
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl mt-4 backdrop-blur-md">
+                    <div className="flex items-center gap-3 text-sm text-white/65">
+                      <span className="flex-shrink-0 w-8 h-8 bg-indigo-500/15 text-indigo-300 rounded-full flex items-center justify-center text-xs border border-indigo-400/20">✨</span>
+                      <span><b className="text-white">Synapse Ready:</b> The coach stays in the selected language and only switches when you explicitly ask it to.</span>
                     </div>
                   </div>
 
                   <div className="flex gap-3 mt-auto pt-8">
-                    <button onClick={() => setStep(1)} className="flex-1 py-4 bg-slate-800 rounded-xl font-bold text-slate-400 hover:bg-slate-700 transition-all">Back</button>
+                    <button onClick={() => setStep(1)} className="flex-1 py-4 rounded-2xl border border-white/10 bg-white/5 font-bold text-white/70 hover:bg-white/10 transition-all duration-300">Back</button>
                     <button
                       onClick={handleStartSession}
-                      className="flex-[2] py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl font-bold text-lg hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25"
+                      className="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 font-bold text-lg text-white transition-all duration-300 shadow-[0_20px_60px_rgba(99,102,241,0.35)] hover:scale-[1.01] hover:shadow-[0_20px_80px_rgba(99,102,241,0.45)]"
                     >
                       Engage Neural Link
                     </button>
