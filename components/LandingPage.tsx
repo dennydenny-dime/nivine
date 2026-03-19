@@ -10,16 +10,49 @@ const metrics = [
   { label: 'Response Speed', value: 'Fast', width: '92%', color: '#a78bfa' },
 ];
 
-const stats = [
-  { value: '10,000+', label: 'Candidates Trained' },
-  { value: '95%', label: 'Confidence Improvement' },
-  { value: '500+', label: 'Interview Scenarios' },
+const overviewBlocks = [
+  {
+    eyebrow: 'What the app is for',
+    title: 'AI interview practice for students, job seekers, and career changers',
+    description:
+      'Nivine helps people prepare for real interviews by simulating recruiter conversations, evaluating spoken answers, and giving practical feedback after every session.',
+  },
+  {
+    eyebrow: 'Different features',
+    title: 'Mock interviews, coaching, and progress insights in one flow',
+    description:
+      'Users can practice role-specific interviews, improve delivery with a custom coach, review performance trends, and build confidence before important hiring rounds.',
+  },
+  {
+    eyebrow: 'Why this app is important',
+    title: 'It turns interview anxiety into repeatable preparation',
+    description:
+      'Instead of guessing what to say, users get a safe place to rehearse, identify weak areas, and improve communication skills that directly affect job outcomes.',
+  },
 ];
 
-const systems: Array<[string, string]> = [
-  ['Neural Interviews', 'Run realistic mock interviews with specialized AI interviewers tailored to different roles and tones.'],
-  ['Custom Coach', 'Get focused communication drills, coaching prompts, and targeted speaking feedback between interviews.'],
-  ['Performance Tracking', 'Review your progress with measurable signals so you can improve confidence, pacing, and clarity over time.'],
+const featureCards = [
+  {
+    label: 'Interview Simulation',
+    title: 'Practice realistic hiring conversations',
+    description:
+      'Launch AI-led mock interviews for different roles, difficulty levels, and interviewer styles so every session feels closer to a real hiring experience.',
+    bullets: ['Role-based interview prompts', 'Adaptive follow-up questions', 'Natural speaking practice'],
+  },
+  {
+    label: 'Personal Coaching',
+    title: 'Improve how you answer, explain, and communicate',
+    description:
+      'Receive actionable coaching on structure, clarity, confidence, and pacing so you know exactly what to fix before the next interview.',
+    bullets: ['Feedback on delivery and tone', 'Answer refinement guidance', 'Targeted practice between sessions'],
+  },
+  {
+    label: 'Growth Tracking',
+    title: 'Measure progress across every interview session',
+    description:
+      'Track improvements over time with performance signals that make growth visible and help users focus on the areas that matter most.',
+    bullets: ['Confidence and clarity signals', 'Session-by-session review', 'Visible improvement over time'],
+  },
 ];
 
 const accentColors = ['#5f77ff', '#8b5cf6', '#ec4899'];
@@ -199,29 +232,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
         </section>
 
-        <section
-          className="w-screen border-y px-6 py-[60px]"
-          style={{
-            background: '#0f0f1a',
-            borderColor: 'rgba(255,255,255,0.06)',
-            marginLeft: 'calc(50% - 50vw)',
-            marginRight: 'calc(50% - 50vw)',
-          }}
-        >
-          <div className="mx-auto flex max-w-6xl flex-col divide-y divide-white/10 md:flex-row md:divide-x md:divide-y-0">
-            {stats.map((stat) => (
-              <div key={stat.label} className="flex-1 px-6 py-8 text-center md:py-0">
-                <div className="text-[32px] font-bold leading-none text-white">{stat.value}</div>
-                <div className="mt-3 text-[14px] text-[#8a8f98]">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+        <section className="grid gap-4 lg:grid-cols-3">
+          {overviewBlocks.map((block, idx) => (
+            <article
+              key={block.eyebrow}
+              className="rounded-[20px] border px-6 py-7 shadow-[0_18px_70px_rgba(15,23,42,0.24)]"
+              style={{
+                background: 'linear-gradient(180deg, rgba(26,26,46,0.96) 0%, rgba(17,24,39,0.96) 100%)',
+                borderColor: `${accentColors[idx]}55`,
+              }}
+            >
+              <p className="text-[11px] uppercase tracking-[0.26em]" style={{ color: accentColors[idx] }}>
+                {block.eyebrow}
+              </p>
+              <h2 className="mt-4 text-2xl font-semibold leading-tight text-[#ededed]">{block.title}</h2>
+              <p className="mt-4 text-sm leading-7 text-[#a0a6b4]">{block.description}</p>
+            </article>
+          ))}
         </section>
 
         <section className="grid gap-4 md:grid-cols-3">
-          {systems.map(([title, copy], idx) => (
+          {featureCards.map((card, idx) => (
             <article
-              key={title}
+              key={card.title}
               className="relative overflow-hidden rounded-[16px] border p-6 transition duration-300 hover:-translate-y-0.5 hover:border-white/15"
               style={{
                 backgroundColor: '#1a1a2e',
@@ -236,9 +269,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                   style={{ backgroundColor: `${accentColors[idx]}22`, borderColor: `${accentColors[idx]}66` }}
                 />
               </div>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Core Module</p>
-              <h3 className="mt-3 text-lg font-semibold text-[#ededed]">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">{copy}</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">{card.label}</p>
+              <h3 className="mt-3 text-lg font-semibold text-[#ededed]">{card.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#8a8f98]">{card.description}</p>
+              <ul className="mt-5 space-y-2">
+                {card.bullets.map((bullet) => (
+                  <li key={bullet} className="flex items-start gap-2 text-sm text-[#c9ced6]">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accentColors[idx] }} />
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
             </article>
           ))}
         </section>
