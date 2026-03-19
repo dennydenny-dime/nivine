@@ -158,21 +158,70 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const nextStartTimeRef = useRef(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionRef = useRef<any>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isUnmountingRef = useRef(false);
   const transcriptionRef = useRef({ input: '', output: '' });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const resetConnectionResources = useCallback(() => {
+    if (scriptProcessorRef.current) {
+      try { scriptProcessorRef.current.disconnect(); } catch(e) {}
+      scriptProcessorRef.current.onaudioprocess = null;
+      scriptProcessorRef.current = null;
+    }
+    if (inputSourceRef.current) {
+      try { inputSourceRef.current.disconnect(); } catch(e) {}
+      inputSourceRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (outputAudioContextRef.current) {
+      outputAudioContextRef.current.close();
+      outputAudioContextRef.current = null;
+    }
+    outputNodeRef.current = null;
+    nextStartTimeRef.current = 0;
+  }, []);
+
   const cleanup = useCallback(() => {
+    isUnmountingRef.current = true;
+    if (reconnectTimeoutRef.current !== null) {
+      window.clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     if (sessionRef.current) {
       try { sessionRef.current.close(); } catch(e) {}
       sessionRef.current = null;
+    }
+    if (scriptProcessorRef.current) {
+      try { scriptProcessorRef.current.disconnect(); } catch(e) {}
+      scriptProcessorRef.current.onaudioprocess = null;
+      scriptProcessorRef.current = null;
+    }
+    if (inputSourceRef.current) {
+      try { inputSourceRef.current.disconnect(); } catch(e) {}
+      inputSourceRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
     sourcesRef.current.forEach(source => {
       try { source.stop(); } catch(e) {}
     });
     sourcesRef.current.clear();
-    if (audioContextRef.current) audioContextRef.current.close();
-    if (outputAudioContextRef.current) outputAudioContextRef.current.close();
-  }, []);
+    resetConnectionResources();
+  }, [resetConnectionResources]);
 
   const handleSaveAndExit = useCallback(() => {
     if (transcriptions.length > 0) {
@@ -215,7 +264,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
   useEffect(() => {
     const initSession = async () => {
+      if (isUnmountingRef.current) {
+        return;
+      }
+
       try {
+        resetConnectionResources();
         const apiKey = getSystemApiKey();
         if (!apiKey) {
           setError("Environment Config Error: No API Key found. In Vercel, please set your variable as 'VITE_API_KEY' or 'REACT_APP_API_KEY'.");
@@ -231,6 +285,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         outputNodeRef.current.connect(outputAudioContextRef.current.destination);
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
 
         await audioContextRef.current.resume();
         await outputAudioContextRef.current.resume();
@@ -262,10 +317,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           },
           callbacks: {
             onopen: () => {
+              reconnectAttemptsRef.current = 0;
+              setError(null);
               setIsConnecting(false);
               const source = audioContextRef.current!.createMediaStreamSource(stream);
+              inputSourceRef.current = source;
               // Reduced buffer size from 4096 to 2048 to lower input latency (approx 128ms at 16kHz)
               const scriptProcessor = audioContextRef.current!.createScriptProcessor(2048, 1, 1);
+              scriptProcessorRef.current = scriptProcessor;
               
               scriptProcessor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
@@ -340,11 +399,30 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               if (errMsg.includes('Network error') || errMsg.includes('Requested entity was not found') || errMsg.includes('403')) {
                 setError("Neural Connection Error: Ensure your API Key is valid and has Gemini API enabled in Google Cloud Console.");
               } else {
-                setError("Synapse Error: The link was severed unexpectedly. Please check your signal.");
+                setError("Synapse Error: The link was severed unexpectedly. Attempting to restore the session.");
               }
             },
             onclose: () => {
               console.log("Session Closed");
+              sessionRef.current = null;
+              if (isUnmountingRef.current) {
+                return;
+              }
+
+              const shouldReconnect = reconnectAttemptsRef.current < 2;
+              if (!shouldReconnect) {
+                setIsConnecting(false);
+                setError("Synapse Error: The neural link became unstable and could not be restored. Please restart the session.");
+                return;
+              }
+
+              reconnectAttemptsRef.current += 1;
+              setIsConnecting(true);
+              setError(`Neural link interrupted. Reconnecting (${reconnectAttemptsRef.current}/2)...`);
+              reconnectTimeoutRef.current = window.setTimeout(() => {
+                reconnectTimeoutRef.current = null;
+                void initSession();
+              }, 1000);
             }
           }
         });
@@ -356,9 +434,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       }
     };
 
+    isUnmountingRef.current = false;
     initSession();
     return cleanup;
-  }, [persona, cleanup]);
+  }, [persona, cleanup, resetConnectionResources]);
 
 
   useEffect(() => {
