@@ -163,6 +163,14 @@ RECOMMENDED NEXT SESSION:
 };
 
 const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, maxDurationMinutes, userId }) => {
+  const logVoiceTiming = (label: string, details: Record<string, unknown> = {}) => {
+    const now = performance.now();
+    console.log(`[voice-timing] ${label}`, {
+      t: now.toFixed(1),
+      isoTime: new Date().toISOString(),
+      ...details,
+    });
+  };
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
@@ -178,18 +186,25 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const sessionRef = useRef<any>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const inputWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const inputWorkletUrlRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isUnmountingRef = useRef(false);
   const transcriptionRef = useRef({ input: '', output: '' });
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastSentInputAtRef = useRef<number | null>(null);
+  const firstResponseAudioLoggedRef = useRef(false);
 
   const resetConnectionResources = useCallback(() => {
-    if (scriptProcessorRef.current) {
-      try { scriptProcessorRef.current.disconnect(); } catch(e) {}
-      scriptProcessorRef.current.onaudioprocess = null;
-      scriptProcessorRef.current = null;
+    if (inputWorkletNodeRef.current) {
+      try { inputWorkletNodeRef.current.port.onmessage = null; } catch(e) {}
+      try { inputWorkletNodeRef.current.disconnect(); } catch(e) {}
+      inputWorkletNodeRef.current = null;
+    }
+    if (inputWorkletUrlRef.current) {
+      URL.revokeObjectURL(inputWorkletUrlRef.current);
+      inputWorkletUrlRef.current = null;
     }
     if (inputSourceRef.current) {
       try { inputSourceRef.current.disconnect(); } catch(e) {}
@@ -221,10 +236,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       try { sessionRef.current.close(); } catch(e) {}
       sessionRef.current = null;
     }
-    if (scriptProcessorRef.current) {
-      try { scriptProcessorRef.current.disconnect(); } catch(e) {}
-      scriptProcessorRef.current.onaudioprocess = null;
-      scriptProcessorRef.current = null;
+    if (inputWorkletNodeRef.current) {
+      try { inputWorkletNodeRef.current.port.onmessage = null; } catch(e) {}
+      try { inputWorkletNodeRef.current.disconnect(); } catch(e) {}
+      inputWorkletNodeRef.current = null;
+    }
+    if (inputWorkletUrlRef.current) {
+      URL.revokeObjectURL(inputWorkletUrlRef.current);
+      inputWorkletUrlRef.current = null;
     }
     if (inputSourceRef.current) {
       try { inputSourceRef.current.disconnect(); } catch(e) {}
@@ -342,8 +361,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
                 // Keep the captured lead-in tiny so the model can respond as soon as the user stops.
                 prefixPaddingMs: 20,
-                // The previous value left a noticeably long pause before turn handoff.
-                silenceDurationMs: 150,
+                // Lower silence detection further to reduce turn-handoff delay.
+                silenceDurationMs: 90,
               },
             },
             systemInstruction,
@@ -351,31 +370,69 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             inputAudioTranscription: {},
           },
           callbacks: {
-            onopen: () => {
+            onopen: async () => {
               reconnectAttemptsRef.current = 0;
               setError(null);
               setIsConnecting(false);
               const source = audioContextRef.current!.createMediaStreamSource(stream);
               inputSourceRef.current = source;
-              // Push smaller audio chunks so the live session can detect turn endings faster.
-              const scriptProcessor = audioContextRef.current!.createScriptProcessor(512, 1, 1);
-              scriptProcessorRef.current = scriptProcessor;
-              
-              scriptProcessor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
+              firstResponseAudioLoggedRef.current = false;
+              lastSentInputAtRef.current = null;
+
+              const workletSource = `
+                class RealtimeInputProcessor extends AudioWorkletProcessor {
+                  process(inputs) {
+                    const input = inputs[0];
+                    const channel = input?.[0];
+                    if (channel?.length) {
+                      this.port.postMessage(channel.slice(0));
+                    }
+                    return true;
+                  }
+                }
+                registerProcessor('realtime-input-processor', RealtimeInputProcessor);
+              `;
+              const workletUrl = URL.createObjectURL(new Blob([workletSource], { type: 'application/javascript' }));
+              inputWorkletUrlRef.current = workletUrl;
+              await audioContextRef.current!.audioWorklet.addModule(workletUrl);
+
+              const inputWorkletNode = new AudioWorkletNode(audioContextRef.current!, 'realtime-input-processor', {
+                numberOfInputs: 1,
+                numberOfOutputs: 0,
+              });
+              inputWorkletNodeRef.current = inputWorkletNode;
+              inputWorkletNode.port.onmessage = ({ data }) => {
+                const inputData = data instanceof Float32Array ? data : new Float32Array(data);
+                const chunkEndedAt = performance.now();
+                lastSentInputAtRef.current = chunkEndedAt;
+                logVoiceTiming('sendRealtimeInput:queued', {
+                  samples: inputData.length,
+                  chunkEndedAt,
+                });
                 const pcmBlob = createBlob(inputData);
-                // Rely on sessionPromise resolving to send input
                 sessionPromise.then(s => {
-                  try { s.sendRealtimeInput({ media: pcmBlob }); } catch(err) {
-                    console.warn("Input dropped:", err);
+                  try {
+                    s.sendRealtimeInput({ media: pcmBlob });
+                    logVoiceTiming('sendRealtimeInput:sent', {
+                      samples: inputData.length,
+                      chunkEndedAt,
+                    });
+                  } catch(err) {
+                    console.warn('Input dropped:', err);
                   }
                 });
               };
 
-              source.connect(scriptProcessor);
-              scriptProcessor.connect(audioContextRef.current!.destination);
+              source.connect(inputWorkletNode);
             },
             onmessage: async (message: LiveServerMessage) => {
+              logVoiceTiming('onmessage', {
+                hasInputTranscription: Boolean(message.serverContent?.inputTranscription),
+                hasOutputTranscription: Boolean(message.serverContent?.outputTranscription),
+                hasAudio: Boolean(message.serverContent?.modelTurn?.parts?.some(part => Boolean(part.inlineData?.data))),
+                turnComplete: Boolean(message.serverContent?.turnComplete),
+                interrupted: Boolean(message.serverContent?.interrupted),
+              });
               if (message.serverContent?.outputTranscription) {
                 transcriptionRef.current.output += message.serverContent.outputTranscription.text;
                 setLiveAiQuestion(transcriptionRef.current.output.trim());
@@ -384,6 +441,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               }
 
               if (message.serverContent?.turnComplete) {
+                firstResponseAudioLoggedRef.current = false;
                 const items: TranscriptionItem[] = [];
                 if (transcriptionRef.current.input) {
                   items.push({ speaker: 'user', text: transcriptionRef.current.input, timestamp: Date.now() });
@@ -401,6 +459,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 for (const part of parts) {
                   const audioData = part.inlineData?.data;
                   if (audioData) {
+                    const responseAudioAt = performance.now();
+                    if (!firstResponseAudioLoggedRef.current) {
+                      firstResponseAudioLoggedRef.current = true;
+                      logVoiceTiming('gemini:firstResponseAudio', {
+                        gapFromLastInputMs: lastSentInputAtRef.current === null ? null : Number((responseAudioAt - lastSentInputAtRef.current).toFixed(1)),
+                      });
+                    }
                     setIsSpeaking(true);
                     const ctx = outputAudioContextRef.current;
                     nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
@@ -420,6 +485,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               }
 
               if (message.serverContent?.interrupted) {
+                firstResponseAudioLoggedRef.current = false;
                 if (transcriptionRef.current.output.trim()) {
                   const partialAiTurn = transcriptionRef.current.output.trim();
                   setTranscriptions(prev => [...prev, { speaker: 'ai', text: partialAiTurn, timestamp: Date.now() }]);
