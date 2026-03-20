@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage, StartSensitivity, EndSensitivity } from '@google/genai';
 import { Persona, TranscriptionItem } from '../types';
 import { getConversationHistoryKey } from '../lib/userStorage';
+import { saveEligibleInterviewHistory } from '../lib/interviewHistorySync';
 import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
@@ -284,6 +285,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
         localStorage.setItem(conversationHistoryKey, JSON.stringify(updatedHistory));
         localStorage.setItem('tm_conversation_history', JSON.stringify(updatedHistory));
+
+        void saveEligibleInterviewHistory({ id: userId }, historyItem).catch((syncError) => {
+          console.error('Failed to sync eligible interview history', syncError);
+        });
       } catch (e) {
         console.error("Failed to save conversation history", e);
       }
