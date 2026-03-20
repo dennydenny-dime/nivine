@@ -1,4 +1,3 @@
-
 import { Mood, Persona } from './types';
 
 export const PRESET_PERSONAS: Persona[] = [
@@ -33,7 +32,7 @@ export const COMMON_LANGUAGES = [
 
 /**
  * Safely retrieves the API Key from various environment variable patterns.
- * Supports: Vite, Create React App, Next.js, and standard Node process.env.
+ * Supports only intentionally public frontend variables.
  */
 export const getSystemApiKey = (): string | undefined => {
   let key: string | undefined;
@@ -45,9 +44,7 @@ export const getSystemApiKey = (): string | undefined => {
       // @ts-ignore
       key =
         import.meta.env.VITE_API_KEY ||
-        import.meta.env.GEMINI_API_KEY ||
-        import.meta.env.REACT_APP_API_KEY ||
-        import.meta.env.API_KEY;
+        import.meta.env.REACT_APP_API_KEY;
     }
   } catch (e) {
     // Ignore ReferenceErrors if import.meta is not defined
@@ -59,16 +56,14 @@ export const getSystemApiKey = (): string | undefined => {
   try {
     // We check typeof process to avoid ReferenceError in pure browser environments
     if (typeof process !== 'undefined' && process.env) {
-      key = process.env.API_KEY || 
-            process.env.REACT_APP_API_KEY || 
+      key = process.env.REACT_APP_API_KEY ||
             process.env.NEXT_PUBLIC_API_KEY ||
-            process.env.GEMINI_API_KEY ||
             process.env.VITE_API_KEY;
     }
   } catch (e) {
     // Ignore errors accessing process
   }
-  
+
   return key;
 };
 

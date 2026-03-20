@@ -1,5 +1,6 @@
 import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, type PastInterviewResult } from '../lib/candidateMemory';
 import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
+import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from './_security';
 
 type ChatHistoryItem = {
   speaker?: 'user' | 'ai' | string;
@@ -225,9 +226,9 @@ const streamGeminiToClient = async (prompt: string, apiKey: string, res: any): P
 };
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (rejectDisallowedOrigin(req, res, ['POST', 'OPTIONS'])) {
+    return;
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -235,6 +236,16 @@ export default async function handler(req: any, res: any) {
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
+  if (!ensureJsonRequest(req, res) || rejectOversizedJsonBody(req, res, 25_000)) {
+    return;
+  }
+
+  const rateLimit = takeRateLimit(req, 'chat', 30, 60_000);
+  if (!rateLimit.allowed) {
+    res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds || 60));
+    return res.status(429).json({ error: 'Too many requests. Please slow down.' });
   }
 
   const apiKey = getApiKey();
@@ -247,6 +258,10 @@ export default async function handler(req: any, res: any) {
   const transcript = typeof req.body?.transcript === 'string' ? req.body.transcript.trim() : '';
   if (!transcript) {
     return res.status(400).json({ error: 'Request must include a non-empty `transcript`.' });
+  }
+
+  if (transcript.length > 4_000) {
+    return res.status(400).json({ error: 'Transcript is too long.' });
   }
 
   const streamMode = req.query?.stream === '1' || req.body?.stream === true;

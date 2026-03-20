@@ -1,4 +1,5 @@
 import { getAdminDb } from './_firebaseAdmin';
+import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, safeCompare, takeRateLimit } from './_security';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 
@@ -94,19 +95,27 @@ const setTierForUser = async (payload: { email?: string | null; id?: string | nu
 };
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  if (rejectDisallowedOrigin(req, res, ['POST', 'OPTIONS'])) return;
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  if (!ensureJsonRequest(req, res) || rejectOversizedJsonBody(req, res, 5_000)) return;
+
+  const rateLimit = takeRateLimit(req, 'subscription', 60, 60_000);
+  if (!rateLimit.allowed) {
+    res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds || 60));
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
 
   try {
     const action = req.body?.action || 'get';
+    if (action !== 'get' && action !== 'set') {
+      return res.status(400).json({ error: 'Invalid action.' });
+    }
 
     if (action === 'set') {
       const adminSecret = process.env.SUBSCRIPTION_ADMIN_SECRET;
-      if (!adminSecret || req.headers['x-subscription-admin-secret'] !== adminSecret) {
+      const presentedSecret = typeof req.headers['x-subscription-admin-secret'] === 'string' ? req.headers['x-subscription-admin-secret'] : '';
+      if (!adminSecret || !presentedSecret || !safeCompare(adminSecret, presentedSecret)) {
         return res.status(401).json({ error: 'Unauthorized set attempt.' });
       }
 
