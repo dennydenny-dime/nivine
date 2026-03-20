@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage, StartSensitivity, EndSensitivity } from '@google/genai';
 import { Persona, TranscriptionItem } from '../types';
-import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, extractPastResultsFromHistory } from '../lib/candidateMemory';
-import { getConversationHistoryKey, getUserConversationHistory } from '../lib/userStorage';
+import { getConversationHistoryKey } from '../lib/userStorage';
 import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
@@ -103,6 +102,7 @@ ${behavioralProfile}
 - Open the session by introducing yourself briefly and stating the context
 - Ask one question at a time — never stack multiple questions
 - React to what the user actually said, not a generic version of it
+- Treat every new user utterance as a standalone prompt; respond only to the latest spoken statement unless the user explicitly repeats prior context
 - Stay in the current session language unless the user explicitly asks you to switch languages
 - If the user starts speaking in a different language without explicitly requesting a switch, politely continue in the current session language
 - Only change languages automatically when you receive a system update that the preferred language changed
@@ -168,11 +168,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const [liveAiQuestion, setLiveAiQuestion] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
-  const candidateMemoryPrompt = React.useMemo(() => {
-    const history = getUserConversationHistory();
-    const profile = buildCandidateMemoryProfile(extractPastResultsFromHistory(history));
-    return buildCandidateMemoryPrompt(profile);
-  }, []);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -314,16 +309,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
         const hardness = persona.difficultyLevel || 5;
         const speechLanguageCode = getSpeechLanguageCode(currentLanguage);
-        const systemInstruction = [
-          buildCoachSystemPrompt({
+        const systemInstruction = buildCoachSystemPrompt({
           personaName: persona.name,
           description: persona.role,
           mood: persona.mood,
           hardness,
           language: currentLanguage,
-          }),
-          candidateMemoryPrompt,
-        ].filter(Boolean).join('\n\n');
+        });
 
         const sessionPromise = ai.live.connect({
           model: 'gemini-2.5-flash-native-audio-preview-12-2025',
