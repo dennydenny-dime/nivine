@@ -7,6 +7,25 @@ import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
 import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
 
+const getSpeechLanguageCode = (language: string): string => {
+  const speechLanguageMap: Record<string, string> = {
+    English: 'en-US',
+    Spanish: 'es-ES',
+    French: 'fr-FR',
+    German: 'de-DE',
+    Italian: 'it-IT',
+    Portuguese: 'pt-PT',
+    Hindi: 'hi-IN',
+    Arabic: 'ar-SA',
+    Japanese: 'ja-JP',
+    Korean: 'ko-KR',
+    Mandarin: 'zh-CN',
+    Russian: 'ru-RU',
+  };
+
+  return speechLanguageMap[language] || 'en-US';
+};
+
 interface ConversationRoomProps {
   persona: Persona;
   onExit: () => void;
@@ -87,6 +106,7 @@ ${behavioralProfile}
 - Stay in the current session language unless the user explicitly asks you to switch languages
 - If the user starts speaking in a different language without explicitly requesting a switch, politely continue in the current session language
 - Only change languages automatically when you receive a system update that the preferred language changed
+- Treat the live transcript as verbatim speech in the current session language; never translate, transliterate, or rewrite English speech into another language
 - Track consistency: if the user contradicts themselves, call it out
 - Track confidence: note hesitations, filler words, vague language
 - Apply pressure proportional to hardness level when answers are weak
@@ -291,6 +311,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         await outputAudioContextRef.current.resume();
 
         const hardness = persona.difficultyLevel || 5;
+        const speechLanguageCode = getSpeechLanguageCode(currentLanguage);
         const systemInstruction = [
           buildCoachSystemPrompt({
           personaName: persona.name,
@@ -307,6 +328,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
+              languageCode: speechLanguageCode,
               voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_MAP[persona.gender] } },
             },
             // Optimize for speed: Disable thinking budget to reduce Time To First Token (TTFT)
