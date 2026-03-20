@@ -10,7 +10,7 @@ import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
 import { clearStoredSession, firebaseApp, initializeAuthPersistence, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import PersonalDashboard from './components/PersonalDashboard';
-import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
+import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminUser } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { Persona, User } from './types';
 import { getDatabase, onDisconnect, onValue, push, ref, remove, serverTimestamp, set } from 'firebase/database';
@@ -84,7 +84,7 @@ const App: React.FC = () => {
   const isGuest = !currentUser;
 
   const normalizedEmail = currentUser?.email.trim().toLowerCase();
-  const isAdmin = isAdminEmail(normalizedEmail);
+  const isAdmin = isAdminUser(currentUser);
   const hasFullAccess = hasFullAccessByEmail(normalizedEmail);
   const hasUnlimitedAccess = isAdmin || hasFullAccess;
   const effectiveTier: SubscriptionTier = hasUnlimitedAccess ? 'team' : subscriptionTier;
