@@ -8,7 +8,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
-import { clearStoredSession, firebaseApp, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
+import { clearStoredSession, firebaseApp, initializeAuthPersistence, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import PersonalDashboard from './components/PersonalDashboard';
 import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminEmail } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
@@ -63,7 +63,14 @@ const syncPathname = (_view: View) => {
 };
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const storedUser = localStorage.getItem('tm_current_user');
+      return storedUser ? JSON.parse(storedUser) as User : null;
+    } catch {
+      return null;
+    }
+  });
   const [authReady, setAuthReady] = useState(false);
   const [showAuthBoard, setShowAuthBoard] = useState(false);
   const [currentView, setCurrentView] = useState<View>(() => getViewFromPath(window.location.pathname));
@@ -150,19 +157,36 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
-      if (firebaseUser) {
-        setCurrentUser(mapFirebaseUser(firebaseUser));
-        setShowAuthBoard(false);
-      } else {
-        clearStoredSession();
-        setCurrentUser(null);
-      }
+    let active = true;
+    let unsubscribe = () => {};
 
-      setAuthReady(true);
-    });
+    initializeAuthPersistence()
+      .catch((error) => {
+        console.warn('Failed to initialize persistent auth session.', error);
+      })
+      .finally(() => {
+        if (!active) {
+          return;
+        }
 
-    return () => unsubscribe();
+        unsubscribe = subscribeToAuthChanges((firebaseUser) => {
+          if (firebaseUser) {
+            setCurrentUser(mapFirebaseUser(firebaseUser));
+            setShowAuthBoard(false);
+          } else {
+            clearStoredSession();
+            localStorage.removeItem('tm_current_user');
+            setCurrentUser(null);
+          }
+
+          setAuthReady(true);
+        });
+      });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
