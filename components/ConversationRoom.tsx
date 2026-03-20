@@ -301,7 +301,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         outputNodeRef.current = outputAudioContextRef.current.createGain();
         outputNodeRef.current.connect(outputAudioContextRef.current.destination);
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
         mediaStreamRef.current = stream;
 
         await audioContextRef.current.resume();
@@ -332,8 +339,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 disabled: false,
                 startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
                 endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
-                prefixPaddingMs: 40,
-                silenceDurationMs: 350,
+                // Keep the captured lead-in tiny so the model can respond as soon as the user stops.
+                prefixPaddingMs: 20,
+                // The previous value left a noticeably long pause before turn handoff.
+                silenceDurationMs: 150,
               },
             },
             systemInstruction,
@@ -347,8 +356,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               setIsConnecting(false);
               const source = audioContextRef.current!.createMediaStreamSource(stream);
               inputSourceRef.current = source;
-              // Reduced buffer size again to cut mic chunk latency to roughly 64ms at 16kHz.
-              const scriptProcessor = audioContextRef.current!.createScriptProcessor(1024, 1, 1);
+              // Push smaller audio chunks so the live session can detect turn endings faster.
+              const scriptProcessor = audioContextRef.current!.createScriptProcessor(512, 1, 1);
               scriptProcessorRef.current = scriptProcessor;
               
               scriptProcessor.onaudioprocess = (e) => {
