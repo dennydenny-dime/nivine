@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
+import { GoogleGenAI, Modality, LiveServerMessage, StartSensitivity, EndSensitivity } from '@google/genai';
 import { Persona, TranscriptionItem } from '../types';
 import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, extractPastResultsFromHistory } from '../lib/candidateMemory';
 import { getConversationHistoryKey, getUserConversationHistory } from '../lib/userStorage';
@@ -113,6 +113,7 @@ ${behavioralProfile}
 - If the user asks for a hint or help, stay in character and push back:
   "I'm not here to help you, I'm here to evaluate you."
 - Keep your responses concise and natural for spoken conversation
+- Start speaking within 2-3 seconds of the user finishing whenever the context is clear
 
 === REAL-TIME SIGNALS TO MONITOR ===
 During the live session, internally track:
@@ -334,6 +335,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             },
             // Optimize for speed: Disable thinking budget to reduce Time To First Token (TTFT)
             thinkingConfig: { thinkingBudget: 0 },
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                disabled: false,
+                startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
+                endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
+                prefixPaddingMs: 40,
+                silenceDurationMs: 350,
+              },
+            },
             systemInstruction,
             outputAudioTranscription: {},
             inputAudioTranscription: {},
@@ -345,8 +355,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               setIsConnecting(false);
               const source = audioContextRef.current!.createMediaStreamSource(stream);
               inputSourceRef.current = source;
-              // Reduced buffer size from 4096 to 2048 to lower input latency (approx 128ms at 16kHz)
-              const scriptProcessor = audioContextRef.current!.createScriptProcessor(2048, 1, 1);
+              // Reduced buffer size again to cut mic chunk latency to roughly 64ms at 16kHz.
+              const scriptProcessor = audioContextRef.current!.createScriptProcessor(1024, 1, 1);
               scriptProcessorRef.current = scriptProcessor;
               
               scriptProcessor.onaudioprocess = (e) => {
