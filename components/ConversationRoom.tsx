@@ -195,6 +195,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const containerRef = useRef<HTMLDivElement>(null);
   const lastSentInputAtRef = useRef<number | null>(null);
   const firstResponseAudioLoggedRef = useRef(false);
+  const aiTurnInFlightRef = useRef(false);
 
   const resetConnectionResources = useCallback(() => {
     if (inputWorkletNodeRef.current) {
@@ -359,10 +360,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 disabled: false,
                 startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
                 endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
-                // Keep the captured lead-in tiny so the model can respond as soon as the user stops.
-                prefixPaddingMs: 20,
-                // Lower silence detection further to reduce turn-handoff delay.
-                silenceDurationMs: 90,
+                // Keep a short lead-in so the user's first words are captured without adding much latency.
+                prefixPaddingMs: 80,
+                // Prevent premature turn handoff that can make the model answer before the user fully finishes.
+                silenceDurationMs: 220,
               },
             },
             systemInstruction,
@@ -378,6 +379,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               inputSourceRef.current = source;
               firstResponseAudioLoggedRef.current = false;
               lastSentInputAtRef.current = null;
+              aiTurnInFlightRef.current = false;
 
               const workletSource = `
                 class RealtimeInputProcessor extends AudioWorkletProcessor {
@@ -434,6 +436,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 interrupted: Boolean(message.serverContent?.interrupted),
               });
               if (message.serverContent?.outputTranscription) {
+                aiTurnInFlightRef.current = true;
                 transcriptionRef.current.output += message.serverContent.outputTranscription.text;
                 setLiveAiQuestion(transcriptionRef.current.output.trim());
               } else if (message.serverContent?.inputTranscription) {
@@ -441,6 +444,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               }
 
               if (message.serverContent?.turnComplete) {
+                aiTurnInFlightRef.current = false;
                 firstResponseAudioLoggedRef.current = false;
                 const items: TranscriptionItem[] = [];
                 if (transcriptionRef.current.input) {
@@ -486,11 +490,18 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
               if (message.serverContent?.interrupted) {
                 firstResponseAudioLoggedRef.current = false;
-                if (transcriptionRef.current.output.trim()) {
-                  const partialAiTurn = transcriptionRef.current.output.trim();
-                  setTranscriptions(prev => [...prev, { speaker: 'ai', text: partialAiTurn, timestamp: Date.now() }]);
-                  transcriptionRef.current.output = '';
+                aiTurnInFlightRef.current = false;
+                const items: TranscriptionItem[] = [];
+                if (transcriptionRef.current.input.trim()) {
+                  items.push({ speaker: 'user', text: transcriptionRef.current.input.trim(), timestamp: Date.now() });
                 }
+                if (transcriptionRef.current.output.trim()) {
+                  items.push({ speaker: 'ai', text: transcriptionRef.current.output.trim(), timestamp: Date.now() });
+                }
+                if (items.length > 0) {
+                  setTranscriptions(prev => [...prev, ...items]);
+                }
+                transcriptionRef.current = { input: '', output: '' };
                 setLiveAiQuestion('');
                 for (const source of sourcesRef.current.values()) {
                   try { source.stop(); } catch(e) {}
