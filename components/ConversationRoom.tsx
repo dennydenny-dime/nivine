@@ -164,6 +164,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
+  const [liveAiQuestion, setLiveAiQuestion] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
   const candidateMemoryPrompt = React.useMemo(() => {
@@ -365,6 +366,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             onmessage: async (message: LiveServerMessage) => {
               if (message.serverContent?.outputTranscription) {
                 transcriptionRef.current.output += message.serverContent.outputTranscription.text;
+                setLiveAiQuestion(transcriptionRef.current.output.trim());
               } else if (message.serverContent?.inputTranscription) {
                 transcriptionRef.current.input += message.serverContent.inputTranscription.text;
               }
@@ -379,6 +381,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 }
                 setTranscriptions(prev => [...prev, ...items]);
                 transcriptionRef.current = { input: '', output: '' };
+                setLiveAiQuestion('');
               }
 
               const parts = message.serverContent?.modelTurn?.parts;
@@ -405,6 +408,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               }
 
               if (message.serverContent?.interrupted) {
+                if (transcriptionRef.current.output.trim()) {
+                  const partialAiTurn = transcriptionRef.current.output.trim();
+                  setTranscriptions(prev => [...prev, { speaker: 'ai', text: partialAiTurn, timestamp: Date.now() }]);
+                  transcriptionRef.current.output = '';
+                }
+                setLiveAiQuestion('');
                 for (const source of sourcesRef.current.values()) {
                   try { source.stop(); } catch(e) {}
                 }
@@ -507,6 +516,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const interviewSeconds = Math.max(0, transcriptions.length ? Math.round((Date.now() - transcriptions[0].timestamp) / 1000) : 0);
   const timerLabel = `${Math.floor(interviewSeconds / 60).toString().padStart(2, '0')}:${(interviewSeconds % 60).toString().padStart(2, '0')}`;
   const fillerWords = ['um', 'uh', 'like', 'you know', 'actually'];
+  const latestCommittedAiQuestion = transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text;
+  const currentQuestionText = liveAiQuestion || latestCommittedAiQuestion || 'The AI interviewer is calibrating the session. Maintain concise high-signal responses.';
 
   return (
     <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-[95rem] flex-col gap-4 px-4 pb-4 lg:px-8">
@@ -542,8 +553,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Current question</p>
-              <p className="mt-3 text-lg leading-relaxed text-[#ededed]">
-                {transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text || 'The AI interviewer is calibrating the session. Maintain concise high-signal responses.'}
+              <p className="mt-3 break-words text-lg leading-relaxed text-[#ededed]">
+                {currentQuestionText}
               </p>
             </div>
           </div>
