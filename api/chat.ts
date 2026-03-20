@@ -1,11 +1,5 @@
-import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, type PastInterviewResult } from '../lib/candidateMemory';
 import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
 import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from './_security';
-
-type ChatHistoryItem = {
-  speaker?: 'user' | 'ai' | string;
-  text?: string;
-};
 
 type GeminiCandidate = {
   content?: {
@@ -26,21 +20,6 @@ const getApiKey = (): string | undefined => {
   );
 };
 
-const toHistoryText = (history: ChatHistoryItem[] | undefined): string => {
-  if (!Array.isArray(history) || history.length === 0) return 'No previous turns.';
-
-  const recent = history.slice(-12);
-  return recent
-    .map((item) => {
-      const speaker = item?.speaker === 'ai' ? 'Coach' : 'User';
-      const text = typeof item?.text === 'string' ? item.text.trim() : '';
-      if (!text) return null;
-      return `${speaker}: ${text}`;
-    })
-    .filter(Boolean)
-    .join('\n');
-};
-
 const buildPrompt = (body: any): string => {
   const transcript = typeof body?.transcript === 'string' ? body.transcript.trim() : '';
   const language = typeof body?.language === 'string' ? body.language : 'English';
@@ -52,10 +31,6 @@ const buildPrompt = (body: any): string => {
   const roleDirectives = Array.isArray(body?.roleDirectives)
     ? body.roleDirectives.filter((directive: unknown) => typeof directive === 'string' && directive.trim().length > 0)
     : [];
-
-  const history = toHistoryText(body?.history);
-  const pastResults = Array.isArray(body?.pastResults) ? body.pastResults as PastInterviewResult[] : [];
-  const candidateMemory = buildCandidateMemoryPrompt(buildCandidateMemoryProfile(pastResults));
 
   const basePrompt = [
     'You are an elite communication coach in a live spoken practice simulation.',
@@ -74,10 +49,7 @@ const buildPrompt = (body: any): string => {
     '',
     roleDirectives.length > 0 ? `Role directives:\n${roleDirectives.map((d) => `- ${d}`).join('\n')}` : 'Role directives: none',
     '',
-    candidateMemory ? `${candidateMemory}\n` : '',
-    `Conversation history:\n${history}`,
-    '',
-    `Latest user transcript: ${transcript}`,
+    `Current user statement: ${transcript}`,
   ].join('\n');
 
   return basePrompt;
