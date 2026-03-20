@@ -174,6 +174,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
+  const [liveUserTranscript, setLiveUserTranscript] = useState('');
   const [liveAiQuestion, setLiveAiQuestion] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
@@ -359,11 +360,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
               automaticActivityDetection: {
                 disabled: false,
                 startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
-                endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_HIGH,
-                // Keep a short lead-in so the user's first words are captured without adding much latency.
-                prefixPaddingMs: 80,
-                // Prevent premature turn handoff that can make the model answer before the user fully finishes.
-                silenceDurationMs: 220,
+                endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
+                // Keep a slightly longer lead-in so soft first words are captured reliably.
+                prefixPaddingMs: 160,
+                // Wait longer before ending the user's turn so multi-sentence answers are not cut off mid-thought.
+                silenceDurationMs: 700,
               },
             },
             systemInstruction,
@@ -439,22 +440,26 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                 aiTurnInFlightRef.current = true;
                 transcriptionRef.current.output += message.serverContent.outputTranscription.text;
                 setLiveAiQuestion(transcriptionRef.current.output.trim());
-              } else if (message.serverContent?.inputTranscription) {
+              }
+
+              if (message.serverContent?.inputTranscription) {
                 transcriptionRef.current.input += message.serverContent.inputTranscription.text;
+                setLiveUserTranscript(transcriptionRef.current.input.trim());
               }
 
               if (message.serverContent?.turnComplete) {
                 aiTurnInFlightRef.current = false;
                 firstResponseAudioLoggedRef.current = false;
                 const items: TranscriptionItem[] = [];
-                if (transcriptionRef.current.input) {
-                  items.push({ speaker: 'user', text: transcriptionRef.current.input, timestamp: Date.now() });
+                if (transcriptionRef.current.input.trim()) {
+                  items.push({ speaker: 'user', text: transcriptionRef.current.input.trim(), timestamp: Date.now() });
                 }
-                if (transcriptionRef.current.output) {
-                  items.push({ speaker: 'ai', text: transcriptionRef.current.output, timestamp: Date.now() });
+                if (transcriptionRef.current.output.trim()) {
+                  items.push({ speaker: 'ai', text: transcriptionRef.current.output.trim(), timestamp: Date.now() });
                 }
                 setTranscriptions(prev => [...prev, ...items]);
                 transcriptionRef.current = { input: '', output: '' };
+                setLiveUserTranscript('');
                 setLiveAiQuestion('');
               }
 
@@ -502,6 +507,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
                   setTranscriptions(prev => [...prev, ...items]);
                 }
                 transcriptionRef.current = { input: '', output: '' };
+                setLiveUserTranscript('');
                 setLiveAiQuestion('');
                 for (const source of sourcesRef.current.values()) {
                   try { source.stop(); } catch(e) {}
@@ -586,7 +592,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [transcriptions]);
+  }, [transcriptions, liveUserTranscript, liveAiQuestion]);
 
   if (error) {
     return (
@@ -668,12 +674,24 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         </div>
         <div ref={containerRef} className="h-[calc(100%-2rem)] space-y-3 overflow-y-auto pr-2">
           {isConnecting && <p className="text-sm text-slate-500">Establishing encrypted interview channel...</p>}
+          {liveUserTranscript && (
+            <div className="rounded-xl border border-indigo-400/20 bg-indigo-500/5 p-3 text-sm leading-relaxed text-slate-100">
+              <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-indigo-200/80">You · live</p>
+              <p className="break-words">{liveUserTranscript}</p>
+            </div>
+          )}
+          {liveAiQuestion && (
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-sm leading-relaxed text-slate-100">
+              <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-emerald-200/80">AI · live</p>
+              <p className="break-words">{liveAiQuestion}</p>
+            </div>
+          )}
           {transcriptions.map((t, idx) => {
             const words = t.text.split(/\s+/);
             return (
               <div key={idx} className="rounded-xl border border-white/10 bg-black/25 p-3 text-sm leading-relaxed text-slate-200">
                 <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-slate-500">{t.speaker === 'user' ? 'You' : 'AI'}</p>
-                <p>
+                <p className="break-words">
                   {words.map((word, i) => {
                     const clean = word.toLowerCase().replace(/[^a-z]/g, '');
                     const isFiller = fillerWords.includes(clean) || (clean === 'you' && words[i + 1]?.toLowerCase().replace(/[^a-z]/g, '') === 'know');
