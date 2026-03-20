@@ -11,6 +11,13 @@ const FULL_ACCESS_EMAILS = new Set([
   'prathamesh4402@gmail.com',
 ]);
 
+const ADMIN_UIDS = new Set(
+  (import.meta.env.VITE_ADMIN_UIDS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+
 export type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 
 export type PlanAccess = {
@@ -90,6 +97,16 @@ const CALL_USAGE_KEY = 'tm_plan_usage_calls';
 export const isAdminEmail = (email?: string | null): boolean => {
   if (!email) return false;
   return ADMIN_EMAILS.has(email.trim().toLowerCase());
+};
+
+export const isAdminUid = (uid?: string | null): boolean => {
+  if (!uid) return false;
+  return ADMIN_UIDS.has(uid.trim());
+};
+
+export const isAdminUser = (user?: { email?: string | null; id?: string | null } | null): boolean => {
+  if (!user) return false;
+  return isAdminEmail(user.email) || isAdminUid(user.id);
 };
 
 export const hasFullAccessByEmail = (email?: string | null): boolean => {
