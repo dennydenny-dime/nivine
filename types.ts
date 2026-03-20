@@ -35,6 +35,10 @@ export interface Persona {
   gender: Gender;
   language?: string;
   difficultyLevel?: number; // Scale 1-10
+  moduleLabel?: string;
+  moduleSubtitle?: string;
+  interviewerPersona?: string;
+  whyItWins?: string;
 }
 
 export interface QuizQuestion {

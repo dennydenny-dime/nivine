@@ -30,14 +30,6 @@ const MOOD_STYLES: Record<string, { glow: string; badge: string; link: string }>
   },
 };
 
-const getInitials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase())
-    .slice(0, 2)
-    .join('');
-
 const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
   const [language, setLanguage] = useState('English');
 
@@ -86,7 +78,6 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
         <div className="space-y-4">
           {PRESET_PERSONAS.map((p, idx) => {
             const moodStyle = MOOD_STYLES[p.mood] ?? MOOD_STYLES.default;
-            const initials = getInitials(p.name);
 
             return (
               <button
@@ -99,29 +90,43 @@ const MainAppPage: React.FC<MainAppPageProps> = ({ onStart }) => {
                   className="pointer-events-none absolute right-12 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full blur-3xl"
                   style={{ backgroundColor: moodStyle.glow, opacity: 0.32 }}
                 />
-                <div className="relative z-10 flex w-full items-center justify-between gap-6">
-                  <div className="flex max-w-2xl flex-1 flex-col justify-center">
-                    <span className={`mb-4 inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] ${moodStyle.badge}`}>
-                      {p.mood}
-                    </span>
-                    <h3 className="text-[28px] font-bold leading-tight text-white">{p.name}</h3>
-                    <p className="mt-2 text-base text-slate-400">{p.role}</p>
-                    <p className={`mt-6 text-sm font-medium ${moodStyle.link}`}>
-                      Start {p.name}'s neural training module in {language}.
-                    </p>
+                <div className="relative z-10 flex w-full flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-5">
+                    <div
+                      className="flex min-h-[88px] min-w-[164px] flex-col items-center justify-center rounded-2xl border px-5 py-4 text-center shadow-[0_10px_35px_rgba(15,23,42,0.28)]"
+                      style={{
+                        borderColor: `${moodStyle.glow}aa`,
+                        backgroundColor: `${moodStyle.glow}22`,
+                        boxShadow: `0 0 0 1px ${moodStyle.glow}22, 0 0 30px ${moodStyle.glow}22`,
+                      }}
+                    >
+                      <span className="text-[14px] font-black leading-none text-white/90">{p.moduleLabel}</span>
+                      <span className="mt-2 text-[26px] font-bold leading-tight text-white">{p.name}</span>
+                    </div>
+
+                    <div className="grid flex-1 gap-5 text-sm text-slate-300 md:grid-cols-3">
+                      <div>
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">Role</p>
+                        <p className="whitespace-pre-line text-lg font-semibold leading-snug text-white">{p.moduleSubtitle ?? p.role}</p>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">Interviewer persona</p>
+                        <p className="whitespace-pre-line text-lg font-semibold leading-snug text-white">{p.interviewerPersona ?? p.role}</p>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">Why it wins</p>
+                        <p className="text-lg font-semibold leading-snug text-white">{p.whyItWins ?? `Start ${p.name}'s neural training module in ${language}.`}</p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="relative z-10 flex h-full shrink-0 items-center justify-center pr-2">
-                    <div
-                      className="absolute right-2 h-32 w-32 rounded-full blur-2xl"
-                      style={{ backgroundColor: moodStyle.glow, opacity: 0.45 }}
-                    />
-                    <div
-                      className="relative flex h-28 w-28 items-center justify-center rounded-full border border-white/10 bg-slate-950/80 text-3xl font-bold text-white shadow-[0_10px_35px_rgba(15,23,42,0.45)]"
-                      style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.08), 0 0 40px ${moodStyle.glow}55` }}
-                    >
-                      {initials}
-                    </div>
+                  <div className="flex items-center justify-between gap-4 lg:w-auto lg:flex-col lg:items-end">
+                    <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] ${moodStyle.badge}`}>
+                      {p.mood}
+                    </span>
+                    <p className={`text-sm font-medium ${moodStyle.link}`}>
+                      Start {p.name} in {language}.
+                    </p>
                   </div>
                 </div>
               </button>
