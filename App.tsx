@@ -533,6 +533,7 @@ const App: React.FC = () => {
             <ConversationRoom
               persona={selectedPersona}
               onExit={goBack}
+              userId={currentUser?.id}
               maxDurationMinutes={
                 conversationCategory === 'coaching'
                   ? planAccess.coachingMaxMinutesPerCall

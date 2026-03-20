@@ -29,6 +29,7 @@ interface ConversationRoomProps {
   persona: Persona;
   onExit: () => void;
   maxDurationMinutes: number | null;
+  userId?: string;
 }
 
 interface CoachPromptConfig {
@@ -161,7 +162,7 @@ RECOMMENDED NEXT SESSION:
 ---`;
 };
 
-const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, maxDurationMinutes }) => {
+const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, maxDurationMinutes, userId }) => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
@@ -251,7 +252,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           scoreCard: buildNeuralSpeechScoreCard(transcriptions),
         };
 
-        const conversationHistoryKey = getConversationHistoryKey();
+        const conversationHistoryKey = getConversationHistoryKey(userId);
         const storedHistory = localStorage.getItem(conversationHistoryKey) ?? localStorage.getItem('tm_conversation_history');
         const history = storedHistory ? JSON.parse(storedHistory) : [];
         // Keep last 50 sessions to manage storage size
@@ -265,7 +266,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     }
     cleanup(); // Ensure resources are freed explicitly before state change
     onExit();
-  }, [transcriptions, persona, onExit, cleanup]);
+  }, [transcriptions, persona, onExit, cleanup, userId]);
 
   const handleLanguageChange = async (newLang: string) => {
     setCurrentLanguage(newLang);
