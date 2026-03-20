@@ -12,6 +12,7 @@ import { clearStoredSession, firebaseApp, initializeAuthPersistence, mapFirebase
 import PersonalDashboard from './components/PersonalDashboard';
 import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminUser } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
+import { syncInterviewHistoryFromServer } from './lib/interviewHistorySync';
 import { Persona, User } from './types';
 import { getDatabase, onDisconnect, onValue, push, ref, remove, serverTimestamp, set } from 'firebase/database';
 
@@ -215,6 +216,11 @@ const App: React.FC = () => {
       })
       .catch(() => {
         setSubscriptionTier('free');
+      });
+
+    syncInterviewHistoryFromServer({ email: currentUser.email, id: currentUser.id })
+      .catch((error) => {
+        console.warn('Failed to sync interview history from server.', error);
       });
 
     const pool = JSON.parse(localStorage.getItem('tm_leaderboard_pool') || '[]');
