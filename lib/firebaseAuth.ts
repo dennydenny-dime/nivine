@@ -3,11 +3,13 @@ import {
   GoogleAuthProvider,
   User as FirebaseSdkUser,
   createUserWithEmailAndPassword,
+  browserLocalPersistence,
   getAuth,
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
   signInWithEmailAndPassword,
+  setPersistence,
   signOut,
   updateProfile
 } from 'firebase/auth';
@@ -25,6 +27,19 @@ const firebaseConfig = {
 export const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
+
+let authPersistenceInitialization: Promise<void> | null = null;
+
+export const initializeAuthPersistence = async () => {
+  if (!authPersistenceInitialization) {
+    authPersistenceInitialization = setPersistence(auth, browserLocalPersistence).catch((error) => {
+      authPersistenceInitialization = null;
+      throw error;
+    });
+  }
+
+  await authPersistenceInitialization;
+};
 
 const buildFallbackAvatar = (firebaseUser: FirebaseSdkUser) =>
   `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.email || firebaseUser.uid}`;
