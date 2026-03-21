@@ -1,5 +1,10 @@
-import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior.js';
-import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from '../lib/server/security.js';
+import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, type PastInterviewResult } from '../lib/candidateMemory';
+import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
+
+type ChatHistoryItem = {
+  speaker?: 'user' | 'ai' | string;
+  text?: string;
+};
 
 type GeminiCandidate = {
   content?: {
@@ -20,6 +25,21 @@ const getApiKey = (): string | undefined => {
   );
 };
 
+const toHistoryText = (history: ChatHistoryItem[] | undefined): string => {
+  if (!Array.isArray(history) || history.length === 0) return 'No previous turns.';
+
+  const recent = history.slice(-12);
+  return recent
+    .map((item) => {
+      const speaker = item?.speaker === 'ai' ? 'Coach' : 'User';
+      const text = typeof item?.text === 'string' ? item.text.trim() : '';
+      if (!text) return null;
+      return `${speaker}: ${text}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+};
+
 const buildPrompt = (body: any): string => {
   const transcript = typeof body?.transcript === 'string' ? body.transcript.trim() : '';
   const language = typeof body?.language === 'string' ? body.language : 'English';
@@ -32,6 +52,10 @@ const buildPrompt = (body: any): string => {
     ? body.roleDirectives.filter((directive: unknown) => typeof directive === 'string' && directive.trim().length > 0)
     : [];
 
+  const history = toHistoryText(body?.history);
+  const pastResults = Array.isArray(body?.pastResults) ? body.pastResults as PastInterviewResult[] : [];
+  const candidateMemory = buildCandidateMemoryPrompt(buildCandidateMemoryProfile(pastResults));
+
   const basePrompt = [
     'You are an elite communication coach in a live spoken practice simulation.',
     `Persona name: ${personaName}`,
@@ -43,17 +67,16 @@ const buildPrompt = (body: any): string => {
     '- Stay in character for the assigned persona role.',
     '- Keep a professional, fluent speaking style with confident pacing and no filler phrasing.',
     '- Respond with natural spoken-language coaching, not markdown.',
-    '- Answer immediately with no intro, no recap, and no planning language.',
-    '- Keep response to 1-3 short sentences and never exceed 5 sentences.',
-    '- Target 40-80 words and never exceed 120 words.',
-    '- Prefer short, direct phrasing suitable for low-latency streaming.',
+    '- Keep response to 2-5 concise sentences.',
     '- If user response is weak/vague, ask one pointed follow-up question.',
     '- Include one actionable improvement tip in your response.',
-    '- Avoid bullets, lists, headings, and repeated phrasing.',
     '',
     roleDirectives.length > 0 ? `Role directives:\n${roleDirectives.map((d) => `- ${d}`).join('\n')}` : 'Role directives: none',
     '',
-    `Current user statement: ${transcript}`,
+    candidateMemory ? `${candidateMemory}\n` : '',
+    `Conversation history:\n${history}`,
+    '',
+    `Latest user transcript: ${transcript}`,
   ].join('\n');
 
   return basePrompt;
@@ -202,9 +225,9 @@ const streamGeminiToClient = async (prompt: string, apiKey: string, res: any): P
 };
 
 export default async function handler(req: any, res: any) {
-  if (rejectDisallowedOrigin(req, res, ['POST', 'OPTIONS'])) {
-    return;
-  }
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -212,16 +235,6 @@ export default async function handler(req: any, res: any) {
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-  }
-
-  if (!ensureJsonRequest(req, res) || rejectOversizedJsonBody(req, res, 25_000)) {
-    return;
-  }
-
-  const rateLimit = takeRateLimit(req, 'chat', 30, 60_000);
-  if (!rateLimit.allowed) {
-    res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds || 60));
-    return res.status(429).json({ error: 'Too many requests. Please slow down.' });
   }
 
   const apiKey = getApiKey();
@@ -234,10 +247,6 @@ export default async function handler(req: any, res: any) {
   const transcript = typeof req.body?.transcript === 'string' ? req.body.transcript.trim() : '';
   if (!transcript) {
     return res.status(400).json({ error: 'Request must include a non-empty `transcript`.' });
-  }
-
-  if (transcript.length > 4_000) {
-    return res.status(400).json({ error: 'Transcript is too long.' });
   }
 
   const streamMode = req.query?.stream === '1' || req.body?.stream === true;

@@ -1,8 +1,6 @@
-import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from '../lib/server/security.js';
+import { getAdminDb } from './_firebaseAdmin';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
-
-type FirestoreType = typeof import('./_firebaseAdmin.ts').firestore;
 
 const PRIVILEGED_TEAM_EMAILS = new Set(['shutterbomb135@gmail.com']);
 const PRIVILEGED_PREMIUM_EMAILS = new Set([
@@ -21,21 +19,8 @@ const normalizeEmail = (email?: string | null): string | null => {
   return normalized || null;
 };
 
-const hasFirebaseEnv = () => {
-  return Boolean(
-    process.env.FIREBASE_PROJECT_ID
-      && process.env.FIREBASE_CLIENT_EMAIL
-      && process.env.FIREBASE_PRIVATE_KEY,
-  );
-};
-
-const getFirestore = async (): Promise<FirestoreType> => {
-  const { firestore } = await import('./_firebaseAdmin.ts');
-  return firestore;
-};
-
 const getTierForUser = async (payload: { email?: string | null; id?: string | null }): Promise<SubscriptionTier> => {
-  const db = await getFirestore();
+  const db = getAdminDb();
   const email = normalizeEmail(payload.email);
   const userId = (payload.id || '').trim();
 
@@ -71,7 +56,7 @@ const getTierForUser = async (payload: { email?: string | null; id?: string | nu
 };
 
 const setTierForUser = async (payload: { email?: string | null; id?: string | null; tier?: string | null }) => {
-  const db = await getFirestore();
+  const db = getAdminDb();
   const tier = normalizeTier(payload.tier);
   const email = normalizeEmail(payload.email);
   const userId = (payload.id || '').trim();
@@ -109,28 +94,22 @@ const setTierForUser = async (payload: { email?: string | null; id?: string | nu
 };
 
 export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+
   try {
-    if (rejectDisallowedOrigin(req, res, ['POST', 'OPTIONS'])) return;
-    if (req.method === 'OPTIONS') return res.status(204).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
-    if (!ensureJsonRequest(req, res) || rejectOversizedJsonBody(req, res, 5_000)) return;
-
-    const rateLimit = takeRateLimit(req, 'subscription', 60, 60_000);
-    if (!rateLimit.allowed) {
-      res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds || 60));
-      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
-    }
-
     const action = req.body?.action || 'get';
-    if (action !== 'get' && action !== 'set') {
-      return res.status(400).json({ error: 'Invalid action.' });
-    }
-
-    if (!hasFirebaseEnv()) {
-      return res.status(200).json({ tier: 'free' });
-    }
 
     if (action === 'set') {
+      const adminSecret = process.env.SUBSCRIPTION_ADMIN_SECRET;
+      if (!adminSecret || req.headers['x-subscription-admin-secret'] !== adminSecret) {
+        return res.status(401).json({ error: 'Unauthorized set attempt.' });
+      }
+
       const result = await setTierForUser(req.body || {});
       return res.status(200).json(result);
     }
@@ -138,7 +117,6 @@ export default async function handler(req: any, res: any) {
     const tier = await getTierForUser(req.body || {});
     return res.status(200).json({ tier });
   } catch (error: any) {
-    console.error('Subscription API error:', error?.message || error);
     return res.status(500).json({ error: error?.message || 'Unable to resolve subscription tier.' });
   }
 }
