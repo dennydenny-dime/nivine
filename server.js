@@ -6,14 +6,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import crypto from 'node:crypto';
 
 const PORT = Number.parseInt(process.env.PORT || '3001', 10);
-const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || '';
+const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
+const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const SESSION_TTL_MS = 1000 * 60 * 30;
 const AURA_MODEL = 'aura-2-thalia-en';
 const GEMINI_MODEL = 'gemini-1.5-flash';
 
-if (!DEEPGRAM_API_KEY) {
-  console.warn('[server] Missing DEEPGRAM_API_KEY. Voice features will fail until it is configured.');
+if (!process.env.DEEPGRAM_API_KEY) {
+  console.warn('[server] DEEPGRAM_API_KEY not set; using the embedded Deepgram fallback key.');
 }
 if (!GEMINI_API_KEY) {
   console.warn('[server] Missing GEMINI_API_KEY. Gemini responses will fail until it is configured.');
