@@ -1,4 +1,4 @@
-import { getAdminDbOrNull } from '../lib/server/firebaseAdmin.js';
+import { firestore } from './_firebaseAdmin.ts';
 import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from '../lib/server/security.js';
 
 const MAX_PERSISTED_SESSIONS = 50;
@@ -101,7 +101,7 @@ const sortAndTrimHistory = (history: ConversationHistoryItem[]) => dedupeHistory
   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   .slice(0, MAX_PERSISTED_SESSIONS);
 
-const getCollectionRefs = (db: NonNullable<ReturnType<typeof getAdminDbOrNull>>, user: UserIdentity) => {
+const getCollectionRefs = (db: typeof firestore, user: UserIdentity) => {
   const email = normalizeEmail(user.email);
   const userId = normalizeUserId(user.id);
   const refs: ReturnType<typeof db.collection>[] = [];
@@ -113,10 +113,7 @@ const getCollectionRefs = (db: NonNullable<ReturnType<typeof getAdminDbOrNull>>,
 };
 
 const readHistory = async (user: UserIdentity): Promise<ConversationHistoryItem[]> => {
-  const db = getAdminDbOrNull();
-  if (!db) return [];
-
-  const refs = getCollectionRefs(db, user);
+  const refs = getCollectionRefs(firestore, user);
   if (refs.length === 0) return [];
 
   const snapshots = await Promise.all(refs.map((docRef) => docRef.get()));
@@ -129,10 +126,7 @@ const readHistory = async (user: UserIdentity): Promise<ConversationHistoryItem[
 };
 
 const writeHistory = async (user: UserIdentity, history: ConversationHistoryItem[]) => {
-  const db = getAdminDbOrNull();
-  if (!db) return sortAndTrimHistory(history);
-
-  const refs = getCollectionRefs(db, user);
+  const refs = getCollectionRefs(firestore, user);
   const sortedHistory = sortAndTrimHistory(history);
   const email = normalizeEmail(user.email);
   const userId = normalizeUserId(user.id);

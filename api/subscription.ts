@@ -1,4 +1,4 @@
-import { getAdminDbOrNull } from '../lib/server/firebaseAdmin.js';
+import { firestore } from './_firebaseAdmin.ts';
 import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, safeCompare, takeRateLimit } from '../lib/server/security.js';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
@@ -21,8 +21,7 @@ const normalizeEmail = (email?: string | null): string | null => {
 };
 
 const getTierForUser = async (payload: { email?: string | null; id?: string | null }): Promise<SubscriptionTier> => {
-  const db = getAdminDbOrNull();
-  if (!db) return 'free';
+  const db = firestore;
   const email = normalizeEmail(payload.email);
   const userId = (payload.id || '').trim();
 
@@ -58,10 +57,7 @@ const getTierForUser = async (payload: { email?: string | null; id?: string | nu
 };
 
 const setTierForUser = async (payload: { email?: string | null; id?: string | null; tier?: string | null }) => {
-  const db = getAdminDbOrNull();
-  if (!db) {
-    throw new Error('Subscription updates require Firebase Admin credentials.');
-  }
+  const db = firestore;
   const tier = normalizeTier(payload.tier);
   const email = normalizeEmail(payload.email);
   const userId = (payload.id || '').trim();
