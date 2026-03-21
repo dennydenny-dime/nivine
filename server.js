@@ -10,7 +10,8 @@ const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const SESSION_TTL_MS = 1000 * 60 * 30;
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_PRIMARY_MODEL = 'gemini-1.5-flash-latest';
+const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash';
 
 if (!process.env.DEEPGRAM_API_KEY) {
   console.warn('[server] DEEPGRAM_API_KEY not set; using the embedded Deepgram fallback key.');
@@ -164,6 +165,21 @@ function maybeCollectSentenceFragments(text, forceFlush = false) {
   return { sentences, remaining };
 }
 
+function getGeminiModel(modelName, systemInstruction) {
+  return genAI.getGenerativeModel({
+    model: modelName,
+    systemInstruction,
+  });
+}
+
+async function generateGeminiContentStream({ modelName, contents, systemInstruction, generationConfig }) {
+  const model = getGeminiModel(modelName, systemInstruction);
+  return model.generateContentStream({
+    contents,
+    generationConfig,
+  });
+}
+
 async function queueTtsSentence(session, sentence) {
   const text = sentence.trim();
   if (!text) return;
@@ -202,11 +218,7 @@ async function streamGeminiResponse(session, userText) {
   session.finalizedAiText = '';
   const turnId = ++session.turnSequence;
 
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODEL,
-    systemInstruction: createSystemPrompt(session.persona),
-  });
-
+  const systemInstruction = createSystemPrompt(session.persona);
   const contents = session.chatHistory.map((item) => ({
     role: item.role,
     parts: [{ text: item.text }],
@@ -214,15 +226,30 @@ async function streamGeminiResponse(session, userText) {
 
   contents.push({ role: 'user', parts: [{ text: userText }] });
 
-  try {
-    const result = await model.generateContentStream({
-      contents,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 300,
-      },
-    });
+  const generationConfig = {
+    temperature: 0.7,
+    maxOutputTokens: 300,
+  };
 
+  let result;
+  try {
+    result = await generateGeminiContentStream({
+      modelName: GEMINI_PRIMARY_MODEL,
+      contents,
+      systemInstruction,
+      generationConfig,
+    });
+  } catch (primaryError) {
+    console.warn(`[gemini] primary model ${GEMINI_PRIMARY_MODEL} failed, retrying with ${GEMINI_FALLBACK_MODEL}`, primaryError);
+    result = await generateGeminiContentStream({
+      modelName: GEMINI_FALLBACK_MODEL,
+      contents,
+      systemInstruction,
+      generationConfig,
+    });
+  }
+
+  try {
     for await (const chunk of result.stream) {
       if (controller.signal.aborted || turnId !== session.turnSequence) {
         break;
@@ -258,6 +285,7 @@ async function streamGeminiResponse(session, userText) {
       session.chatHistory.push({ role: 'user', text: userText });
       session.chatHistory.push({ role: 'model', text: aiText });
     }
+
 
     sendJson(session.ws, { type: 'ai_turn_complete', text: aiText });
   } catch (error) {

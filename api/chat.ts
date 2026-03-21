@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { buildCandidateMemoryProfile, buildCandidateMemoryPrompt, type PastInterviewResult } from '../lib/candidateMemory';
 import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
 
@@ -6,14 +7,11 @@ type ChatHistoryItem = {
   text?: string;
 };
 
-type GeminiCandidate = {
-  content?: {
-    parts?: Array<{ text?: string }>;
-  };
-};
+const GEMINI_PRIMARY_MODEL = 'gemini-1.5-flash-latest';
+const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash';
 
-type GeminiChunk = {
-  candidates?: GeminiCandidate[];
+type GeminiStreamChunk = {
+  text: () => string;
 };
 
 const getApiKey = (): string | undefined => {
@@ -116,37 +114,23 @@ const getInterviewBehaviorConfig = (body: any): InterviewBehaviorConfig => {
   };
 };
 
-const extractTextFromChunk = (chunk: GeminiChunk): string => {
-  return (chunk?.candidates || [])
-    .flatMap((candidate) => candidate?.content?.parts || [])
-    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-    .join('');
+const getGenAI = (apiKey: string) => new GoogleGenerativeAI(apiKey);
+
+const getGeminiModel = (apiKey: string, modelName: string) => {
+  return getGenAI(apiKey).getGenerativeModel({ model: modelName });
 };
 
-const callGemini = async (prompt: string, apiKey: string): Promise<string> => {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 280,
-        },
-      }),
+const generateGeminiContent = async (prompt: string, apiKey: string, modelName: string): Promise<string> => {
+  const model = getGeminiModel(apiKey, modelName);
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 280,
     },
-  );
+  });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini request failed (${response.status}): ${errorBody}`);
-  }
-
-  const data: GeminiChunk = await response.json();
-  const text = extractTextFromChunk(data).trim();
-
+  const text = result.response.text().trim();
   if (!text) {
     throw new Error('Gemini response did not include text output.');
   }
@@ -154,74 +138,50 @@ const callGemini = async (prompt: string, apiKey: string): Promise<string> => {
   return text;
 };
 
-const streamGeminiToClient = async (prompt: string, apiKey: string, res: any): Promise<void> => {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 280,
-        },
-      }),
-    },
-  );
-
-  if (!response.ok || !response.body) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini stream request failed (${response.status}): ${errorBody}`);
+const callGemini = async (prompt: string, apiKey: string): Promise<string> => {
+  try {
+    return await generateGeminiContent(prompt, apiKey, GEMINI_PRIMARY_MODEL);
+  } catch (primaryError) {
+    console.warn(`[gemini] primary model ${GEMINI_PRIMARY_MODEL} failed, retrying with ${GEMINI_FALLBACK_MODEL}`, primaryError);
+    return generateGeminiContent(prompt, apiKey, GEMINI_FALLBACK_MODEL);
   }
+};
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let pending = '';
-
+const streamGeminiToClient = async (prompt: string, apiKey: string, res: any): Promise<void> => {
   const sendEvent = (event: string, payload: Record<string, unknown>) => {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(payload)}\n\n`);
   };
 
+  const streamFromModel = async (modelName: string) => {
+    const model = getGeminiModel(apiKey, modelName);
+    return model.generateContentStream({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 280,
+      },
+    });
+  };
+
+  let result;
+  try {
+    result = await streamFromModel(GEMINI_PRIMARY_MODEL);
+  } catch (primaryError) {
+    console.warn(`[gemini] primary model ${GEMINI_PRIMARY_MODEL} stream failed, retrying with ${GEMINI_FALLBACK_MODEL}`, primaryError);
+    result = await streamFromModel(GEMINI_FALLBACK_MODEL);
+  }
+
   sendEvent('ready', { ok: true });
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      pending += decoder.decode(value, { stream: true });
-      const blocks = pending.split('\n\n');
-      pending = blocks.pop() || '';
-
-      for (const block of blocks) {
-        const dataLine = block
-          .split('\n')
-          .map((line) => line.trim())
-          .find((line) => line.startsWith('data:'));
-
-        if (!dataLine) continue;
-
-        const jsonText = dataLine.slice(5).trim();
-        if (!jsonText || jsonText === '[DONE]') continue;
-
-        try {
-          const chunk: GeminiChunk = JSON.parse(jsonText);
-          const token = extractTextFromChunk(chunk);
-          if (token) {
-            sendEvent('token', { token });
-          }
-        } catch {
-          // Ignore malformed stream chunks and continue.
-        }
-      }
+  for await (const chunk of result.stream as AsyncIterable<GeminiStreamChunk>) {
+    const token = chunk.text();
+    if (token) {
+      sendEvent('token', { token });
     }
-
-    sendEvent('done', { ok: true });
-  } finally {
-    reader.releaseLock();
   }
+
+  sendEvent('done', { ok: true });
 };
 
 export default async function handler(req: any, res: any) {
