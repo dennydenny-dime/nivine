@@ -1,5 +1,5 @@
-import { getAdminDbOrNull } from './_firebaseAdmin';
-import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from './_security';
+import { getAdminDbOrNull } from '../lib/server/firebaseAdmin.js';
+import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from '../lib/server/security.js';
 
 const MAX_PERSISTED_SESSIONS = 50;
 const MINIMUM_ELIGIBLE_MINUTES = 3.5;
