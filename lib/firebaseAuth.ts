@@ -16,12 +16,13 @@ import {
 import { User } from '../types';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCjY-ezOaccYVysb6NGaOuPyz_OluIgbvM',
-  authDomain: 'node-ai-d0015.firebaseapp.com',
-  projectId: 'node-ai-d0015',
-  storageBucket: 'node-ai-d0015.firebasestorage.app',
-  messagingSenderId: '986509381276',
-  appId: '1:986509381276:web:a0f790b186078bf1d82759'
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCjY-ezOaccYVysb6NGaOuPyz_OluIgbvM',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'node-ai-d0015.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'node-ai-d0015',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'node-ai-d0015.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '986509381276',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:986509381276:web:a0f790b186078bf1d82759',
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || 'https://node-ai-d0015-default-rtdb.firebaseio.com'
 };
 
 export const firebaseApp = initializeApp(firebaseConfig);
@@ -162,3 +163,5 @@ const getFriendlyAuthError = (error: unknown) => {
 
   return 'Authentication failed. Please try again.';
 };
+
+export const hasRealtimeDatabaseConfig = Boolean(firebaseConfig.databaseURL);

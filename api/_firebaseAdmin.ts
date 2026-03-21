@@ -7,6 +7,14 @@ const getPrivateKey = () => {
   return raw.replace(/\\n/g, '\n');
 };
 
+export const hasFirebaseAdminConfig = () => {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = getPrivateKey();
+
+  return Boolean(projectId && clientEmail && privateKey);
+};
+
 const initializeAdmin = () => {
   if (getApps().length > 0) {
     return getApps()[0];
@@ -32,4 +40,12 @@ const initializeAdmin = () => {
 export const getAdminDb = () => {
   const app = initializeAdmin();
   return getFirestore(app);
+};
+
+export const getAdminDbOrNull = () => {
+  if (!hasFirebaseAdminConfig()) {
+    return null;
+  }
+
+  return getAdminDb();
 };
