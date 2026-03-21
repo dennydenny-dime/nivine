@@ -1,3 +1,4 @@
+import type { DocumentReference, Firestore } from 'firebase-admin/firestore';
 import { firestore } from './_firebaseAdmin.ts';
 import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from '../lib/server/security.js';
 
@@ -101,10 +102,10 @@ const sortAndTrimHistory = (history: ConversationHistoryItem[]) => dedupeHistory
   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   .slice(0, MAX_PERSISTED_SESSIONS);
 
-const getCollectionRefs = (db: typeof firestore, user: UserIdentity) => {
+const getDocumentRefs = (db: Firestore, user: UserIdentity): DocumentReference[] => {
   const email = normalizeEmail(user.email);
   const userId = normalizeUserId(user.id);
-  const refs: ReturnType<typeof db.collection>[] = [];
+  const refs: DocumentReference[] = [];
 
   if (email) refs.push(db.collection('interviewHistoryByEmail').doc(email));
   if (userId) refs.push(db.collection('interviewHistoryByUid').doc(userId));
@@ -113,7 +114,7 @@ const getCollectionRefs = (db: typeof firestore, user: UserIdentity) => {
 };
 
 const readHistory = async (user: UserIdentity): Promise<ConversationHistoryItem[]> => {
-  const refs = getCollectionRefs(firestore, user);
+  const refs = getDocumentRefs(firestore, user);
   if (refs.length === 0) return [];
 
   const snapshots = await Promise.all(refs.map((docRef) => docRef.get()));
@@ -126,7 +127,7 @@ const readHistory = async (user: UserIdentity): Promise<ConversationHistoryItem[
 };
 
 const writeHistory = async (user: UserIdentity, history: ConversationHistoryItem[]) => {
-  const refs = getCollectionRefs(firestore, user);
+  const refs = getDocumentRefs(firestore, user);
   const sortedHistory = sortAndTrimHistory(history);
   const email = normalizeEmail(user.email);
   const userId = normalizeUserId(user.id);
