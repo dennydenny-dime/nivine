@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import { getAdminDb } from '../lib/server/firebaseAdmin.js';
-import { applySecurityHeaders, rejectOversizedJsonBody, safeCompare, takeRateLimit } from '../lib/server/security.js';
+import { getAdminDb } from './_firebaseAdmin';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 
@@ -20,7 +19,7 @@ const verifySignature = (bodyText: string, signature: string | undefined) => {
   if (!secret || !signature) return false;
 
   const expected = crypto.createHmac('sha256', secret).update(bodyText).digest('hex');
-  return safeCompare(expected, signature);
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 };
 
 const upsertSubscription = async (payload: { email?: string | null; userId?: string | null; tier?: string | null; paymentId?: string | null }) => {
@@ -63,20 +62,8 @@ const upsertSubscription = async (payload: { email?: string | null; userId?: str
 };
 
 export default async function handler(req: any, res: any) {
-  applySecurityHeaders(res);
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed.' });
-  }
-
-  if (rejectOversizedJsonBody(req, res, 25_000)) {
-    return;
-  }
-
-  const rateLimit = takeRateLimit(req, 'razorpay-webhook', 120, 60_000);
-  if (!rateLimit.allowed) {
-    res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds || 60));
-    return res.status(429).json({ error: 'Too many webhook requests.' });
   }
 
   try {
