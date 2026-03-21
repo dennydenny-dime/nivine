@@ -10,7 +10,7 @@ const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const SESSION_TTL_MS = 1000 * 60 * 30;
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash-latest';
 
 if (!process.env.DEEPGRAM_API_KEY) {
   console.warn('[server] DEEPGRAM_API_KEY not set; using the embedded Deepgram fallback key.');
