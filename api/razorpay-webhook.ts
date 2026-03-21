@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import { getAdminDb } from './_firebaseAdmin';
-import { applySecurityHeaders, rejectOversizedJsonBody, safeCompare, takeRateLimit } from './_security';
+import { getAdminDb } from '../lib/server/firebaseAdmin.js';
+import { applySecurityHeaders, rejectOversizedJsonBody, safeCompare, takeRateLimit } from '../lib/server/security.js';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 

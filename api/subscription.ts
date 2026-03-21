@@ -1,5 +1,5 @@
-import { getAdminDbOrNull } from './_firebaseAdmin';
-import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, safeCompare, takeRateLimit } from './_security';
+import { getAdminDbOrNull } from '../lib/server/firebaseAdmin.js';
+import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, safeCompare, takeRateLimit } from '../lib/server/security.js';
 
 type SubscriptionTier = 'free' | 'premium' | 'elite' | 'team';
 

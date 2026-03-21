@@ -1,5 +1,5 @@
-import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior';
-import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from './_security';
+import { buildInterviewerSystem, type InterviewBehaviorConfig } from '../lib/interviewBehavior.js';
+import { ensureJsonRequest, rejectDisallowedOrigin, rejectOversizedJsonBody, takeRateLimit } from '../lib/server/security.js';
 
 type GeminiCandidate = {
   content?: {
