@@ -8,7 +8,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
-import { clearStoredSession, firebaseApp, initializeAuthPersistence, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
+import { clearStoredSession, firebaseApp, hasRealtimeDatabaseConfig, initializeAuthPersistence, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import PersonalDashboard from './components/PersonalDashboard';
 import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminUser } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
@@ -117,6 +117,10 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!hasRealtimeDatabaseConfig) {
+      return;
+    }
+
     const database = getDatabase(firebaseApp);
     const connectionsRef = ref(database, 'presence/connections');
     const connectedRef = ref(database, '.info/connected');

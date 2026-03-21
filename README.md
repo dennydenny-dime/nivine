@@ -144,6 +144,12 @@ GEMINI_API_KEY=your_gemini_api_key
 #### Optional frontend / integration settings
 ```bash
 VITE_FIREBASE_API_KEY=your_firebase_web_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_firebase_app_id
+VITE_FIREBASE_DATABASE_URL=https://your-project-default-rtdb.firebaseio.com
 VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
 VITE_BACKEND_API_URL=http://localhost:3000/api
 ```
