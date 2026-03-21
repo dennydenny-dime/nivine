@@ -9,7 +9,6 @@ const PORT = Number.parseInt(process.env.PORT || '3001', 10);
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const SESSION_TTL_MS = 1000 * 60 * 30;
-const AURA_MODEL = 'aura-2-thalia-en';
 const GEMINI_MODEL = 'gemini-1.5-flash';
 
 if (!DEEPGRAM_API_KEY) {
@@ -129,14 +128,6 @@ async function closeTransports(session, { dropHistory = false } = {}) {
     session.sttConnection = null;
   }
 
-  if (session.ttsConnection) {
-    try { session.ttsConnection.sendText?.(' '); } catch {}
-    try { session.ttsConnection.flush?.(); } catch {}
-    try { session.ttsConnection.requestClose?.(); } catch {}
-    try { session.ttsConnection.removeAllListeners?.(); } catch {}
-    session.ttsConnection = null;
-    session.ttsReady = null;
-  }
 
   session.responseInFlight = false;
   session.pendingAiText = '';
@@ -172,63 +163,20 @@ function maybeCollectSentenceFragments(text, forceFlush = false) {
   return { sentences, remaining };
 }
 
-async function ensureTtsConnection(session) {
-  if (session.ttsConnection && session.ttsReady) {
-    return session.ttsReady;
-  }
-
-  session.ttsReady = new Promise(async (resolve, reject) => {
-    try {
-      const connection = await deepgram.speak.live({
-        model: AURA_MODEL,
-        encoding: 'linear16',
-        sample_rate: 24000,
-      });
-
-      session.ttsConnection = connection;
-
-      connection.on(LiveTranscriptionEvents.Open, () => resolve(connection));
-      connection.on(LiveTranscriptionEvents.Error, (error) => {
-        console.error('[tts] error', error);
-        session.ttsConnection = null;
-        session.ttsReady = null;
-        reject(error);
-      });
-      connection.on(LiveTranscriptionEvents.Close, () => {
-        session.ttsConnection = null;
-        session.ttsReady = null;
-      });
-      connection.on(LiveTranscriptionEvents.Audio, (data) => {
-        if (!data) return;
-        const audioBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-        sendJson(session.ws, {
-          type: 'tts_audio',
-          audio: audioBuffer.toString('base64'),
-          sampleRate: 24000,
-          encoding: 'linear16',
-        });
-      });
-      connection.on(LiveTranscriptionEvents.Flushed, () => {
-        sendJson(session.ws, { type: 'tts_flushed' });
-      });
-    } catch (error) {
-      session.ttsConnection = null;
-      session.ttsReady = null;
-      reject(error);
-    }
-  });
-
-  return session.ttsReady;
-}
-
 async function queueTtsSentence(session, sentence) {
   const text = sentence.trim();
   if (!text) return;
 
   try {
-    const connection = await ensureTtsConnection(session);
-    connection.sendText(text + ' ');
-    connection.flush?.();
+    const response = await deepgram.speak.request({ text }, { model: 'aura-asteria-en' });
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    sendJson(session.ws, {
+      type: 'tts_audio',
+      audio: audioBuffer.toString('base64'),
+      sampleRate: 24000,
+      encoding: 'linear16',
+    });
+    sendJson(session.ws, { type: 'tts_flushed' });
     sendJson(session.ws, { type: 'ai_sentence', text });
   } catch (error) {
     console.error('[tts] queue sentence failed', error);
