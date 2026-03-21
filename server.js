@@ -221,7 +221,6 @@ async function streamGeminiResponse(session, userText) {
         temperature: 0.7,
         maxOutputTokens: 300,
       },
-      signal: controller.signal,
     });
 
     for await (const chunk of result.stream) {
