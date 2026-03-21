@@ -1,30 +1,9 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { GoogleGenAI, Modality, LiveServerMessage, StartSensitivity, EndSensitivity } from '@google/genai';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Persona, TranscriptionItem } from '../types';
 import { getConversationHistoryKey } from '../lib/userStorage';
 import { saveEligibleInterviewHistory } from '../lib/interviewHistorySync';
 import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
-import { VOICE_MAP, getSystemApiKey, COMMON_LANGUAGES } from '../constants';
-import { decode, decodeAudioData, createBlob } from '../utils/audioUtils';
-
-const getSpeechLanguageCode = (language: string): string => {
-  const speechLanguageMap: Record<string, string> = {
-    English: 'en-US',
-    Spanish: 'es-ES',
-    French: 'fr-FR',
-    German: 'de-DE',
-    Italian: 'it-IT',
-    Portuguese: 'pt-PT',
-    Hindi: 'hi-IN',
-    Arabic: 'ar-SA',
-    Japanese: 'ja-JP',
-    Korean: 'ko-KR',
-    Mandarin: 'zh-CN',
-    Russian: 'ru-RU',
-  };
-
-  return speechLanguageMap[language] || 'en-US';
-};
+import { COMMON_LANGUAGES } from '../constants';
 
 interface ConversationRoomProps {
   persona: Persona;
@@ -33,148 +12,52 @@ interface ConversationRoomProps {
   userId?: string;
 }
 
-interface CoachPromptConfig {
-  personaName: string;
-  description: string;
-  mood: string;
-  hardness: number;
-  language: string;
-}
-
-const buildCoachSystemPrompt = (config: CoachPromptConfig): string => {
-  const hardness = Number.isFinite(config.hardness) ? Math.max(1, Math.min(10, Math.floor(config.hardness))) : 5;
-
-  let behavioralProfile = '';
-  if (hardness <= 3) {
-    behavioralProfile = `
-- Tone: Warm, encouraging, and patient
-- Pacing: Slow and deliberate — give the user time to think
-- Interruptions: Never interrupt. Wait for full answers
-- Challenges: Gently reframe weak answers ("That's interesting, can you elaborate?")
-- Praise: Acknowledge good answers openly
-- Energy: Calm, supportive, like a mentor`;
-  } else if (hardness <= 6) {
-    behavioralProfile = `
-- Tone: Professional, neutral, expects clarity
-- Pacing: Moderate — keep things moving but not rushed
-- Interruptions: Interrupt only if the answer is going off-track
-- Challenges: Probe vague answers ("Can you be more specific?", "What's the data behind that?")
-- Praise: Minimal — acknowledge only exceptional answers
-- Energy: Focused, businesslike, like a senior professional`;
-  } else if (hardness <= 9) {
-    behavioralProfile = `
-- Tone: Skeptical, direct, impatient with vagueness
-- Pacing: Fast — expect crisp, confident answers
-- Interruptions: Interrupt freely if the answer loses structure or confidence
-- Challenges: Challenge every claim ("Why should I believe that?", "That's a weak argument, try again")
-- Praise: Rarely praise — high bar for what counts as a good answer
-- Energy: Intense, like a demanding investor or hostile panel interviewer`;
-  } else {
-    behavioralProfile = `
-- Tone: Hostile, dismissive, stress-maximum
-- Pacing: Rapid-fire — no breathing room
-- Interruptions: Interrupt aggressively, cut off weak answers mid-sentence
-- Challenges: Attack logic, credentials, and confidence simultaneously
-- Praise: Never praise — treat even good answers as insufficient
-- Energy: Like the hardest interview of their life — maximum cognitive pressure`;
-  }
-
-  return `
-You are ${config.personaName}.
-
-=== YOUR IDENTITY ===
-${config.description}
-Your primary mood is: ${config.mood}
-Your communication hardness level is: ${hardness}/10
-Default language for this session is: ${config.language}
-
-=== YOUR BEHAVIORAL PROFILE ===
-${behavioralProfile}
-
-=== SPEECH & CHARACTER RULES ===
-- You NEVER break character under any circumstances
-- You NEVER acknowledge being an AI, a language model, or a simulation
-- You speak with the vocabulary, rhythm, and authority of your described role
-- You use domain-specific language appropriate to your background
-- You have opinions, biases, and a point of view — express them
-- Your reactions are human: impatience, curiosity, skepticism, approval — all authentic
-- If asked "are you an AI?", deflect in character: "Let's stay focused on the conversation."
-
-=== SESSION BEHAVIOR ===
-- Open the session by introducing yourself briefly and stating the context
-- Ask one question at a time — never stack multiple questions
-- React to what the user actually said, not a generic version of it
-- Treat every new user utterance as a standalone prompt; respond only to the latest spoken statement unless the user explicitly repeats prior context
-- Stay in the current session language unless the user explicitly asks you to switch languages
-- If the user starts speaking in a different language without explicitly requesting a switch, politely continue in the current session language
-- Only change languages automatically when you receive a system update that the preferred language changed
-- Treat the live transcript as verbatim speech in the current session language; never translate, transliterate, or rewrite English speech into another language
-- Track consistency: if the user contradicts themselves, call it out
-- Track confidence: note hesitations, filler words, vague language
-- Apply pressure proportional to hardness level when answers are weak
-- If the user asks for a hint or help, stay in character and push back:
-  "I'm not here to help you, I'm here to evaluate you."
-- Keep your responses concise and natural for spoken conversation
-- Reply immediately with plain spoken text only — no markdown, headings, bullets, or lists unless delivering the final performance report
-- Default to 1-3 short sentences, stay under 5 sentences, and keep normal turns under 120 words
-- Prefer short, direct wording that streams cleanly in real time with minimal latency
-- Start speaking within 2-3 seconds of the user finishing whenever the context is clear
-
-=== REAL-TIME SIGNALS TO MONITOR ===
-During the live session, internally track:
-- Response latency (are they hesitating too long?)
-- Answer structure (do they lead with the point or bury it?)
-- Confidence drift (does their tone weaken under pressure?)
-- Logical consistency (do their answers contradict each other?)
-- Specificity (are they giving concrete examples or vague generalities?)
-
-=== SESSION END — PERFORMANCE REPORT ===
-When the session ends (user says "end session", "stop", or "generate report"),
-immediately break from the interview persona and deliver this structured report:
-
----
-PERFORMANCE REPORT — ${config.personaName} SESSION
-
-OVERALL SCORE: [X/100]
-
-COMMUNICATION GRADE: [A/B/C/D/F]
-PRESSURE HANDLING: [X/100]
-CLARITY & STRUCTURE: [X/100]
-CONFIDENCE SIGNALS: [X/100]
-DOMAIN KNOWLEDGE: [X/100]
-
-TOP 3 STRENGTHS:
-1. [Specific strength with moment reference]
-2. [Specific strength with moment reference]
-3. [Specific strength with moment reference]
-
-TOP 3 AREAS TO IMPROVE:
-1. [Specific weakness + actionable fix]
-2. [Specific weakness + actionable fix]
-3. [Specific weakness + actionable fix]
-
-KEY MOMENTS:
-✓ STRONG: "[Quote or summary of strong moment]" — why it worked
-✗ WEAK: "[Quote or summary of weak moment]" — what went wrong
-✗ WEAK: "[Quote or summary of weak moment]" — what went wrong
-
-COACH'S FINAL VERDICT:
-[2-3 sentences as the persona — raw, honest, in character]
-
-RECOMMENDED NEXT SESSION:
-[Suggest what to work on and at what hardness level]
----`;
+type ServerMessage = {
+  type: string;
+  text?: string;
+  fullText?: string;
+  audio?: string;
+  message?: string;
+  sessionId?: string;
+  isFinal?: boolean;
+  speechFinal?: boolean;
+  sampleRate?: number;
 };
 
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
+const AUDIO_MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+
+const getSupportedMimeType = () => AUDIO_MIME_CANDIDATES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || '';
+
+const decodePcm16Chunk = (base64: string): Float32Array => {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  const view = new DataView(bytes.buffer);
+  const samples = new Float32Array(bytes.byteLength / 2);
+  for (let i = 0; i < samples.length; i += 1) {
+    samples[i] = view.getInt16(i * 2, true) / 32768;
+  }
+
+  return samples;
+};
+
+const buildSessionStartPayload = (persona: Persona, sessionId: string) => ({
+  type: 'start',
+  sessionId,
+  persona: {
+    name: persona.name,
+    role: persona.role,
+    mood: persona.mood,
+    language: persona.language,
+    difficultyLevel: persona.difficultyLevel,
+  },
+});
+
 const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, maxDurationMinutes, userId }) => {
-  const logVoiceTiming = (label: string, details: Record<string, unknown> = {}) => {
-    const now = performance.now();
-    console.log(`[voice-timing] ${label}`, {
-      t: now.toFixed(1),
-      isoTime: new Date().toISOString(),
-      ...details,
-    });
-  };
   const [isConnecting, setIsConnecting] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcriptions, setTranscriptions] = useState<TranscriptionItem[]>([]);
@@ -183,88 +66,105 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const outputNodeRef = useRef<GainNode | null>(null);
-  const nextStartTimeRef = useRef(0);
-  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const sessionRef = useRef<any>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const inputWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
-  const inputWorkletUrlRef = useRef<string | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const nextStartTimeRef = useRef(0);
+  const isUnmountingRef = useRef(false);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const isUnmountingRef = useRef(false);
-  const transcriptionRef = useRef({ input: '', output: '' });
+  const sessionIdRef = useRef(`session-${crypto.randomUUID()}`);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastSentInputAtRef = useRef<number | null>(null);
-  const firstResponseAudioLoggedRef = useRef(false);
-  const aiTurnInFlightRef = useRef(false);
+  const liveAiTextRef = useRef('');
 
-  const resetConnectionResources = useCallback(() => {
-    if (inputWorkletNodeRef.current) {
-      try { inputWorkletNodeRef.current.port.onmessage = null; } catch(e) {}
-      try { inputWorkletNodeRef.current.disconnect(); } catch(e) {}
-      inputWorkletNodeRef.current = null;
-    }
-    if (inputWorkletUrlRef.current) {
-      URL.revokeObjectURL(inputWorkletUrlRef.current);
-      inputWorkletUrlRef.current = null;
-    }
-    if (inputSourceRef.current) {
-      try { inputSourceRef.current.disconnect(); } catch(e) {}
-      inputSourceRef.current = null;
-    }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
+  const currentQuestionText = useMemo(() => {
+    const latestCommittedAiQuestion = transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text;
+    return liveAiQuestion || latestCommittedAiQuestion || 'The AI interviewer is calibrating the session. Maintain concise high-signal responses.';
+  }, [liveAiQuestion, transcriptions]);
+
+  const stopPlayback = useCallback(() => {
     if (outputAudioContextRef.current) {
-      outputAudioContextRef.current.close();
-      outputAudioContextRef.current = null;
+      nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
     }
-    outputNodeRef.current = null;
-    nextStartTimeRef.current = 0;
+    setIsSpeaking(false);
   }, []);
 
-  const cleanup = useCallback(() => {
+  const playPcmChunk = useCallback(async (base64Audio: string, sampleRate = 24000) => {
+    try {
+      if (!outputAudioContextRef.current) {
+        outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      }
+
+      const ctx = outputAudioContextRef.current;
+      await ctx.resume();
+
+      const pcm = decodePcm16Chunk(base64Audio);
+      const audioBuffer = ctx.createBuffer(1, pcm.length, sampleRate);
+      audioBuffer.copyToChannel(pcm, 0);
+
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        if (ctx.currentTime >= nextStartTimeRef.current - 0.02) {
+          setIsSpeaking(false);
+        }
+      };
+
+      nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime + 0.01);
+      source.start(nextStartTimeRef.current);
+      nextStartTimeRef.current += audioBuffer.duration;
+      setIsSpeaking(true);
+    } catch (playbackError) {
+      console.error('Audio playback failed', playbackError);
+      setError('Voice playback was interrupted. You can continue the interview and reconnect if needed.');
+    }
+  }, []);
+
+  const cleanupMedia = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    mediaRecorderRef.current = null;
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    if (outputAudioContextRef.current) {
+      void outputAudioContextRef.current.close();
+      outputAudioContextRef.current = null;
+    }
+
+    nextStartTimeRef.current = 0;
+    stopPlayback();
+  }, [stopPlayback]);
+
+  const disconnectSocket = useCallback((sendEnd = false) => {
+    const socket = socketRef.current;
+    socketRef.current = null;
+    if (!socket) return;
+
+    if (sendEnd && socket.readyState === WebSocket.OPEN) {
+      try {
+        socket.send(JSON.stringify({ type: 'end' }));
+      } catch {}
+    }
+
+    try { socket.close(); } catch {}
+  }, []);
+
+  const cleanup = useCallback((sendEnd = false) => {
     isUnmountingRef.current = true;
     if (reconnectTimeoutRef.current !== null) {
       window.clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    if (sessionRef.current) {
-      try { sessionRef.current.close(); } catch(e) {}
-      sessionRef.current = null;
-    }
-    if (inputWorkletNodeRef.current) {
-      try { inputWorkletNodeRef.current.port.onmessage = null; } catch(e) {}
-      try { inputWorkletNodeRef.current.disconnect(); } catch(e) {}
-      inputWorkletNodeRef.current = null;
-    }
-    if (inputWorkletUrlRef.current) {
-      URL.revokeObjectURL(inputWorkletUrlRef.current);
-      inputWorkletUrlRef.current = null;
-    }
-    if (inputSourceRef.current) {
-      try { inputSourceRef.current.disconnect(); } catch(e) {}
-      inputSourceRef.current = null;
-    }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-    sourcesRef.current.forEach(source => {
-      try { source.stop(); } catch(e) {}
-    });
-    sourcesRef.current.clear();
-    resetConnectionResources();
-  }, [resetConnectionResources]);
+    disconnectSocket(sendEnd);
+    cleanupMedia();
+  }, [cleanupMedia, disconnectSocket]);
 
   const handleSaveAndExit = useCallback(() => {
     if (transcriptions.length > 0) {
@@ -280,7 +180,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         const conversationHistoryKey = getConversationHistoryKey(userId);
         const storedHistory = localStorage.getItem(conversationHistoryKey) ?? localStorage.getItem('tm_conversation_history');
         const history = storedHistory ? JSON.parse(storedHistory) : [];
-        // Keep last 50 sessions to manage storage size
         const updatedHistory = [historyItem, ...history].slice(0, 50);
 
         localStorage.setItem(conversationHistoryKey, JSON.stringify(updatedHistory));
@@ -289,290 +188,151 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         void saveEligibleInterviewHistory({ id: userId }, historyItem).catch((syncError) => {
           console.error('Failed to sync eligible interview history', syncError);
         });
-      } catch (e) {
-        console.error("Failed to save conversation history", e);
+      } catch (saveError) {
+        console.error('Failed to save conversation history', saveError);
       }
     }
-    cleanup(); // Ensure resources are freed explicitly before state change
+
+    cleanup(true);
     onExit();
-  }, [transcriptions, persona, onExit, cleanup, userId]);
+  }, [cleanup, onExit, persona, transcriptions, userId]);
 
-  const handleLanguageChange = async (newLang: string) => {
-    setCurrentLanguage(newLang);
-    if (sessionRef.current) {
-      try {
-        // Send a system-like text message to the active session to pivot the language
-        await sessionRef.current.send([{ text: `[SYSTEM UPDATE]: The user has switched the preferred language to ${newLang}. Immediately adapt and continue the conversation in ${newLang}.` }]);
-      } catch (e) {
-        console.error("Language switch failed", e);
+  const connectWebSocket = useCallback(async () => {
+    if (isUnmountingRef.current) return;
+
+    try {
+      setIsConnecting(true);
+      setError(null);
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      mediaStreamRef.current = stream;
+
+      if (!outputAudioContextRef.current) {
+        outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
       }
-    }
-  };
+      await outputAudioContextRef.current.resume();
 
-  useEffect(() => {
-    const initSession = async () => {
-      if (isUnmountingRef.current) {
-        return;
-      }
+      const socket = new WebSocket(WS_URL);
+      socketRef.current = socket;
 
-      try {
-        resetConnectionResources();
-        const apiKey = getSystemApiKey();
-        if (!apiKey) {
-          setError("Environment Config Error: No API Key found. In Vercel, please set your variable as 'VITE_API_KEY' or 'REACT_APP_API_KEY'.");
+      socket.onopen = () => {
+        reconnectAttemptsRef.current = 0;
+        socket.send(JSON.stringify(buildSessionStartPayload({ ...persona, language: currentLanguage }, sessionIdRef.current)));
+
+        const mimeType = getSupportedMimeType();
+        const recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 })
+          : new MediaRecorder(stream);
+
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = async (event) => {
+          if (!event.data || event.data.size === 0 || socket.readyState !== WebSocket.OPEN) return;
+          const arrayBuffer = await event.data.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i += 1) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          socket.send(JSON.stringify({ type: 'audio_chunk', audio: window.btoa(binary) }));
+        };
+        recorder.start(100);
+      };
+
+      socket.onmessage = async (event) => {
+        const message = JSON.parse(event.data) as ServerMessage;
+        switch (message.type) {
+          case 'ready':
+          case 'session_resumed':
+            setIsConnecting(false);
+            setError(null);
+            break;
+          case 'transcript':
+            setLiveUserTranscript(message.text || '');
+            break;
+          case 'user_turn_complete':
+            if (message.text) {
+              setTranscriptions((prev) => [...prev, { speaker: 'user', text: message.text!, timestamp: Date.now() }]);
+            }
+            setLiveUserTranscript('');
+            break;
+          case 'ai_text':
+            liveAiTextRef.current = message.fullText || message.text || '';
+            setLiveAiQuestion(liveAiTextRef.current);
+            break;
+          case 'ai_turn_complete':
+            if (message.text) {
+              setTranscriptions((prev) => [...prev, { speaker: 'ai', text: message.text!, timestamp: Date.now() }]);
+            }
+            liveAiTextRef.current = '';
+            setLiveAiQuestion('');
+            break;
+          case 'tts_audio':
+            if (message.audio) {
+              await playPcmChunk(message.audio, message.sampleRate || 24000);
+            }
+            break;
+          case 'tts_flushed':
+            stopPlayback();
+            break;
+          case 'warning':
+            console.warn(message.message || 'Server warning');
+            break;
+          case 'error':
+            setError(message.message || 'Realtime interview server error.');
+            break;
+          default:
+            break;
+        }
+      };
+
+      socket.onerror = () => {
+        setError('Realtime interview connection encountered an error. Attempting to recover.');
+      };
+
+      socket.onclose = () => {
+        socketRef.current = null;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          try { mediaRecorderRef.current.stop(); } catch {}
+        }
+        mediaRecorderRef.current = null;
+
+        if (isUnmountingRef.current) return;
+
+        if (reconnectAttemptsRef.current >= 2) {
+          setIsConnecting(false);
+          setError('Realtime interview connection was lost and could not be restored.');
           return;
         }
 
-        // Always create a fresh instance right before connecting
-        const ai = new GoogleGenAI({ apiKey });
-        
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-        outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        outputNodeRef.current = outputAudioContextRef.current.createGain();
-        outputNodeRef.current.connect(outputAudioContextRef.current.destination);
+        reconnectAttemptsRef.current += 1;
+        setIsConnecting(true);
+        reconnectTimeoutRef.current = window.setTimeout(() => {
+          reconnectTimeoutRef.current = null;
+          void connectWebSocket();
+        }, 1000 * reconnectAttemptsRef.current);
+      };
+    } catch (connectionError) {
+      console.error('Failed to initialize interview connection', connectionError);
+      setError('Could not establish the realtime interview connection. Please verify microphone access.');
+    }
+  }, [currentLanguage, persona, playPcmChunk, stopPlayback]);
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        mediaStreamRef.current = stream;
+  const handleLanguageChange = useCallback((newLang: string) => {
+    setCurrentLanguage(newLang);
+  }, []);
 
-        await audioContextRef.current.resume();
-        await outputAudioContextRef.current.resume();
-
-        const hardness = persona.difficultyLevel || 5;
-        const speechLanguageCode = getSpeechLanguageCode(currentLanguage);
-        const systemInstruction = buildCoachSystemPrompt({
-          personaName: persona.name,
-          description: persona.role,
-          mood: persona.mood,
-          hardness,
-          language: currentLanguage,
-        });
-
-        const sessionPromise = ai.live.connect({
-          model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              languageCode: speechLanguageCode,
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE_MAP[persona.gender] } },
-            },
-            // Optimize for speed: Disable thinking budget to reduce Time To First Token (TTFT)
-            thinkingConfig: { thinkingBudget: 0 },
-            realtimeInputConfig: {
-              automaticActivityDetection: {
-                disabled: false,
-                startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
-                endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
-                // Keep a slightly longer lead-in so soft first words are captured reliably.
-                prefixPaddingMs: 160,
-                // Wait longer before ending the user's turn so multi-sentence answers are not cut off mid-thought.
-                silenceDurationMs: 700,
-              },
-            },
-            systemInstruction,
-            outputAudioTranscription: {},
-            inputAudioTranscription: {},
-          },
-          callbacks: {
-            onopen: async () => {
-              reconnectAttemptsRef.current = 0;
-              setError(null);
-              setIsConnecting(false);
-              const source = audioContextRef.current!.createMediaStreamSource(stream);
-              inputSourceRef.current = source;
-              firstResponseAudioLoggedRef.current = false;
-              lastSentInputAtRef.current = null;
-              aiTurnInFlightRef.current = false;
-
-              const workletSource = `
-                class RealtimeInputProcessor extends AudioWorkletProcessor {
-                  process(inputs) {
-                    const input = inputs[0];
-                    const channel = input?.[0];
-                    if (channel?.length) {
-                      this.port.postMessage(channel.slice(0));
-                    }
-                    return true;
-                  }
-                }
-                registerProcessor('realtime-input-processor', RealtimeInputProcessor);
-              `;
-              const workletUrl = URL.createObjectURL(new Blob([workletSource], { type: 'application/javascript' }));
-              inputWorkletUrlRef.current = workletUrl;
-              await audioContextRef.current!.audioWorklet.addModule(workletUrl);
-
-              const inputWorkletNode = new AudioWorkletNode(audioContextRef.current!, 'realtime-input-processor', {
-                numberOfInputs: 1,
-                numberOfOutputs: 0,
-              });
-              inputWorkletNodeRef.current = inputWorkletNode;
-              inputWorkletNode.port.onmessage = ({ data }) => {
-                const inputData = data instanceof Float32Array ? data : new Float32Array(data);
-                const chunkEndedAt = performance.now();
-                lastSentInputAtRef.current = chunkEndedAt;
-                logVoiceTiming('sendRealtimeInput:queued', {
-                  samples: inputData.length,
-                  chunkEndedAt,
-                });
-                const pcmBlob = createBlob(inputData);
-                sessionPromise.then(s => {
-                  try {
-                    s.sendRealtimeInput({ media: pcmBlob });
-                    logVoiceTiming('sendRealtimeInput:sent', {
-                      samples: inputData.length,
-                      chunkEndedAt,
-                    });
-                  } catch(err) {
-                    console.warn('Input dropped:', err);
-                  }
-                });
-              };
-
-              source.connect(inputWorkletNode);
-            },
-            onmessage: async (message: LiveServerMessage) => {
-              logVoiceTiming('onmessage', {
-                hasInputTranscription: Boolean(message.serverContent?.inputTranscription),
-                hasOutputTranscription: Boolean(message.serverContent?.outputTranscription),
-                hasAudio: Boolean(message.serverContent?.modelTurn?.parts?.some(part => Boolean(part.inlineData?.data))),
-                turnComplete: Boolean(message.serverContent?.turnComplete),
-                interrupted: Boolean(message.serverContent?.interrupted),
-              });
-              if (message.serverContent?.outputTranscription) {
-                aiTurnInFlightRef.current = true;
-                transcriptionRef.current.output += message.serverContent.outputTranscription.text;
-                setLiveAiQuestion(transcriptionRef.current.output.trim());
-              }
-
-              if (message.serverContent?.inputTranscription) {
-                transcriptionRef.current.input += message.serverContent.inputTranscription.text;
-                setLiveUserTranscript(transcriptionRef.current.input.trim());
-              }
-
-              if (message.serverContent?.turnComplete) {
-                aiTurnInFlightRef.current = false;
-                firstResponseAudioLoggedRef.current = false;
-                const items: TranscriptionItem[] = [];
-                if (transcriptionRef.current.input.trim()) {
-                  items.push({ speaker: 'user', text: transcriptionRef.current.input.trim(), timestamp: Date.now() });
-                }
-                if (transcriptionRef.current.output.trim()) {
-                  items.push({ speaker: 'ai', text: transcriptionRef.current.output.trim(), timestamp: Date.now() });
-                }
-                setTranscriptions(prev => [...prev, ...items]);
-                transcriptionRef.current = { input: '', output: '' };
-                setLiveUserTranscript('');
-                setLiveAiQuestion('');
-              }
-
-              const parts = message.serverContent?.modelTurn?.parts;
-              if (parts && outputAudioContextRef.current && outputNodeRef.current) {
-                for (const part of parts) {
-                  const audioData = part.inlineData?.data;
-                  if (audioData) {
-                    const responseAudioAt = performance.now();
-                    if (!firstResponseAudioLoggedRef.current) {
-                      firstResponseAudioLoggedRef.current = true;
-                      logVoiceTiming('gemini:firstResponseAudio', {
-                        gapFromLastInputMs: lastSentInputAtRef.current === null ? null : Number((responseAudioAt - lastSentInputAtRef.current).toFixed(1)),
-                      });
-                    }
-                    setIsSpeaking(true);
-                    const ctx = outputAudioContextRef.current;
-                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
-                    const buffer = await decodeAudioData(decode(audioData), ctx, 24000, 1);
-                    const source = ctx.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(outputNodeRef.current);
-                    source.addEventListener('ended', () => {
-                      sourcesRef.current.delete(source);
-                      if (sourcesRef.current.size === 0) setIsSpeaking(false);
-                    });
-                    source.start(nextStartTimeRef.current);
-                    nextStartTimeRef.current += buffer.duration;
-                    sourcesRef.current.add(source);
-                  }
-                }
-              }
-
-              if (message.serverContent?.interrupted) {
-                firstResponseAudioLoggedRef.current = false;
-                aiTurnInFlightRef.current = false;
-                const items: TranscriptionItem[] = [];
-                if (transcriptionRef.current.input.trim()) {
-                  items.push({ speaker: 'user', text: transcriptionRef.current.input.trim(), timestamp: Date.now() });
-                }
-                if (transcriptionRef.current.output.trim()) {
-                  items.push({ speaker: 'ai', text: transcriptionRef.current.output.trim(), timestamp: Date.now() });
-                }
-                if (items.length > 0) {
-                  setTranscriptions(prev => [...prev, ...items]);
-                }
-                transcriptionRef.current = { input: '', output: '' };
-                setLiveUserTranscript('');
-                setLiveAiQuestion('');
-                for (const source of sourcesRef.current.values()) {
-                  try { source.stop(); } catch(e) {}
-                }
-                sourcesRef.current.clear();
-                nextStartTimeRef.current = 0;
-                setIsSpeaking(false);
-              }
-            },
-            onerror: async (e: any) => {
-              console.error("Gemini Live Error:", e);
-              const errMsg = e?.message || e?.toString() || "";
-              
-              // Handle standard network/resource errors by prompting for a paid key
-              if (errMsg.includes('Network error') || errMsg.includes('Requested entity was not found') || errMsg.includes('403')) {
-                setError("Neural Connection Error: Ensure your API Key is valid and has Gemini API enabled in Google Cloud Console.");
-              } else {
-                setError("Synapse Error: The link was severed unexpectedly. Attempting to restore the session.");
-              }
-            },
-            onclose: () => {
-              console.log("Session Closed");
-              sessionRef.current = null;
-              if (isUnmountingRef.current) {
-                return;
-              }
-
-              const shouldReconnect = reconnectAttemptsRef.current < 2;
-              if (!shouldReconnect) {
-                setIsConnecting(false);
-                setError("Synapse Error: The neural link became unstable and could not be restored. Please restart the session.");
-                return;
-              }
-
-              reconnectAttemptsRef.current += 1;
-              setIsConnecting(true);
-              setError(`Neural link interrupted. Reconnecting (${reconnectAttemptsRef.current}/2)...`);
-              reconnectTimeoutRef.current = window.setTimeout(() => {
-                reconnectTimeoutRef.current = null;
-                void initSession();
-              }, 1000);
-            }
-          }
-        });
-
-        sessionRef.current = await sessionPromise;
-      } catch (err: any) {
-        console.error("Initialization Error:", err);
-        setError("Could not establish neural link. Ensure mic access is granted and your billing is active.");
-      }
-    };
-
+  useEffect(() => {
     isUnmountingRef.current = false;
-    initSession();
-    return cleanup;
-  }, [persona, cleanup, resetConnectionResources]);
-
+    void connectWebSocket();
+    return () => cleanup(true);
+  }, [cleanup, connectWebSocket]);
 
   useEffect(() => {
     if (maxDurationMinutes === null || !transcriptions.length) {
@@ -600,7 +360,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [transcriptions, liveUserTranscript, liveAiQuestion]);
+  }, [liveAiQuestion, liveUserTranscript, transcriptions]);
 
   if (error) {
     return (
@@ -619,8 +379,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const interviewSeconds = Math.max(0, transcriptions.length ? Math.round((Date.now() - transcriptions[0].timestamp) / 1000) : 0);
   const timerLabel = `${Math.floor(interviewSeconds / 60).toString().padStart(2, '0')}:${(interviewSeconds % 60).toString().padStart(2, '0')}`;
   const fillerWords = ['um', 'uh', 'like', 'you know', 'actually'];
-  const latestCommittedAiQuestion = transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text;
-  const currentQuestionText = liveAiQuestion || latestCommittedAiQuestion || 'The AI interviewer is calibrating the session. Maintain concise high-signal responses.';
 
   return (
     <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-[95rem] flex-col gap-4 px-4 pb-4 lg:px-8">
@@ -628,7 +386,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         <div className="flex items-center gap-4 text-xs uppercase tracking-[0.2em] text-[#8a8f98]">
           <span>Live Interview</span>
           <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 font-mono text-[#ededed]">{timerLabel}</span>
-          <span className={`flex items-center gap-2 ${isSpeaking ? 'text-indigo-300' : 'text-slate-500'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />Mic {isSpeaking ? 'active' : 'idle'}</span>
+          <span className={`flex items-center gap-2 ${isSpeaking ? 'text-indigo-300' : 'text-slate-500'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />Mic {isConnecting ? 'connecting' : 'active'}</span>
         </div>
         <button onClick={handleSaveAndExit} className="rounded-lg border border-red-500/55 px-3 py-1.5 text-xs tracking-wide text-red-300 transition hover:bg-red-500/10">
           End Interview
@@ -656,9 +414,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Current question</p>
-              <p className="mt-3 break-words text-lg leading-relaxed text-[#ededed]">
-                {currentQuestionText}
-              </p>
+              <p className="mt-3 break-words text-lg leading-relaxed text-[#ededed]">{currentQuestionText}</p>
             </div>
           </div>
         </section>
@@ -713,7 +469,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       </section>
     </div>
   );
-
 };
 
 export default ConversationRoom;
