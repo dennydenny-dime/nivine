@@ -77,6 +77,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const sessionIdRef = useRef(`session-${crypto.randomUUID()}`);
   const containerRef = useRef<HTMLDivElement>(null);
   const liveAiTextRef = useRef('');
+  const recorderStartedRef = useRef(false);
 
   const currentQuestionText = useMemo(() => {
     const latestCommittedAiQuestion = transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text;
@@ -123,6 +124,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   }, []);
 
   const cleanupMedia = useCallback(() => {
+    recorderStartedRef.current = false;
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try { mediaRecorderRef.current.stop(); } catch {}
     }
@@ -165,6 +168,18 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     disconnectSocket(sendEnd);
     cleanupMedia();
   }, [cleanupMedia, disconnectSocket]);
+
+  const startRecorder = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    const socket = socketRef.current;
+
+    if (!recorder || !socket || socket.readyState !== WebSocket.OPEN || recorderStartedRef.current) {
+      return;
+    }
+
+    recorderStartedRef.current = true;
+    recorder.start(100);
+  }, []);
 
   const handleSaveAndExit = useCallback(() => {
     if (transcriptions.length > 0) {
@@ -231,6 +246,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 })
           : new MediaRecorder(stream);
 
+        recorderStartedRef.current = false;
         mediaRecorderRef.current = recorder;
         recorder.ondataavailable = async (event) => {
           if (!event.data || event.data.size === 0 || socket.readyState !== WebSocket.OPEN) return;
@@ -242,7 +258,6 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           }
           socket.send(JSON.stringify({ type: 'audio_chunk', audio: window.btoa(binary) }));
         };
-        recorder.start(100);
       };
 
       socket.onmessage = async (event) => {
@@ -250,6 +265,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         switch (message.type) {
           case 'ready':
           case 'session_resumed':
+            startRecorder();
             setIsConnecting(false);
             setError(null);
             break;
@@ -322,7 +338,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       console.error('Failed to initialize interview connection', connectionError);
       setError('Could not establish the realtime interview connection. Please verify microphone access.');
     }
-  }, [currentLanguage, persona, playPcmChunk, stopPlayback]);
+  }, [currentLanguage, persona, playPcmChunk, startRecorder, stopPlayback]);
 
   const handleLanguageChange = useCallback((newLang: string) => {
     setCurrentLanguage(newLang);
