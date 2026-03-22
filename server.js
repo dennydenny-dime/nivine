@@ -346,8 +346,8 @@ async function initializeStt(session) {
     sendJson(session.ws, { type: 'ready', sessionId: session.id });
   });
 
-  connection.on(LiveTranscriptionEvents.Error, (error) => {
-    console.error('[stt] error', error);
+  connection.on(LiveTranscriptionEvents.Error, (err) => {
+    console.error('[stt] detailed error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     sendJson(session.ws, { type: 'warning', message: 'Speech recognition hiccup detected. Attempting to continue.' });
   });
 
