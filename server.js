@@ -336,7 +336,7 @@ async function initializeStt(session) {
     interim_results: true,
     smart_format: true,
     channels: 1,
-    endpointing: 300,
+    endpointing: 800,
   });
 
   session.sttConnection = connection;
