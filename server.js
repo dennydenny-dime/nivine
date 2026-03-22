@@ -185,7 +185,7 @@ async function queueTtsSentence(session, sentence) {
   if (!text) return;
 
   try {
-    const response = await deepgram.speak.request({ text }, { model: 'aura-asteria-en', encoding: 'linear16', sample_rate: 24000 });
+    const response = await deepgram.speak.request({ text }, { model: 'aura-asteria-en', encoding: 'mp3' });
     const stream = await response.getStream?.() ?? response.stream;
     if (!stream) {
       throw new Error('Deepgram TTS response did not include a readable stream.');
@@ -206,8 +206,7 @@ async function queueTtsSentence(session, sentence) {
     sendJson(session.ws, {
       type: 'tts_audio',
       audio: audioBuffer.toString('base64'),
-      sampleRate: 24000,
-      encoding: 'linear16',
+      encoding: 'mp3',
     });
     sendJson(session.ws, { type: 'tts_flushed' });
     sendJson(session.ws, { type: 'ai_sentence', text });
