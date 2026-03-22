@@ -351,7 +351,8 @@ async function initializeStt(session) {
     sendJson(session.ws, { type: 'warning', message: 'Speech recognition hiccup detected. Attempting to continue.' });
   });
 
-  connection.on(LiveTranscriptionEvents.Close, () => {
+  connection.on(LiveTranscriptionEvents.Close, (event) => {
+    console.error('[stt] Connection closed. Code:', event?.code, 'Reason:', event?.reason);
     session.sttConnection = null;
   });
 
