@@ -81,6 +81,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const containerRef = useRef<HTMLDivElement>(null);
   const liveAiTextRef = useRef('');
   const recorderStartedRef = useRef(false);
+  const aiTurnActiveRef = useRef(false);
 
   const currentQuestionText = useMemo(() => {
     const latestCommittedAiQuestion = transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text;
@@ -99,6 +100,35 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       activePlaybackTurnRef.current = null;
     }
     setIsSpeaking(false);
+  }, []);
+
+  const pauseRecorder = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorderStartedRef.current || !recorder || recorder.state !== 'recording') {
+      return;
+    }
+
+    try {
+      recorder.pause();
+    } catch {}
+  }, []);
+
+  const resumeRecorder = useCallback(() => {
+    if (aiTurnActiveRef.current) {
+      return;
+    }
+
+    const recorder = mediaRecorderRef.current;
+    const socket = socketRef.current;
+    if (!recorderStartedRef.current || !recorder || !socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    if (recorder.state === 'paused') {
+      try {
+        recorder.resume();
+      } catch {}
+    }
   }, []);
 
   const playPcmChunk = useCallback(async (base64Audio: string, turnId?: number, sampleRate = 24000) => {
@@ -129,6 +159,9 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         activeSourcesRef.current.delete(source);
         if (ctx.currentTime >= nextStartTimeRef.current - 0.02 && activeSourcesRef.current.size === 0) {
           setIsSpeaking(false);
+          if (!aiTurnActiveRef.current) {
+            resumeRecorder();
+          }
         }
       };
 
@@ -140,7 +173,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       console.error('Audio playback failed', playbackError);
       setError('Voice playback was interrupted. You can continue the interview and reconnect if needed.');
     }
-  }, [stopPlayback]);
+  }, [resumeRecorder, stopPlayback]);
 
   const cleanupMedia = useCallback(() => {
     recorderStartedRef.current = false;
@@ -192,12 +225,19 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     const recorder = mediaRecorderRef.current;
     const socket = socketRef.current;
 
-    if (!recorder || !socket || socket.readyState !== WebSocket.OPEN || recorderStartedRef.current) {
+    if (!recorder || !socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    recorderStartedRef.current = true;
-    recorder.start(100);
+    if (!recorderStartedRef.current) {
+      recorderStartedRef.current = true;
+      recorder.start(100);
+      return;
+    }
+
+    if (recorder.state === 'paused' && !aiTurnActiveRef.current) {
+      recorder.resume();
+    }
   }, []);
 
   const handleSaveAndExit = useCallback(() => {
@@ -289,7 +329,9 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             setError(null);
             break;
           case 'transcript':
-            setLiveUserTranscript(message.text || '');
+            if (!aiTurnActiveRef.current) {
+              setLiveUserTranscript(message.text || '');
+            }
             break;
           case 'user_turn_complete':
             stopPlayback(true);
@@ -299,6 +341,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             setLiveUserTranscript('');
             break;
           case 'ai_text':
+            aiTurnActiveRef.current = true;
+            pauseRecorder();
             if (typeof message.turnId === 'number' && activePlaybackTurnRef.current !== null && activePlaybackTurnRef.current !== message.turnId) {
               stopPlayback();
             }
@@ -309,10 +353,16 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             if (message.text) {
               setTranscriptions((prev) => [...prev, { speaker: 'ai', text: message.text!, timestamp: Date.now() }]);
             }
+            aiTurnActiveRef.current = false;
             liveAiTextRef.current = '';
             setLiveAiQuestion('');
+            if (activeSourcesRef.current.size === 0) {
+              resumeRecorder();
+            }
             break;
           case 'tts_audio':
+            aiTurnActiveRef.current = true;
+            pauseRecorder();
             if (message.audio) {
               await playPcmChunk(message.audio, message.turnId, message.sampleRate || 24000);
             }
@@ -363,7 +413,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       console.error('Failed to initialize interview connection', connectionError);
       setError('Could not establish the realtime interview connection. Please verify microphone access.');
     }
-  }, [currentLanguage, persona, playPcmChunk, startRecorder, stopPlayback]);
+  }, [currentLanguage, pauseRecorder, persona, playPcmChunk, resumeRecorder, startRecorder, stopPlayback]);
 
   const handleLanguageChange = useCallback((newLang: string) => {
     setCurrentLanguage(newLang);
