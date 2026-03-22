@@ -7,8 +7,8 @@ import crypto from 'node:crypto';
 
 const PORT = Number.parseInt(process.env.PORT || '3001', 10);
 const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
-const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const DEEPGRAM_API_KEY = (process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY).trim();
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 const SESSION_TTL_MS = 1000 * 60 * 30;
 const GEMINI_PRIMARY_MODEL = 'gemini-2.5-flash';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
@@ -334,10 +334,8 @@ async function initializeStt(session) {
     punctuate: true,
     interim_results: true,
     smart_format: true,
-    encoding: 'webm-opus',
     channels: 1,
     endpointing: 300,
-    utterance_end_ms: 1000,
   });
 
   session.sttConnection = connection;
@@ -347,7 +345,8 @@ async function initializeStt(session) {
   });
 
   connection.on(LiveTranscriptionEvents.Error, (err) => {
-    console.error('[stt] detailed error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    console.error('[stt] raw error string:', String(err));
+    console.error('[stt] error message:', err.message || err.type);
     sendJson(session.ws, { type: 'warning', message: 'Speech recognition hiccup detected. Attempting to continue.' });
   });
 
