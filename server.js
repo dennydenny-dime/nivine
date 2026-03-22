@@ -186,7 +186,23 @@ async function queueTtsSentence(session, sentence) {
 
   try {
     const response = await deepgram.speak.request({ text }, { model: 'aura-asteria-en' });
-    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    const stream = await response.getStream?.() ?? response.stream;
+    if (!stream) {
+      throw new Error('Deepgram TTS response did not include a readable stream.');
+    }
+
+    const reader = stream.getReader();
+    const chunks = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(Buffer.from(value));
+      }
+    }
+
+    const audioBuffer = Buffer.concat(chunks);
     sendJson(session.ws, {
       type: 'tts_audio',
       audio: audioBuffer.toString('base64'),
