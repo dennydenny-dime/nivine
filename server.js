@@ -180,7 +180,7 @@ async function generateGeminiContentStream({ modelName, contents, systemInstruct
   });
 }
 
-async function queueTtsSentence(session, sentence) {
+async function queueTtsSentence(session, sentence, turnId) {
   const text = sentence.trim();
   if (!text) return;
 
@@ -207,10 +207,11 @@ async function queueTtsSentence(session, sentence) {
       type: 'tts_audio',
       audio: audioBuffer.toString('base64'),
       sampleRate: 24000,
-      encoding: 'linear16'
+      encoding: 'linear16',
+      turnId,
     });
-    sendJson(session.ws, { type: 'tts_flushed' });
-    sendJson(session.ws, { type: 'ai_sentence', text });
+    sendJson(session.ws, { type: 'tts_flushed', turnId });
+    sendJson(session.ws, { type: 'ai_sentence', text, turnId });
   } catch (error) {
     console.error('[tts] queue sentence failed', error);
     sendJson(session.ws, { type: 'warning', message: 'TTS temporarily unavailable. Continuing with text only.' });
@@ -275,13 +276,13 @@ async function streamGeminiResponse(session, userText) {
       if (!text) continue;
 
       session.pendingAiText += text;
-      sendJson(session.ws, { type: 'ai_text', text, fullText: session.pendingAiText });
+      sendJson(session.ws, { type: 'ai_text', text, fullText: session.pendingAiText, turnId });
 
       const { sentences, remaining } = maybeCollectSentenceFragments(session.pendingAiText, false);
       session.pendingAiText = remaining;
       for (const sentence of sentences) {
         session.finalizedAiText += `${session.finalizedAiText ? ' ' : ''}${sentence}`;
-        await queueTtsSentence(session, sentence);
+        await queueTtsSentence(session, sentence, turnId);
       }
     }
 
@@ -293,7 +294,7 @@ async function streamGeminiResponse(session, userText) {
     session.pendingAiText = '';
     for (const sentence of sentences) {
       session.finalizedAiText += `${session.finalizedAiText ? ' ' : ''}${sentence}`;
-      await queueTtsSentence(session, sentence);
+      await queueTtsSentence(session, sentence, turnId);
     }
 
     const aiText = session.finalizedAiText.trim();
@@ -303,7 +304,7 @@ async function streamGeminiResponse(session, userText) {
     }
 
 
-    sendJson(session.ws, { type: 'ai_turn_complete', text: aiText });
+    sendJson(session.ws, { type: 'ai_turn_complete', text: aiText, turnId });
   } catch (error) {
     if (controller.signal.aborted) {
       sendJson(session.ws, { type: 'warning', message: 'Previous response cancelled for a newer turn.' });

@@ -22,6 +22,7 @@ type ServerMessage = {
   isFinal?: boolean;
   speechFinal?: boolean;
   sampleRate?: number;
+  turnId?: number;
 };
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
@@ -71,6 +72,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef(0);
+  const activePlaybackTurnRef = useRef<number | null>(null);
+  const activeSourcesRef = useRef(new Set<AudioBufferSourceNode>());
   const isUnmountingRef = useRef(false);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -84,14 +87,21 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     return liveAiQuestion || latestCommittedAiQuestion || 'The AI interviewer is calibrating the session. Maintain concise high-signal responses.';
   }, [liveAiQuestion, transcriptions]);
 
-  const stopPlayback = useCallback(() => {
+  const stopPlayback = useCallback((resetTurn = false) => {
+    activeSourcesRef.current.forEach((source) => {
+      try { source.stop(); } catch {}
+    });
+    activeSourcesRef.current.clear();
     if (outputAudioContextRef.current) {
       nextStartTimeRef.current = outputAudioContextRef.current.currentTime;
+    }
+    if (resetTurn) {
+      activePlaybackTurnRef.current = null;
     }
     setIsSpeaking(false);
   }, []);
 
-  const playPcmChunk = useCallback(async (base64Audio: string, sampleRate = 24000) => {
+  const playPcmChunk = useCallback(async (base64Audio: string, turnId?: number, sampleRate = 24000) => {
     try {
       if (!outputAudioContextRef.current) {
         outputAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
@@ -100,6 +110,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       const ctx = outputAudioContextRef.current;
       await ctx.resume();
 
+      if (typeof turnId === 'number') {
+        if (activePlaybackTurnRef.current !== null && activePlaybackTurnRef.current !== turnId) {
+          stopPlayback();
+        }
+        activePlaybackTurnRef.current = turnId;
+      }
+
       const pcm = decodePcm16Chunk(base64Audio);
       const audioBuffer = ctx.createBuffer(1, pcm.length, sampleRate);
       audioBuffer.copyToChannel(pcm, 0);
@@ -107,8 +124,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
+      activeSourcesRef.current.add(source);
       source.onended = () => {
-        if (ctx.currentTime >= nextStartTimeRef.current - 0.02) {
+        activeSourcesRef.current.delete(source);
+        if (ctx.currentTime >= nextStartTimeRef.current - 0.02 && activeSourcesRef.current.size === 0) {
           setIsSpeaking(false);
         }
       };
@@ -121,7 +140,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       console.error('Audio playback failed', playbackError);
       setError('Voice playback was interrupted. You can continue the interview and reconnect if needed.');
     }
-  }, []);
+  }, [stopPlayback]);
 
   const cleanupMedia = useCallback(() => {
     recorderStartedRef.current = false;
@@ -142,7 +161,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     }
 
     nextStartTimeRef.current = 0;
-    stopPlayback();
+    stopPlayback(true);
   }, [stopPlayback]);
 
   const disconnectSocket = useCallback((sendEnd = false) => {
@@ -273,12 +292,16 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             setLiveUserTranscript(message.text || '');
             break;
           case 'user_turn_complete':
+            stopPlayback(true);
             if (message.text) {
               setTranscriptions((prev) => [...prev, { speaker: 'user', text: message.text!, timestamp: Date.now() }]);
             }
             setLiveUserTranscript('');
             break;
           case 'ai_text':
+            if (typeof message.turnId === 'number' && activePlaybackTurnRef.current !== null && activePlaybackTurnRef.current !== message.turnId) {
+              stopPlayback();
+            }
             liveAiTextRef.current = message.fullText || message.text || '';
             setLiveAiQuestion(liveAiTextRef.current);
             break;
@@ -291,11 +314,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             break;
           case 'tts_audio':
             if (message.audio) {
-              await playPcmChunk(message.audio, message.sampleRate || 24000);
+              await playPcmChunk(message.audio, message.turnId, message.sampleRate || 24000);
             }
             break;
           case 'tts_flushed':
-            stopPlayback();
+            if (message.turnId === undefined || activePlaybackTurnRef.current === null || message.turnId === activePlaybackTurnRef.current) {
+              stopPlayback();
+            }
             break;
           case 'warning':
             console.warn(message.message || 'Server warning');
