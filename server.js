@@ -185,7 +185,7 @@ async function queueTtsSentence(session, sentence) {
   if (!text) return;
 
   try {
-    const response = await deepgram.speak.request({ text }, { model: 'aura-asteria-en' });
+    const response = await deepgram.speak.request({ text }, { model: 'aura-asteria-en', encoding: 'linear16', sample_rate: 24000 });
     const stream = await response.getStream?.() ?? response.stream;
     if (!stream) {
       throw new Error('Deepgram TTS response did not include a readable stream.');
