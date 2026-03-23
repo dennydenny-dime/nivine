@@ -8,7 +8,7 @@ import DailyQuiz from './components/DailyQuiz';
 import PricingPage from './components/PricingPage';
 import Leaderboard from './components/Leaderboard';
 import AuthPage from './components/AuthPage';
-import { clearStoredSession, firebaseApp, hasRealtimeDatabaseConfig, initializeAuthPersistence, mapFirebaseUser, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
+import { clearStoredSession, firebaseApp, hasRealtimeDatabaseConfig, initializeAuthPersistence, mapFirebaseUser, resolveRedirectAuthResult, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
 import PersonalDashboard from './components/PersonalDashboard';
 import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminUser } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
@@ -165,7 +165,7 @@ const App: React.FC = () => {
     let active = true;
     let unsubscribe = () => {};
 
-    initializeAuthPersistence()
+    Promise.allSettled([initializeAuthPersistence(), resolveRedirectAuthResult()])
       .catch((error) => {
         console.warn('Failed to initialize persistent auth session.', error);
       })
