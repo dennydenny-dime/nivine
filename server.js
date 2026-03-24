@@ -1,6 +1,6 @@
 import express from 'express';
 import http from 'http';
-import WebSocket, { WebSocketServer } from 'ws';
+import { Server } from 'socket.io';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import crypto from 'node:crypto';
@@ -13,22 +13,72 @@ const SESSION_TTL_MS = 1000 * 60 * 30;
 const GEMINI_PRIMARY_MODEL = 'gemini-2.5-flash';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 
+const configuredOrigins = [
+  process.env.FRONTEND_ORIGIN,
+  process.env.CORS_ORIGIN,
+  process.env.VERCEL_FRONTEND_URL,
+]
+  .filter((value) => typeof value === 'string' && value.trim())
+  .map((value) => value.trim().replace(/\/$/, ''));
+
+const allowedOrigins = new Set([
+  ...configuredOrigins,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]);
+
 if (!process.env.DEEPGRAM_API_KEY) {
   console.warn('[server] DEEPGRAM_API_KEY not set; using the embedded Deepgram fallback key.');
 }
 if (!GEMINI_API_KEY) {
   console.warn('[server] Missing GEMINI_API_KEY. Gemini responses will fail until it is configured.');
 }
+if (!configuredOrigins.length) {
+  console.warn('[server] FRONTEND_ORIGIN/CORS_ORIGIN not set; only localhost origins are explicitly allowlisted.');
+}
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin.replace(/\/$/, ''))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+
+  next();
+});
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
+const io = new Server(server, {
+  path: '/socket.io',
+  cors: {
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin.replace(/\/$/, ''))) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin not allowed: ${origin}`));
+    },
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'],
+});
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY, { apiVersion: 'v1' });
 const sessions = new Map();
@@ -65,14 +115,14 @@ function createSystemPrompt(persona = {}) {
     '=== SESSION GOAL ===',
     '- Conduct a realistic interview tailored to the persona.',
     '- Maintain continuity using the chat history provided in the conversation.',
-    '- Start with a short greeting and the first interview question when the session begins.'
+    '- Start with a short greeting and the first interview question when the session begins.',
   ].join('\n');
 }
 
 function createSession(sessionId) {
   return {
     id: sessionId,
-    ws: null,
+    socket: null,
     persona: null,
     chatHistory: [],
     transcriptBuffer: '',
@@ -103,13 +153,9 @@ function getOrCreateSession(sessionId) {
   return created;
 }
 
-function sendJson(ws, payload) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  try {
-    ws.send(JSON.stringify(payload));
-  } catch (error) {
-    console.error('[ws] send failed', error);
-  }
+function sendJson(session, payload) {
+  if (!session?.socket?.connected) return;
+  session.socket.emit('server_event', payload);
 }
 
 async function closeTransports(session, { dropHistory = false } = {}) {
@@ -124,12 +170,11 @@ async function closeTransports(session, { dropHistory = false } = {}) {
   }
 
   if (session.sttConnection) {
-    try { session.sttConnection.requestClose?.(); } catch {}
-    try { session.sttConnection.finish?.(); } catch {}
-    try { session.sttConnection.removeAllListeners?.(); } catch {}
+    session.sttConnection.requestClose?.();
+    session.sttConnection.finish?.();
+    session.sttConnection.removeAllListeners?.();
     session.sttConnection = null;
   }
-
 
   session.responseInFlight = false;
   session.pendingAiText = '';
@@ -185,7 +230,10 @@ async function queueTtsSentence(session, sentence, turnId) {
   if (!text) return;
 
   try {
-    const response = await deepgram.speak.request({ text }, { model: 'aura-hera-en', encoding: 'linear16', container: 'none', sample_rate: 24000 });
+    const response = await deepgram.speak.request(
+      { text },
+      { model: 'aura-hera-en', encoding: 'linear16', container: 'none', sample_rate: 24000 },
+    );
     const stream = await response.getStream?.() ?? response.stream;
     if (!stream) {
       throw new Error('Deepgram TTS response did not include a readable stream.');
@@ -203,24 +251,24 @@ async function queueTtsSentence(session, sentence, turnId) {
     }
 
     const audioBuffer = Buffer.concat(chunks);
-    sendJson(session.ws, {
+    sendJson(session, {
       type: 'tts_audio',
       audio: audioBuffer.toString('base64'),
       sampleRate: 24000,
       encoding: 'linear16',
       turnId,
     });
-    sendJson(session.ws, { type: 'tts_flushed', turnId });
-    sendJson(session.ws, { type: 'ai_sentence', text, turnId });
+    sendJson(session, { type: 'tts_flushed', turnId });
+    sendJson(session, { type: 'ai_sentence', text, turnId });
   } catch (error) {
     console.error('[tts] queue sentence failed', error);
-    sendJson(session.ws, { type: 'warning', message: 'TTS temporarily unavailable. Continuing with text only.' });
+    sendJson(session, { type: 'warning', message: 'TTS temporarily unavailable. Continuing with text only.' });
   }
 }
 
 async function streamGeminiResponse(session, userText) {
   if (!GEMINI_API_KEY) {
-    sendJson(session.ws, { type: 'error', message: 'Missing GEMINI_API_KEY on the server.' });
+    sendJson(session, { type: 'error', message: 'Missing GEMINI_API_KEY on the server.' });
     return;
   }
 
@@ -276,7 +324,7 @@ async function streamGeminiResponse(session, userText) {
       if (!text) continue;
 
       session.pendingAiText += text;
-      sendJson(session.ws, { type: 'ai_text', text, fullText: session.pendingAiText, turnId });
+      sendJson(session, { type: 'ai_text', text, fullText: session.pendingAiText, turnId });
 
       const { sentences, remaining } = maybeCollectSentenceFragments(session.pendingAiText, false);
       session.pendingAiText = remaining;
@@ -303,14 +351,13 @@ async function streamGeminiResponse(session, userText) {
       session.chatHistory.push({ role: 'model', text: aiText });
     }
 
-
-    sendJson(session.ws, { type: 'ai_turn_complete', text: aiText, turnId });
+    sendJson(session, { type: 'ai_turn_complete', text: aiText, turnId });
   } catch (error) {
     if (controller.signal.aborted) {
-      sendJson(session.ws, { type: 'warning', message: 'Previous response cancelled for a newer turn.' });
+      sendJson(session, { type: 'warning', message: 'Previous response cancelled for a newer turn.' });
     } else {
       console.error('[gemini] stream failed', error);
-      sendJson(session.ws, { type: 'error', message: 'Gemini temporarily unavailable. Please continue speaking or retry.' });
+      sendJson(session, { type: 'error', message: 'Gemini temporarily unavailable. Please continue speaking or retry.' });
     }
   } finally {
     if (session.aiAbortController === controller) {
@@ -342,13 +389,13 @@ async function initializeStt(session) {
   session.sttConnection = connection;
 
   connection.on(LiveTranscriptionEvents.Open, () => {
-    sendJson(session.ws, { type: 'ready', sessionId: session.id });
+    sendJson(session, { type: 'ready', sessionId: session.id });
   });
 
   connection.on(LiveTranscriptionEvents.Error, (err) => {
     console.error('[stt] raw error string:', String(err));
     console.error('[stt] error message:', err.message || err.type);
-    sendJson(session.ws, { type: 'warning', message: 'Speech recognition hiccup detected. Attempting to continue.' });
+    sendJson(session, { type: 'warning', message: 'Speech recognition hiccup detected. Attempting to continue.' });
   });
 
   connection.on(LiveTranscriptionEvents.Close, (event) => {
@@ -364,7 +411,7 @@ async function initializeStt(session) {
 
       const isFinal = Boolean(payload?.is_final);
       session.latestInterimTranscript = transcript;
-      sendJson(session.ws, {
+      sendJson(session, {
         type: 'transcript',
         text: transcript,
         isFinal,
@@ -380,19 +427,17 @@ async function initializeStt(session) {
         session.committedUserTranscript = committed;
         session.transcriptBuffer = '';
         session.latestInterimTranscript = '';
-        sendJson(session.ws, { type: 'user_turn_complete', text: committed });
+        sendJson(session, { type: 'user_turn_complete', text: committed });
         await streamGeminiResponse(session, committed);
       }
     } catch (error) {
       console.error('[stt] transcript handler failed', error);
-      sendJson(session.ws, { type: 'warning', message: 'Could not process one transcript update, but the session is still live.' });
+      sendJson(session, { type: 'warning', message: 'Could not process one transcript update, but the session is still live.' });
     }
   });
 
   session.keepAliveInterval = setInterval(() => {
-    try {
-      connection.keepAlive?.();
-    } catch {}
+    connection.keepAlive?.();
   }, 8_000);
 
   return connection;
@@ -409,36 +454,30 @@ async function handleStart(session, payload) {
   if (!session.chatHistory.length) {
     await streamGeminiResponse(session, 'Begin the interview now with a short greeting and your first question.');
   } else {
-    sendJson(session.ws, { type: 'session_resumed', sessionId: session.id });
+    sendJson(session, { type: 'session_resumed', sessionId: session.id });
   }
 }
 
-wss.on('connection', (ws) => {
+io.on('connection', (socket) => {
   let session = null;
 
-  ws.on('message', async (raw, isBinary) => {
+  socket.on('client_event', async (message) => {
     try {
-      if (isBinary) {
-        if (!session?.sttConnection) return;
-        session.lastSeenAt = Date.now();
-        session.sttConnection.send(raw);
-        return;
-      }
+      if (!message || typeof message !== 'object') return;
 
-      const message = JSON.parse(raw.toString());
       if (message.type === 'start') {
         const sessionId = typeof message.sessionId === 'string' && message.sessionId.trim()
           ? message.sessionId.trim()
           : crypto.randomUUID();
         session = getOrCreateSession(sessionId);
-        session.ws = ws;
+        session.socket = socket;
         session.lastSeenAt = Date.now();
         await handleStart(session, message);
         return;
       }
 
       if (!session) {
-        sendJson(ws, { type: 'error', message: 'Session not started yet.' });
+        socket.emit('server_event', { type: 'error', message: 'Session not started yet.' });
         return;
       }
 
@@ -456,23 +495,23 @@ wss.on('connection', (ws) => {
       }
 
       if (message.type === 'ping') {
-        sendJson(ws, { type: 'pong', sessionId: session.id });
+        sendJson(session, { type: 'pong', sessionId: session.id });
         return;
       }
 
       if (message.type === 'end') {
         await closeTransports(session);
-        sendJson(ws, { type: 'session_ended', sessionId: session.id });
+        sendJson(session, { type: 'session_ended', sessionId: session.id });
       }
     } catch (error) {
-      console.error('[ws] message handler failed', error);
-      sendJson(ws, { type: 'error', message: 'Server could not process that message.' });
+      console.error('[socket.io] message handler failed', error);
+      socket.emit('server_event', { type: 'error', message: 'Server could not process that message.' });
     }
   });
 
-  ws.on('close', async () => {
+  socket.on('disconnect', () => {
     if (!session) return;
-    session.ws = null;
+    session.socket = null;
     session.lastSeenAt = Date.now();
     if (session.keepAliveInterval) {
       clearInterval(session.keepAliveInterval);
@@ -480,8 +519,8 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('error', (error) => {
-    console.error('[ws] client error', error);
+  socket.on('error', (error) => {
+    console.error('[socket.io] client error', error);
   });
 });
 
@@ -495,5 +534,5 @@ setInterval(async () => {
 }, 60_000).unref();
 
 server.listen(PORT, () => {
-  console.log(`[server] listening on http://localhost:${PORT}`);
+  console.log(`[server] listening on port ${PORT}`);
 });

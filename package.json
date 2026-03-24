@@ -20,6 +20,8 @@
     "@deepgram/sdk": "^3.3.0",
     "@google/generative-ai": "^0.21.0",
     "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
