@@ -65,7 +65,7 @@ app.get('/health', (_req, res) => {
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  path: '/socket.io',
+  path: '/ws',
   cors: {
     origin(origin, callback) {
       if (!origin || allowedOrigins.has(origin.replace(/\/$/, ''))) {
@@ -533,6 +533,6 @@ setInterval(async () => {
   }
 }, 60_000).unref();
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`[server] listening on port ${PORT}`);
 });

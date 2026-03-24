@@ -30,7 +30,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'node-ai-d0015.firebasestorage.app',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '986509381276',
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:986509381276:web:a0f790b186078bf1d82759',
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || 'https://node-ai-d0015-default-rtdb.firebaseio.com'
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL
 };
 
 const SESSION_STORAGE_KEY = 'tm_firebase_session';
