@@ -293,7 +293,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       await outputAudioContextRef.current.resume();
 
       const socket = io(SOCKET_URL, {
-        path: '/socket.io',
+        path: '/ws',
         transports: ['websocket'],
       });
       socketRef.current = socket;
