@@ -164,7 +164,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             resumeRecorder();
           }
         }
-      });
+      };
 
       nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime + 0.01);
       source.start(nextStartTimeRef.current);
