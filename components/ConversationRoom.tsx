@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { Persona, TranscriptionItem } from '../types';
 import { getConversationHistoryKey } from '../lib/userStorage';
 import { saveEligibleInterviewHistory } from '../lib/interviewHistorySync';
@@ -25,7 +26,7 @@ type ServerMessage = {
   turnId?: number;
 };
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_WS_URL || 'http://localhost:3001';
 const AUDIO_MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
 
 const getSupportedMimeType = () => AUDIO_MIME_CANDIDATES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || '';
@@ -67,7 +68,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const [error, setError] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState(persona.language || 'English');
 
-  const socketRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -120,7 +121,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
     const recorder = mediaRecorderRef.current;
     const socket = socketRef.current;
-    if (!recorderStartedRef.current || !recorder || !socket || socket.readyState !== WebSocket.OPEN) {
+    if (!recorderStartedRef.current || !recorder || !socket || !socket.connected) {
       return;
     }
 
@@ -163,7 +164,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
             resumeRecorder();
           }
         }
-      };
+      });
 
       nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime + 0.01);
       source.start(nextStartTimeRef.current);
@@ -202,13 +203,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     socketRef.current = null;
     if (!socket) return;
 
-    if (sendEnd && socket.readyState === WebSocket.OPEN) {
-      try {
-        socket.send(JSON.stringify({ type: 'end' }));
-      } catch {}
+    if (sendEnd && socket.connected) {
+      socket.emit('client_event', { type: 'end' });
     }
 
-    try { socket.close(); } catch {}
+    socket.disconnect();
   }, []);
 
   const cleanup = useCallback((sendEnd = false) => {
@@ -225,7 +224,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     const recorder = mediaRecorderRef.current;
     const socket = socketRef.current;
 
-    if (!recorder || !socket || socket.readyState !== WebSocket.OPEN) {
+    if (!recorder || !socket || !socket.connected) {
       return;
     }
 
@@ -293,12 +292,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       }
       await outputAudioContextRef.current.resume();
 
-      const socket = new WebSocket(WS_URL);
+      const socket = io(SOCKET_URL, {
+        path: '/socket.io',
+        transports: ['websocket'],
+      });
       socketRef.current = socket;
 
-      socket.onopen = () => {
+      socket.on('connect', () => {
         reconnectAttemptsRef.current = 0;
-        socket.send(JSON.stringify(buildSessionStartPayload({ ...persona, language: currentLanguage }, sessionIdRef.current)));
+        socket.emit('client_event', buildSessionStartPayload({ ...persona, language: currentLanguage }, sessionIdRef.current));
 
         const mimeType = getSupportedMimeType();
         const recorder = mimeType
@@ -308,19 +310,18 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         recorderStartedRef.current = false;
         mediaRecorderRef.current = recorder;
         recorder.ondataavailable = async (event) => {
-          if (!event.data || event.data.size === 0 || socket.readyState !== WebSocket.OPEN) return;
+          if (!event.data || event.data.size === 0 || !socket.connected) return;
           const arrayBuffer = await event.data.arrayBuffer();
           const bytes = new Uint8Array(arrayBuffer);
           let binary = '';
           for (let i = 0; i < bytes.length; i += 1) {
             binary += String.fromCharCode(bytes[i]);
           }
-          socket.send(JSON.stringify({ type: 'audio_chunk', audio: window.btoa(binary) }));
+          socket.emit('client_event', { type: 'audio_chunk', audio: window.btoa(binary) });
         };
-      };
+      });
 
-      socket.onmessage = async (event) => {
-        const message = JSON.parse(event.data) as ServerMessage;
+      socket.on('server_event', async (message: ServerMessage) => {
         switch (message.type) {
           case 'ready':
           case 'session_resumed':
@@ -381,13 +382,13 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           default:
             break;
         }
-      };
+      });
 
-      socket.onerror = () => {
+      socket.on('connect_error', () => {
         setError('Realtime interview connection encountered an error. Attempting to recover.');
-      };
+      });
 
-      socket.onclose = () => {
+      socket.on('disconnect', () => {
         socketRef.current = null;
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
           try { mediaRecorderRef.current.stop(); } catch {}
@@ -408,7 +409,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
           reconnectTimeoutRef.current = null;
           void connectWebSocket();
         }, 1000 * reconnectAttemptsRef.current);
-      };
+      });
     } catch (connectionError) {
       console.error('Failed to initialize interview connection', connectionError);
       setError('Could not establish the realtime interview connection. Please verify microphone access.');
