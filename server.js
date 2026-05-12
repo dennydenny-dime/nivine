@@ -5,7 +5,7 @@ import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import crypto from 'node:crypto';
 
-const PORT = Number.parseInt(process.env.PORT || '3001', 10);
+const PORT = process.env.PORT || 3001;
 const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
 const DEEPGRAM_API_KEY = (process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY).trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
@@ -59,6 +59,12 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/', (_req, res) => {
+  res.json({
+    status: 'NODE AI backend running',
+  });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
@@ -67,15 +73,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   path: '/ws',
   cors: {
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin.replace(/\/$/, ''))) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error(`Origin not allowed: ${origin}`));
-    },
+    origin: '*',
     methods: ['GET', 'POST'],
-    credentials: true,
   },
   transports: ['websocket', 'polling'],
 });
