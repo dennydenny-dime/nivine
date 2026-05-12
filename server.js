@@ -5,7 +5,8 @@ import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import crypto from 'node:crypto';
 
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
+const HOST = '0.0.0.0';
 const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
 const DEEPGRAM_API_KEY = (process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY).trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
@@ -532,6 +533,6 @@ setInterval(async () => {
   }
 }, 60_000).unref();
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, HOST, () => {
   console.log(`[server] listening on port ${PORT}`);
 });
