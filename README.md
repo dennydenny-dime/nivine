@@ -151,7 +151,8 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_firebase_app_id
 VITE_FIREBASE_DATABASE_URL=https://your-project-default-rtdb.firebaseio.com
 VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
-VITE_BACKEND_API_URL=http://localhost:3000/api
+VITE_API_URL=https://niviine.onrender.com
+VITE_BACKEND_API_URL=https://niviine.onrender.com/api
 ```
 
 #### Required for backend subscription + webhook flows

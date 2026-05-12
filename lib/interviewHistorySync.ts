@@ -3,7 +3,7 @@ import { getConversationHistoryKey } from './userStorage';
 
 type UserIdentity = { email?: string | null; id?: string | null };
 
-const API_BASE = (import.meta.env.VITE_BACKEND_API_URL || '/api').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_BACKEND_API_URL || `${import.meta.env.VITE_API_URL || 'https://niviine.onrender.com'}/api`).replace(/\/$/, '');
 const MAX_PERSISTED_SESSIONS = 50;
 
 const dedupeHistory = (history: ConversationHistoryItem[]): ConversationHistoryItem[] => {

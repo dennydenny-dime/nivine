@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { Persona, TranscriptionItem } from '../types';
 import { getConversationHistoryKey } from '../lib/userStorage';
 import { saveEligibleInterviewHistory } from '../lib/interviewHistorySync';
 import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { COMMON_LANGUAGES } from '../constants';
+import { closeSocket, getSocket } from '../lib/socketService';
 
 interface ConversationRoomProps {
   persona: Persona;
@@ -26,7 +27,6 @@ type ServerMessage = {
   turnId?: number;
 };
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_WS_URL || 'http://localhost:3001';
 const AUDIO_MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
 
 const getSupportedMimeType = () => AUDIO_MIME_CANDIDATES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || '';
@@ -208,6 +208,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     }
 
     socket.disconnect();
+    closeSocket();
   }, []);
 
   const cleanup = useCallback((sendEnd = false) => {
@@ -292,11 +293,11 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       }
       await outputAudioContextRef.current.resume();
 
-      const socket = io(SOCKET_URL, {
-        path: '/ws',
-        transports: ['websocket'],
-      });
+      const socket = getSocket();
       socketRef.current = socket;
+      if (!socket.connected) {
+        socket.connect();
+      }
 
       socket.on('connect', () => {
         reconnectAttemptsRef.current = 0;
@@ -385,10 +386,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       });
 
       socket.on('connect_error', () => {
-        setError('Realtime interview connection encountered an error. Attempting to recover.');
+        setError('Realtime interview connection encountered an error. Reconnecting to server...');
       });
 
-      socket.on('disconnect', () => {
+      socket.on('disconnect', (reason) => {
         socketRef.current = null;
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
           try { mediaRecorderRef.current.stop(); } catch {}
@@ -397,7 +398,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
         if (isUnmountingRef.current) return;
 
-        if (reconnectAttemptsRef.current >= 2) {
+        if (reconnectAttemptsRef.current >= 10) {
           setIsConnecting(false);
           setError('Realtime interview connection was lost and could not be restored.');
           return;
@@ -408,7 +409,7 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         reconnectTimeoutRef.current = window.setTimeout(() => {
           reconnectTimeoutRef.current = null;
           void connectWebSocket();
-        }, 1000 * reconnectAttemptsRef.current);
+        }, Math.min(15000, 2000 * reconnectAttemptsRef.current));
       });
     } catch (connectionError) {
       console.error('Failed to initialize interview connection', connectionError);
@@ -460,6 +461,9 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
         <div className="premium-panel w-full max-w-lg rounded-3xl p-8 text-center">
           <h3 className="text-lg font-semibold tracking-tight text-[#ededed]">Signal interrupted</h3>
           <p className="mt-3 text-sm leading-relaxed text-[#8a8f98]">{error}</p>
+          <button onClick={() => { setError(null); reconnectAttemptsRef.current = 0; void connectWebSocket(); }} className="mt-4 rounded-xl border border-indigo-400/40 px-4 py-2 text-sm text-indigo-200 transition hover:border-indigo-200/70">
+            Retry connection
+          </button>
           <button onClick={onExit} className="mt-7 rounded-xl border border-white/20 px-4 py-2 text-sm text-[#ededed] transition hover:border-white/35">
             Return to console
           </button>
