@@ -1,48 +1,71 @@
 import { io, Socket } from 'socket.io-client';
-import { SOCKET_URL } from './config';
+import { SOCKET_PATH, SOCKET_URL } from './config';
 
 let socketInstance: Socket | null = null;
 
-export const getSocket = (): Socket => {
-  if (socketInstance) return socketInstance;
-
-  socketInstance = io(SOCKET_URL, {
-    path: '/ws',
-    transports: ['websocket', 'polling'],
+const buildSocket = (): Socket => {
+  const socket = io(SOCKET_URL, {
+    path: SOCKET_PATH,
+    transports: ['polling', 'websocket'],
+    upgrade: true,
     reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 2000,
-    reconnectionDelayMax: 20000,
+    reconnectionAttempts: 30,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 10000,
     randomizationFactor: 0.5,
-    timeout: 20000,
+    timeout: 15000,
     withCredentials: true,
     autoConnect: false,
   });
 
-  socketInstance.on('connect', () => {
-    console.log('[socket] connected:', socketInstance?.id);
+  socket.on('connect', () => {
+    console.info('[socket] connected', {
+      id: socket.id,
+      transport: socket.io.engine.transport.name,
+      url: SOCKET_URL,
+      path: SOCKET_PATH,
+    });
   });
 
-  socketInstance.on('disconnect', (reason) => {
-    console.log('[socket] disconnected:', reason);
+  socket.on('disconnect', (reason) => {
+    console.warn('[socket] disconnected', { reason });
   });
 
-  socketInstance.on('connect_error', (err) => {
-    console.error('[socket] connection error:', err.message);
+  socket.on('connect_error', (err) => {
+    console.error('[socket] connect_error', {
+      message: err.message,
+      description: err.description,
+      context: err.context,
+    });
   });
 
-  socketInstance.io.on('reconnect_attempt', (attempt) => {
-    console.log(`[socket] reconnect attempt ${attempt}`);
+  socket.io.on('reconnect_attempt', (attempt) => {
+    console.info('[socket] reconnect_attempt', { attempt });
   });
 
-  socketInstance.io.on('reconnect_error', (err) => {
-    console.error('[socket] reconnect error:', err.message);
+  socket.io.on('reconnect_failed', () => {
+    console.error('[socket] reconnect_failed: max attempts reached');
   });
 
-  socketInstance.io.on('upgrade_error', (err) => {
-    console.error('[socket] transport upgrade failure:', err.message);
+  socket.io.on('reconnect_error', (err) => {
+    console.error('[socket] reconnect_error', { message: err.message });
   });
 
+  socket.io.on('upgrade_error', (err) => {
+    console.error('[socket] upgrade_error', { message: err.message });
+  });
+
+  socket.io.engine.on('upgrade', (transport) => {
+    console.info('[socket] upgraded transport', { to: transport.name });
+  });
+
+  return socket;
+};
+
+export const getSocket = (): Socket => {
+  if (!socketInstance) {
+    socketInstance = buildSocket();
+  }
   return socketInstance;
 };
 

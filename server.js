@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = '0.0.0.0';
+const SOCKET_PATH = process.env.SOCKET_IO_PATH || '/socket.io';
 const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
 const DEEPGRAM_API_KEY = (process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY).trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
@@ -43,6 +44,7 @@ if (!configuredOrigins.length) {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => {
   const origin = normalizeOrigin(req.headers.origin);
@@ -75,12 +77,12 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, uptime: process.uptime() });
+  res.status(200).json({ ok: true, uptime: process.uptime(), socketPath: SOCKET_PATH });
 });
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  path: '/ws',
+  path: SOCKET_PATH,
   cors: {
     origin(origin, callback) {
       if (!origin) {
@@ -100,9 +102,27 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   },
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   allowUpgrades: true,
 });
+
+server.on('error', (error) => {
+  console.error('[server] fatal error', error);
+});
+
+server.on('listening', () => {
+  console.info(`[server] listening on ${HOST}:${PORT} path=${SOCKET_PATH}`);
+});
+
+io.engine.on('connection_error', (err) => {
+  console.error('[socket.io] connection_error', {
+    reqOrigin: err.req?.headers?.origin,
+    code: err.code,
+    message: err.message,
+    context: err.context,
+  });
+});
+
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY, { apiVersion: 'v1' });
 const sessions = new Map();
@@ -483,6 +503,12 @@ async function handleStart(session, payload) {
 }
 
 io.on('connection', (socket) => {
+  console.info('[socket] connected', {
+    socketId: socket.id,
+    transport: socket.conn.transport.name,
+    origin: socket.handshake.headers.origin,
+    address: socket.handshake.address,
+  });
   let session = null;
 
   socket.on('client_event', async (message) => {
@@ -533,7 +559,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
+    console.warn('[socket] disconnected', { socketId: socket.id, reason });
     if (!session) return;
     session.socket = null;
     session.lastSeenAt = Date.now();
