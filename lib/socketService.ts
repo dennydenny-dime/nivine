@@ -1,12 +1,12 @@
 import { io, Socket } from 'socket.io-client';
-import { API_URL } from './config';
+import { SOCKET_URL } from './config';
 
 let socketInstance: Socket | null = null;
 
 export const getSocket = (): Socket => {
   if (socketInstance) return socketInstance;
 
-  socketInstance = io(API_URL, {
+  socketInstance = io(SOCKET_URL, {
     path: '/ws',
     transports: ['websocket', 'polling'],
     reconnection: true,
@@ -15,6 +15,7 @@ export const getSocket = (): Socket => {
     reconnectionDelayMax: 20000,
     randomizationFactor: 0.5,
     timeout: 20000,
+    withCredentials: true,
     autoConnect: false,
   });
 

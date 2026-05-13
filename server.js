@@ -14,13 +14,15 @@ const SESSION_TTL_MS = 1000 * 60 * 30;
 const GEMINI_PRIMARY_MODEL = 'gemini-2.5-flash';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 
+const normalizeOrigin = (origin) => (typeof origin === 'string' ? origin.trim().replace(/\/$/, '') : '');
+
 const configuredOrigins = [
   process.env.FRONTEND_ORIGIN,
   process.env.CORS_ORIGIN,
   process.env.VERCEL_FRONTEND_URL,
 ]
-  .filter((value) => typeof value === 'string' && value.trim())
-  .map((value) => value.trim().replace(/\/$/, ''));
+  .map(normalizeOrigin)
+  .filter(Boolean);
 
 const allowedOrigins = new Set([
   ...configuredOrigins,
@@ -43,16 +45,22 @@ if (!configuredOrigins.length) {
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.has(origin.replace(/\/$/, ''))) {
+  const origin = normalizeOrigin(req.headers.origin);
+  const isAllowedOrigin = origin && allowedOrigins.has(origin);
+
+  if (isAllowedOrigin) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   }
 
   if (req.method === 'OPTIONS') {
+    if (!isAllowedOrigin && req.headers.origin) {
+      res.sendStatus(403);
+      return;
+    }
     res.sendStatus(204);
     return;
   }
@@ -74,10 +82,26 @@ const server = http.createServer(app);
 const io = new Server(server, {
   path: '/ws',
   cors: {
-    origin: '*',
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalized = normalizeOrigin(origin);
+      if (allowedOrigins.has(normalized)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} is not allowed by Socket.IO CORS`));
+    },
+    credentials: true,
     methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   },
   transports: ['websocket', 'polling'],
+  allowUpgrades: true,
 });
 const deepgram = createClient(DEEPGRAM_API_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY, { apiVersion: 'v1' });
