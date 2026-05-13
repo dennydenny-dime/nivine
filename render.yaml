@@ -18,3 +18,7 @@ services:
         value: https://nivine.vercel.app
       - key: CORS_ORIGIN
         value: https://nivine.vercel.app
+      - key: VERCEL_FRONTEND_URL
+        value: https://nivine.vercel.app
+      - key: SOCKET_IO_PATH
+        value: /socket.io
