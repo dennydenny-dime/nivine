@@ -14,3 +14,7 @@ services:
         sync: false
       - key: PORT
         value: 10000
+      - key: FRONTEND_ORIGIN
+        value: https://nivine.vercel.app
+      - key: CORS_ORIGIN
+        value: https://nivine.vercel.app
