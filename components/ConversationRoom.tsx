@@ -103,7 +103,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     });
 
     if (!response.ok) {
-      throw new Error(`Session token fetch failed (${response.status})`);
+      const backendError = await response.text();
+      throw new Error(`Session token fetch failed (${response.status}): ${backendError}`);
     }
 
     const data = await response.json() as { sessionId?: string; token?: string; expiresAt?: number };
@@ -459,7 +460,8 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     } catch (connectionError) {
       console.error('Failed to initialize interview connection', connectionError);
       setIsConnecting(false);
-      setError('Could not establish the realtime interview connection. Check backend availability, CORS, and microphone permission before retrying.');
+      const message = connectionError instanceof Error ? connectionError.message : 'Unknown connection error';
+      setError(`Could not establish the realtime interview connection: ${message}`);
     }
   }, [currentLanguage, fetchRealtimeSessionToken, pauseRecorder, persona, playPcmChunk, resumeRecorder, startRecorder, stopPlayback, verifyMicrophonePermission]);
 

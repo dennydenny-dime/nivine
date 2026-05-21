@@ -10,5 +10,5 @@ export const SOCKET_URL = normalizeUrl(stripSocketPath(import.meta.env.VITE_SOCK
 
 export const BACKEND_API_URL = normalizeUrl(
   import.meta.env.VITE_BACKEND_API_URL ||
-  `${API_URL}/api`,
+  API_URL,
 );

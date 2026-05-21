@@ -31,7 +31,37 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'https://nivine.vercel.app',
 ]);
+
+
+const getAllowedOrigins = () => Array.from(allowedOrigins).sort();
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  return allowedOrigins.has(normalizeOrigin(origin));
+};
+
+const logAllowedOrigins = () => {
+  console.info('[CORS] allowed origins', getAllowedOrigins());
+};
+
+const registerApiRequestLogger = (appInstance) => {
+  appInstance.use((req, res, next) => {
+    const startedAt = Date.now();
+    const origin = normalizeOrigin(req.headers.origin);
+    res.on('finish', () => {
+      console.info('[ROUTE]', {
+        method: req.method,
+        path: req.originalUrl,
+        origin: origin || 'n/a',
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
+    });
+    next();
+  });
+};
 
 if (!process.env.DEEPGRAM_API_KEY) {
   console.warn('[server] DEEPGRAM_API_KEY not set; using the embedded Deepgram fallback key.');
@@ -46,24 +76,35 @@ if (!configuredOrigins.length) {
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
-app.use((req, res, next) => {
-  const origin = normalizeOrigin(req.headers.origin);
-  const isAllowedOrigin = origin && allowedOrigins.has(origin);
+registerApiRequestLogger(app);
 
-  if (isAllowedOrigin) {
+app.use((req, res, next) => {
+  const rawOrigin = req.headers.origin;
+  const origin = normalizeOrigin(rawOrigin);
+  const allowed = isOriginAllowed(rawOrigin);
+
+  if (rawOrigin && allowed) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   }
 
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+
   if (req.method === 'OPTIONS') {
-    if (!isAllowedOrigin && req.headers.origin) {
-      res.sendStatus(403);
+    console.info('[CORS] preflight', { origin: origin || 'n/a', path: req.originalUrl, allowed });
+    if (!allowed) {
+      res.status(403).json({ error: `Origin ${origin || 'unknown'} is not allowed` });
       return;
     }
     res.sendStatus(204);
+    return;
+  }
+
+  if (rawOrigin && !allowed) {
+    console.warn('[CORS] blocked request', { origin, path: req.originalUrl });
+    res.status(403).json({ error: `Origin ${origin} is not allowed` });
     return;
   }
 
@@ -77,7 +118,7 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-  res.status(200).json({ ok: true, uptime: process.uptime(), socketPath: SOCKET_PATH });
+  res.status(200).json({ ok: true, uptime: process.uptime(), allowedOrigins: getAllowedOrigins(), environment: process.env.NODE_ENV || 'development' });
 });
 
 app.post('/realtime/session-token', (req, res) => {
@@ -92,8 +133,46 @@ app.post('/realtime/session-token', (req, res) => {
   const token = crypto.randomBytes(24).toString('hex');
   const expiresAt = Date.now() + SESSION_TTL_MS;
 
-  console.info('[realtime] issued session token', { sessionId, expiresAt });
+  console.info('[REALTIME] issued session token', { sessionId, expiresAt });
+  console.info('[SESSION] token generated', { sessionId, ttlMs: SESSION_TTL_MS });
   res.status(200).json({ sessionId, token, expiresAt });
+});
+
+
+const interviewHistoryByUser = new Map();
+
+app.post('/interview-history', (req, res) => {
+  const { action, email, id, historyItem } = req.body || {};
+  const userKey = (typeof id === 'string' && id.trim()) || (typeof email === 'string' && email.trim());
+
+  if (!userKey) {
+    res.status(400).json({ error: 'id or email is required' });
+    return;
+  }
+
+  const existing = interviewHistoryByUser.get(userKey) || [];
+
+  if (action === 'append') {
+    const next = historyItem ? [historyItem, ...existing].slice(0, 50) : existing;
+    interviewHistoryByUser.set(userKey, next);
+    res.status(200).json({ history: next });
+    return;
+  }
+
+  res.status(200).json({ history: existing });
+});
+
+const collectRegisteredRoutes = () => (app.router?.stack || [])
+  .filter((layer) => layer.route?.path)
+  .map((layer) => ({
+    path: layer.route.path,
+    methods: Object.entries(layer.route.methods || {})
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([method]) => method.toUpperCase()),
+  }));
+
+app.get('/debug/routes', (_req, res) => {
+  res.status(200).json({ routes: collectRegisteredRoutes() });
 });
 
 const server = http.createServer(app);
@@ -107,11 +186,13 @@ const io = new Server(server, {
       }
 
       const normalized = normalizeOrigin(origin);
-      if (allowedOrigins.has(normalized)) {
+      if (isOriginAllowed(origin)) {
+        console.info('[SOCKET] cors allow', { origin: normalized });
         callback(null, true);
         return;
       }
 
+      console.warn('[SOCKET] cors reject', { origin: normalized });
       callback(new Error(`Origin ${origin} is not allowed by Socket.IO CORS`));
     },
     credentials: true,
@@ -602,4 +683,6 @@ setInterval(async () => {
 
 server.listen(PORT, HOST, () => {
   console.log(`[server] listening on port ${PORT}`);
+  logAllowedOrigins();
+  console.info('[ROUTE] registered routes', collectRegisteredRoutes());
 });
