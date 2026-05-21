@@ -71,6 +71,21 @@ const registerApiRequestLogger = (appInstance) => {
   appInstance.use((req, res, next) => {
     const startedAt = Date.now();
     const origin = normalizeOrigin(req.headers.origin);
+
+    console.info('[REQUEST] incoming', {
+      method: req.method,
+      path: req.originalUrl,
+      origin: origin || 'n/a',
+    });
+
+    if (req.method === 'OPTIONS') {
+      console.info('[REQUEST] options preflight', {
+        method: req.method,
+        path: req.originalUrl,
+        origin: origin || 'n/a',
+      });
+    }
+
     res.on('finish', () => {
       console.info('[ROUTE]', {
         method: req.method,
@@ -152,7 +167,13 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, uptime: process.uptime(), allowedOrigins: getAllowedOrigins(), environment: process.env.NODE_ENV || 'development' });
 });
 
+app.options('/realtime/session-token', (_req, res) => {
+  console.info('[TOKEN ROUTE HIT]', { method: 'OPTIONS', path: '/realtime/session-token' });
+  res.sendStatus(204);
+});
+
 app.post('/realtime/session-token', (req, res) => {
+  console.info('[TOKEN ROUTE HIT]', { method: 'POST', path: '/realtime/session-token' });
   const requestedSessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
   const sessionId = requestedSessionId || `session-${crypto.randomUUID()}`;
 
