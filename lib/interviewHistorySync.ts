@@ -1,10 +1,9 @@
 import { ConversationHistoryItem } from '../types';
 import { getConversationHistoryKey } from './userStorage';
-import { BACKEND_API_URL } from './config';
 
 type UserIdentity = { email?: string | null; id?: string | null };
 
-const API_BASE = BACKEND_API_URL;
+const INTERVIEW_HISTORY_API_URL = '/api/interview-history';
 const MAX_PERSISTED_SESSIONS = 50;
 const MAX_RETRIES = 4;
 
@@ -52,7 +51,7 @@ const postInterviewHistoryAction = async (payload: Record<string, unknown>) => {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     try {
       console.info('[history-sync] request start', { action: payload.action, attempt });
-      const response = await fetch(`${API_BASE}/interview-history`, {
+      const response = await fetch(INTERVIEW_HISTORY_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
