@@ -16,6 +16,8 @@ const GEMINI_PRIMARY_MODEL = 'gemini-2.5-flash';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 
 const normalizeOrigin = (origin) => (typeof origin === 'string' ? origin.trim().replace(/\/$/, '') : '');
+const PREVIEW_VERCEL_ORIGIN_PATTERN = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
+const LOCALHOST_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
 const configuredOrigins = [
   process.env.FRONTEND_ORIGIN,
@@ -37,9 +39,28 @@ const allowedOrigins = new Set([
 
 const getAllowedOrigins = () => Array.from(allowedOrigins).sort();
 
-const isOriginAllowed = (origin) => {
-  if (!origin) return true;
-  return allowedOrigins.has(normalizeOrigin(origin));
+const isPreviewVercelOrigin = (normalizedOrigin) => PREVIEW_VERCEL_ORIGIN_PATTERN.test(normalizedOrigin);
+const isLocalhostOrigin = (normalizedOrigin) => LOCALHOST_ORIGIN_PATTERN.test(normalizedOrigin);
+
+const evaluateOrigin = (origin) => {
+  if (!origin) {
+    return { allowed: true, normalized: '', reason: 'no-origin-header' };
+  }
+
+  const normalized = normalizeOrigin(origin);
+  if (allowedOrigins.has(normalized)) {
+    return { allowed: true, normalized, reason: 'exact-allowlist-match' };
+  }
+
+  if (isPreviewVercelOrigin(normalized)) {
+    return { allowed: true, normalized, reason: 'vercel-preview-match' };
+  }
+
+  if (isLocalhostOrigin(normalized)) {
+    return { allowed: true, normalized, reason: 'localhost-pattern-match' };
+  }
+
+  return { allowed: false, normalized, reason: 'no-match' };
 };
 
 const logAllowedOrigins = () => {
@@ -80,11 +101,21 @@ registerApiRequestLogger(app);
 
 app.use((req, res, next) => {
   const rawOrigin = req.headers.origin;
-  const origin = normalizeOrigin(rawOrigin);
-  const allowed = isOriginAllowed(rawOrigin);
+  const { allowed, normalized: normalizedOrigin, reason } = evaluateOrigin(rawOrigin);
+  const corsDecision = {
+    rawOrigin: rawOrigin || 'n/a',
+    normalizedOrigin: normalizedOrigin || 'n/a',
+    allowedOrigins: getAllowedOrigins(),
+    method: req.method,
+    path: req.originalUrl,
+    allowed,
+    reason,
+  };
+
+  console.info('[CORS] decision', corsDecision);
 
   if (rawOrigin && allowed) {
-    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Origin', normalizedOrigin);
     res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Credentials', 'true');
   }
@@ -93,9 +124,9 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
 
   if (req.method === 'OPTIONS') {
-    console.info('[CORS] preflight', { origin: origin || 'n/a', path: req.originalUrl, allowed });
     if (!allowed) {
-      res.status(403).json({ error: `Origin ${origin || 'unknown'} is not allowed` });
+      console.warn('[CORS] blocked preflight origin', corsDecision);
+      res.status(403).json({ error: `Origin ${normalizedOrigin || 'unknown'} is not allowed` });
       return;
     }
     res.sendStatus(204);
@@ -103,8 +134,8 @@ app.use((req, res, next) => {
   }
 
   if (rawOrigin && !allowed) {
-    console.warn('[CORS] blocked request', { origin, path: req.originalUrl });
-    res.status(403).json({ error: `Origin ${origin} is not allowed` });
+    console.warn('[CORS] blocked request origin', corsDecision);
+    res.status(403).json({ error: `Origin ${normalizedOrigin} is not allowed` });
     return;
   }
 
@@ -219,13 +250,14 @@ const io = new Server(server, {
       }
 
       const normalized = normalizeOrigin(origin);
-      if (isOriginAllowed(origin)) {
-        console.info('[SOCKET] cors allow', { origin: normalized });
+      const decision = evaluateOrigin(origin);
+      if (decision.allowed) {
+        console.info('[SOCKET] cors allow', { origin: normalized, reason: decision.reason });
         callback(null, true);
         return;
       }
 
-      console.warn('[SOCKET] cors reject', { origin: normalized });
+      console.warn('[SOCKET] cors reject', { origin: normalized, reason: decision.reason });
       callback(new Error(`Origin ${origin} is not allowed by Socket.IO CORS`));
     },
     credentials: true,
