@@ -162,17 +162,50 @@ app.post('/interview-history', (req, res) => {
   res.status(200).json({ history: existing });
 });
 
-const collectRegisteredRoutes = () => (app.router?.stack || [])
-  .filter((layer) => layer.route?.path)
-  .map((layer) => ({
-    path: layer.route.path,
-    methods: Object.entries(layer.route.methods || {})
-      .filter(([, enabled]) => Boolean(enabled))
-      .map(([method]) => method.toUpperCase()),
-  }));
+const collectRegisteredRoutes = () => {
+  const routes = [];
+
+  const collectFromStack = (stack = [], parentPath = '') => {
+    for (const layer of stack) {
+      if (layer?.route?.path) {
+        const routePath = Array.isArray(layer.route.path)
+          ? layer.route.path.join('|')
+          : layer.route.path;
+        routes.push({
+          path: `${parentPath}${routePath}`,
+          methods: Object.entries(layer.route.methods || {})
+            .filter(([, enabled]) => Boolean(enabled))
+            .map(([method]) => method.toUpperCase()),
+        });
+        continue;
+      }
+
+      if (layer?.name === 'router' && Array.isArray(layer.handle?.stack)) {
+        const mountPath = layer.regexp?.fast_slash ? '' : parentPath;
+        collectFromStack(layer.handle.stack, mountPath);
+      }
+    }
+  };
+
+  const stack = app?._router?.stack;
+  if (!Array.isArray(stack)) {
+    return routes;
+  }
+
+  collectFromStack(stack);
+  return routes;
+};
 
 app.get('/debug/routes', (_req, res) => {
-  res.status(200).json({ routes: collectRegisteredRoutes() });
+  try {
+    const routes = collectRegisteredRoutes();
+    res.status(200).json({ routes });
+  } catch (error) {
+    console.warn('[debug/routes] failed to collect routes', {
+      message: error?.message,
+    });
+    res.status(200).json({ routes: [], error: 'Route inspection unavailable' });
+  }
 });
 
 const server = http.createServer(app);
@@ -684,5 +717,9 @@ setInterval(async () => {
 server.listen(PORT, HOST, () => {
   console.log(`[server] listening on port ${PORT}`);
   logAllowedOrigins();
-  console.info('[ROUTE] registered routes', collectRegisteredRoutes());
+  try {
+    console.info('[ROUTE] registered routes', collectRegisteredRoutes());
+  } catch (error) {
+    console.warn('[ROUTE] route inspection unavailable', { message: error?.message });
+  }
 });
