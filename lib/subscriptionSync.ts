@@ -1,12 +1,11 @@
 import { normalizeTier, SubscriptionTier } from './subscription';
-import { BACKEND_API_URL } from './config';
 
 type UserIdentity = { email?: string | null; id?: string | null };
 
-const API_BASE = BACKEND_API_URL;
+const SUBSCRIPTION_API_URL = '/api/subscription';
 
 const postSubscriptionAction = async (payload: Record<string, unknown>) => {
-  const response = await fetch(`${API_BASE}/subscription`, {
+  const response = await fetch(SUBSCRIPTION_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
