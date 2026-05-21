@@ -6,6 +6,9 @@ type UserIdentity = { email?: string | null; id?: string | null };
 
 const API_BASE = BACKEND_API_URL;
 const MAX_PERSISTED_SESSIONS = 50;
+const MAX_RETRIES = 4;
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const dedupeHistory = (history: ConversationHistoryItem[]): ConversationHistoryItem[] => {
   const seen = new Set<string>();
@@ -44,17 +47,43 @@ const persistLocalHistory = (userId: string | undefined | null, history: Convers
 };
 
 const postInterviewHistoryAction = async (payload: Record<string, unknown>) => {
-  const response = await fetch(`${API_BASE}/interview-history`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let lastError: unknown = null;
 
-  if (!response.ok) {
-    throw new Error(`Interview history API failed (${response.status}).`);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      console.info('[history-sync] request start', { action: payload.action, attempt });
+      const response = await fetch(`${API_BASE}/interview-history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Interview history API failed (${response.status}).`);
+      }
+
+      console.info('[history-sync] request success', { action: payload.action, attempt });
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      const backoffMs = Math.min(2000, 250 * (2 ** attempt));
+      console.error('[history-sync] request failed', {
+        action: payload.action,
+        attempt,
+        backoffMs,
+        error,
+      });
+
+      if (attempt >= MAX_RETRIES) {
+        break;
+      }
+
+      await wait(backoffMs);
+    }
   }
 
-  return response.json();
+  throw lastError instanceof Error ? lastError : new Error('Interview history request failed.');
 };
 
 export const syncInterviewHistoryFromServer = async (user: UserIdentity) => {

@@ -6,6 +6,7 @@ import { saveEligibleInterviewHistory } from '../lib/interviewHistorySync';
 import { buildNeuralSpeechScoreCard } from '../lib/interviewEvaluation';
 import { COMMON_LANGUAGES } from '../constants';
 import { closeSocket, getSocket } from '../lib/socketService';
+import { BACKEND_API_URL } from '../lib/config';
 
 interface ConversationRoomProps {
   persona: Persona;
@@ -83,6 +84,36 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
   const liveAiTextRef = useRef('');
   const recorderStartedRef = useRef(false);
   const aiTurnActiveRef = useRef(false);
+
+  const verifyMicrophonePermission = useCallback(async () => {
+    const permissionsApi = navigator.permissions as Navigator['permissions'] | undefined;
+    if (!permissionsApi?.query) return true;
+    const status = await permissionsApi.query({ name: 'microphone' as PermissionName });
+    console.info('[realtime] microphone permission state', { state: status.state });
+    return status.state !== 'denied';
+  }, []);
+
+  const fetchRealtimeSessionToken = useCallback(async () => {
+    console.info('[realtime] fetching realtime session token');
+    const response = await fetch(`${BACKEND_API_URL}/realtime/session-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ sessionId: sessionIdRef.current }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Session token fetch failed (${response.status})`);
+    }
+
+    const data = await response.json() as { sessionId?: string; token?: string; expiresAt?: number };
+    if (!data?.sessionId || !data?.token) {
+      throw new Error('Session token response is missing required fields');
+    }
+    sessionIdRef.current = data.sessionId;
+    console.info('[realtime] session token received', { sessionId: data.sessionId, expiresAt: data.expiresAt });
+    return data;
+  }, []);
 
   const currentQuestionText = useMemo(() => {
     const latestCommittedAiQuestion = transcriptions.filter((t) => t.speaker === 'ai').at(-1)?.text;
@@ -277,6 +308,15 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
     try {
       setIsConnecting(true);
       setError(null);
+      console.info('[realtime] stage=init');
+
+      const hasMicPermission = await verifyMicrophonePermission();
+      if (!hasMicPermission) {
+        throw new Error('Microphone permission denied. Please allow microphone access in your browser settings.');
+      }
+
+      await fetchRealtimeSessionToken();
+      console.info('[realtime] stage=token_ready');
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -295,11 +335,14 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
 
       const socket = getSocket();
       socketRef.current = socket;
+      console.info('[realtime] stage=socket_created');
       if (!socket.connected) {
         socket.connect();
+        console.info('[realtime] stage=socket_connecting');
       }
 
       socket.on('connect', () => {
+        console.info('[realtime] stage=socket_connected', { sessionId: sessionIdRef.current });
         reconnectAttemptsRef.current = 0;
         socket.emit('client_event', buildSessionStartPayload({ ...persona, language: currentLanguage }, sessionIdRef.current));
 
@@ -386,10 +429,12 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       });
 
       socket.on('connect_error', () => {
+        console.error('[realtime] stage=socket_connect_error');
         setError('Realtime interview connection encountered an error. Reconnecting to server...');
       });
 
       socket.on('disconnect', (reason) => {
+        console.warn('[realtime] stage=socket_disconnected', { reason });
         socketRef.current = null;
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
           try { mediaRecorderRef.current.stop(); } catch {}
@@ -413,9 +458,10 @@ const ConversationRoom: React.FC<ConversationRoomProps> = ({ persona, onExit, ma
       });
     } catch (connectionError) {
       console.error('Failed to initialize interview connection', connectionError);
-      setError('Could not establish the realtime interview connection. Please verify microphone access.');
+      setIsConnecting(false);
+      setError('Could not establish the realtime interview connection. Check backend availability, CORS, and microphone permission before retrying.');
     }
-  }, [currentLanguage, pauseRecorder, persona, playPcmChunk, resumeRecorder, startRecorder, stopPlayback]);
+  }, [currentLanguage, fetchRealtimeSessionToken, pauseRecorder, persona, playPcmChunk, resumeRecorder, startRecorder, stopPlayback, verifyMicrophonePermission]);
 
   const handleLanguageChange = useCallback((newLang: string) => {
     setCurrentLanguage(newLang);

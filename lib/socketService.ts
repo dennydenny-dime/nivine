@@ -55,9 +55,19 @@ const buildSocket = (): Socket => {
     console.error('[socket] upgrade_error', { message: err.message });
   });
 
-  socket.io.engine.on('upgrade', (transport) => {
-    console.info('[socket] upgraded transport', { to: transport.name });
-  });
+  const attachEngineListeners = () => {
+    const engine = socket.io.engine;
+    if (!engine) {
+      console.warn('[socket] engine is unavailable while attaching listeners');
+      return;
+    }
+
+    engine.on('upgrade', (transport) => {
+      console.info('[socket] upgraded transport', { to: transport.name });
+    });
+  };
+
+  socket.on('connect', attachEngineListeners);
 
   return socket;
 };
@@ -71,8 +81,9 @@ export const getSocket = (): Socket => {
 
 export const closeSocket = () => {
   if (!socketInstance) return;
+  console.info('[socket] closing shared socket instance');
   socketInstance.removeAllListeners();
-  socketInstance.io.removeAllListeners();
-  socketInstance.disconnect();
+  socketInstance.io?.removeAllListeners?.();
+  socketInstance.disconnect?.();
   socketInstance = null;
 };

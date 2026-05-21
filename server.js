@@ -80,6 +80,22 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, uptime: process.uptime(), socketPath: SOCKET_PATH });
 });
 
+app.post('/realtime/session-token', (req, res) => {
+  const requestedSessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
+  const sessionId = requestedSessionId || `session-${crypto.randomUUID()}`;
+
+  if (!sessionId) {
+    res.status(400).json({ error: 'sessionId is required' });
+    return;
+  }
+
+  const token = crypto.randomBytes(24).toString('hex');
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+
+  console.info('[realtime] issued session token', { sessionId, expiresAt });
+  res.status(200).json({ sessionId, token, expiresAt });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   path: SOCKET_PATH,
