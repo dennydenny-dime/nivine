@@ -110,9 +110,42 @@ if (!configuredOrigins.length) {
 }
 
 const app = express();
+console.log('SERVER ENTRY:', __filename);
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 registerApiRequestLogger(app);
+
+app.options('/realtime/session-token', (req, res) => {
+  const origin = normalizeOrigin(req.headers.origin);
+  const { allowed } = evaluateOrigin(origin);
+  const allowOrigin = allowed && origin ? origin : 'https://nivine.vercel.app';
+  res.header('Access-Control-Allow-Origin', allowOrigin);
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  console.info('[TOKEN ROUTE HIT]', { method: 'OPTIONS', path: '/realtime/session-token', origin: origin || 'n/a' });
+  return res.sendStatus(204);
+});
+
+app.options('*', (req, res) => {
+  const origin = normalizeOrigin(req.headers.origin);
+  const { allowed } = evaluateOrigin(origin);
+  if (!allowed) {
+    res.status(403).json({ error: `Origin ${origin || 'unknown'} is not allowed` });
+    return;
+  }
+
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  return res.sendStatus(204);
+});
 
 app.use((req, res, next) => {
   const rawOrigin = req.headers.origin;
@@ -167,13 +200,18 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ ok: true, uptime: process.uptime(), allowedOrigins: getAllowedOrigins(), environment: process.env.NODE_ENV || 'development' });
 });
 
-app.options('/realtime/session-token', (_req, res) => {
-  console.info('[TOKEN ROUTE HIT]', { method: 'OPTIONS', path: '/realtime/session-token' });
-  res.sendStatus(204);
-});
-
 app.post('/realtime/session-token', (req, res) => {
-  console.info('[TOKEN ROUTE HIT]', { method: 'POST', path: '/realtime/session-token' });
+  const origin = normalizeOrigin(req.headers.origin);
+  const { allowed } = evaluateOrigin(origin);
+  if (origin && allowed) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  console.info('[TOKEN ROUTE HIT]', { method: 'POST', path: '/realtime/session-token', origin: origin || 'n/a' });
   const requestedSessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
   const sessionId = requestedSessionId || `session-${crypto.randomUUID()}`;
 
@@ -771,7 +809,7 @@ server.listen(PORT, HOST, () => {
   console.log(`[server] listening on port ${PORT}`);
   logAllowedOrigins();
   try {
-    console.info('[ROUTE] registered routes', collectRegisteredRoutes());
+    console.info('REGISTERED ROUTES:', collectRegisteredRoutes());
   } catch (error) {
     console.warn('[ROUTE] route inspection unavailable', { message: error?.message });
   }
