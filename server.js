@@ -5,7 +5,7 @@ import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import crypto from 'node:crypto';
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0';
 const SOCKET_PATH = process.env.SOCKET_IO_PATH || '/socket.io';
 const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
@@ -99,6 +99,55 @@ const registerApiRequestLogger = (appInstance) => {
   });
 };
 
+const cors = (options = {}) => (req, res, next) => {
+  const origin = req.headers.origin;
+  const methods = Array.isArray(options.methods) ? options.methods.join(',') : options.methods;
+  const headers = Array.isArray(options.allowedHeaders) ? options.allowedHeaders.join(',') : options.allowedHeaders;
+
+  const applyHeadersAndContinue = () => {
+    if (options.credentials) {
+      res.header('Access-Control-Allow-Credentials', 'true');
+    }
+
+    if (methods) {
+      res.header('Access-Control-Allow-Methods', methods);
+    }
+
+    if (headers) {
+      res.header('Access-Control-Allow-Headers', headers);
+    }
+
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+      return;
+    }
+
+    next();
+  };
+
+  if (typeof options.origin === 'function') {
+    options.origin(origin, (error, allowedOriginValue) => {
+      if (error) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      if (allowedOriginValue === true && origin) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Vary', 'Origin');
+      } else if (typeof allowedOriginValue === 'string') {
+        res.header('Access-Control-Allow-Origin', allowedOriginValue);
+        res.header('Vary', 'Origin');
+      }
+
+      applyHeadersAndContinue();
+    });
+    return;
+  }
+
+  applyHeadersAndContinue();
+};
+
 if (!process.env.DEEPGRAM_API_KEY) {
   console.warn('[server] DEEPGRAM_API_KEY not set; using the embedded Deepgram fallback key.');
 }
@@ -110,10 +159,28 @@ if (!configuredOrigins.length) {
 }
 
 const app = express();
-console.log('SERVER ENTRY:', __filename);
+console.log('SERVER ENTRY:', import.meta.url);
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 registerApiRequestLogger(app);
+
+const corsOptions = {
+  origin(origin, callback) {
+    const { allowed } = evaluateOrigin(origin);
+    if (allowed) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin ${origin || 'unknown'} is not allowed`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.options('/realtime/session-token', (req, res) => {
   const origin = normalizeOrigin(req.headers.origin);
@@ -125,25 +192,6 @@ app.options('/realtime/session-token', (req, res) => {
   res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   console.info('[TOKEN ROUTE HIT]', { method: 'OPTIONS', path: '/realtime/session-token', origin: origin || 'n/a' });
-  return res.sendStatus(204);
-});
-
-app.options('*', (req, res) => {
-  const origin = normalizeOrigin(req.headers.origin);
-  const { allowed } = evaluateOrigin(origin);
-  if (!allowed) {
-    res.status(403).json({ error: `Origin ${origin || 'unknown'} is not allowed` });
-    return;
-  }
-
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-  }
-
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   return res.sendStatus(204);
 });
 
