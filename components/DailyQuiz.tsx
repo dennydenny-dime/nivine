@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
 import {
   QuizQuestion,
   QuizCategory,
@@ -8,7 +7,7 @@ import {
   User,
   UserStats,
 } from '../types';
-import { COMMON_LANGUAGES, getSystemApiKey } from '../constants';
+import { COMMON_LANGUAGES } from '../constants';
 import { getUserStats, setUserStats } from '../lib/userStorage';
 
 const CATEGORIES: { id: QuizCategory; icon: string; label: string }[] = [
@@ -401,35 +400,21 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
   const generateQuiz = async () => {
     setLoading(true);
     try {
-      const apiKey = getSystemApiKey();
-      if (!apiKey) {
-        alert('API Key missing. Check Vercel settings.');
-        setLoading(false);
-        return;
-      }
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Generate a communication challenge for the category "${selectedCategory}" with a difficulty level of "${selectedDifficulty}".
-        The scenario and challenge MUST be written in ${selectedLanguage}.
-        The scenario should be highly realistic and detailed.
-        Keep it practical, role-specific, and immediately usable for interview practice.`,
-        config: {
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              scenario: { type: Type.STRING },
-              challenge: { type: Type.STRING },
-              tips: { type: Type.ARRAY, items: { type: Type.STRING } },
-            },
-            required: ['id', 'scenario', 'challenge', 'tips'],
-          },
-        },
+      const response = await fetch('/api/quiz/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: selectedCategory,
+          difficulty: selectedDifficulty,
+          language: selectedLanguage,
+        }),
       });
-      const data = JSON.parse(response.text);
+
+      if (!response.ok) {
+        throw new Error('Failed to generate quiz challenge.');
+      }
+
+      const data = await response.json();
       setQuiz({ ...data, category: selectedCategory, difficulty: selectedDifficulty });
       setStep('quiz');
     } catch (err) {
@@ -443,115 +428,22 @@ const DailyQuiz: React.FC<DailyQuizProps> = ({ onSeeLeaderboard }) => {
     if (!userResponse.trim()) return;
     setEvaluating(true);
     try {
-      const apiKey = getSystemApiKey();
-      if (!apiKey) {
-        alert('API Key missing.');
-        setEvaluating(false);
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `You are evaluating an interview response.
-
-QUESTION:
-${quiz?.challenge}
-
-CANDIDATE ANSWER:
-${userResponse}
-
-Evaluate using the Synapse Communication Score™ pillars:
-
-Structure Score (0–20)
-
-Does the answer follow Situation, Task, Action, Result?
-
-Is there clear sequencing?
-
-Is the result explicit?
-
-Clarity Score (0–15)
-
-Are sentences direct and easy to understand?
-
-Is there minimal ambiguity?
-
-Is wording precise?
-
-Impact Score (0–15)
-
-Are measurable outcomes included?
-
-Are specific numbers used?
-
-Is business impact clear?
-
-Confidence Language Score (0–15)
-
-Avoids weak phrases ("I think", "maybe", "kind of")
-
-Uses assertive language
-
-Sounds decisive
-
-Response Relevance Score (0–15)
-
-Directly answers the question
-
-Avoids tangents
-
-Stays aligned with interviewer intent
-
-Return STRICT JSON in this format:
-
-{
-"structure_score": number,
-"clarity_score": number,
-"impact_score": number,
-"confidence_score": number,
-"relevance_score": number,
-"strengths": ["bullet1", "bullet2"],
-"weaknesses": ["bullet1", "bullet2"],
-"improvement_suggestions": ["bullet1", "bullet2"]
-}
-
-Do not include filler analysis or conciseness scoring.
-Those are handled separately.
-
-Do not include explanations outside JSON.
-
-All feedback text (strengths, weaknesses, suggestions) must be in ${selectedLanguage}.`,
-        config: {
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              structure_score: { type: Type.NUMBER },
-              clarity_score: { type: Type.NUMBER },
-              impact_score: { type: Type.NUMBER },
-              confidence_score: { type: Type.NUMBER },
-              relevance_score: { type: Type.NUMBER },
-              strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-              weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-              improvement_suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            },
-            required: [
-              'structure_score',
-              'clarity_score',
-              'impact_score',
-              'confidence_score',
-              'relevance_score',
-              'strengths',
-              'weaknesses',
-              'improvement_suggestions',
-            ],
-          },
-        },
+      const response = await fetch('/api/quiz/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challenge: quiz?.challenge,
+          answer: userResponse,
+        }),
       });
 
-      const diagnostics = JSON.parse(response.text);
+      if (!response.ok) {
+        throw new Error('Failed to evaluate response.');
+      }
+
+      const data = await response.json();
+      const rawEval: SynapseEvaluation = data.evaluation;
+      const diagnostics = rawEval;
       const weakLanguagePenalty = calculateWeakLanguagePenalty(userResponse);
       const quantifiedResultsBoost = calculateQuantifiedResultsBoost(userResponse);
       const starDelta = calculateStarScoreDelta(userResponse);
