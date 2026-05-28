@@ -27,12 +27,17 @@ const configuredOrigins = [
   .map(normalizeOrigin)
   .filter(Boolean);
 
-const productionOrigins = new Set([
+const allowedOrigins = new Set([
   ...configuredOrigins,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'https://nivine.vercel.app',
 ]);
 
-const getAllowedOrigins = () => Array.from(productionOrigins).sort();
+
+const getAllowedOrigins = () => Array.from(allowedOrigins).sort();
 
 const isPreviewVercelOrigin = (normalizedOrigin) => PREVIEW_VERCEL_ORIGIN_PATTERN.test(normalizedOrigin);
 const isLocalhostOrigin = (normalizedOrigin) => LOCALHOST_ORIGIN_PATTERN.test(normalizedOrigin);
@@ -43,7 +48,7 @@ const evaluateOrigin = (origin) => {
   }
 
   const normalized = normalizeOrigin(origin);
-  if (productionOrigins.has(normalized)) {
+  if (allowedOrigins.has(normalized)) {
     return { allowed: true, normalized, reason: 'exact-allowlist-match' };
   }
 
@@ -58,17 +63,6 @@ const evaluateOrigin = (origin) => {
   return { allowed: false, normalized, reason: 'no-match' };
 };
 
-
-
-const corsOriginCallback = (origin, callback) => {
-  const { allowed } = evaluateOrigin(origin);
-  if (allowed) {
-    callback(null, true);
-    return;
-  }
-
-  callback(new Error(`Origin ${origin || 'unknown'} is not allowed`));
-};
 const logAllowedOrigins = () => {
   console.info('[CORS] allowed origins', getAllowedOrigins());
 };
@@ -171,7 +165,15 @@ app.use(express.json({ limit: '1mb' }));
 registerApiRequestLogger(app);
 
 const corsOptions = {
-  origin: corsOriginCallback,
+  origin(origin, callback) {
+    const { allowed } = evaluateOrigin(origin);
+    if (allowed) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin ${origin || 'unknown'} is not allowed`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -332,40 +334,6 @@ const collectRegisteredRoutes = () => {
   return routes;
 };
 
-
-
-app.post('/api/quiz/generate', async (req, res) => {
-  try {
-    const { category, difficulty, language } = req.body || {};
-    const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
-    const result = await model.generateContent(`Generate a communication challenge for the category "${category}" with a difficulty level of "${difficulty}". The scenario and challenge MUST be written in ${language}. Return strict JSON with id, scenario, challenge, tips.`);
-    const text = result.response.text();
-    res.status(200).json(JSON.parse(text));
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to generate quiz challenge.' });
-  }
-});
-
-app.post('/api/quiz/evaluate', async (req, res) => {
-  try {
-    const { challenge, answer } = req.body || {};
-    const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
-    const prompt = `You are evaluating an interview response.
-QUESTION:
-${challenge}
-
-CANDIDATE ANSWER:
-${answer}
-
-Return STRICT JSON: {"structure_score": number, "clarity_score": number, "impact_score": number, "confidence_score": number, "relevance_score": number, "strengths": string[], "weaknesses": string[], "improvement_suggestions": string[]}.`;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    res.status(200).json({ evaluation: JSON.parse(text) });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to evaluate response.' });
-  }
-});
-
 app.get('/debug/routes', (_req, res) => {
   try {
     const routes = collectRegisteredRoutes();
@@ -383,18 +351,21 @@ const io = new Server(server, {
   path: SOCKET_PATH,
   cors: {
     origin(origin, callback) {
-      corsOriginCallback(origin, (error, allowed) => {
-        const normalized = normalizeOrigin(origin);
-        if (error || !allowed) {
-          console.warn('[SOCKET] cors reject', { origin: normalized, reason: 'no-match' });
-          callback(new Error(`Origin ${origin} is not allowed by Socket.IO CORS`));
-          return;
-        }
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
 
-        const decision = evaluateOrigin(origin);
+      const normalized = normalizeOrigin(origin);
+      const decision = evaluateOrigin(origin);
+      if (decision.allowed) {
         console.info('[SOCKET] cors allow', { origin: normalized, reason: decision.reason });
         callback(null, true);
-      });
+        return;
+      }
+
+      console.warn('[SOCKET] cors reject', { origin: normalized, reason: decision.reason });
+      callback(new Error(`Origin ${origin} is not allowed by Socket.IO CORS`));
     },
     credentials: true,
     methods: ['GET', 'POST'],

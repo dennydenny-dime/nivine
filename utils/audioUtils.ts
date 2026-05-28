@@ -1,4 +1,6 @@
 
+import { Blob } from '@google/genai';
+
 export function encode(bytes: Uint8Array): string {
   let binary = '';
   const len = bytes.byteLength;
@@ -37,7 +39,7 @@ export async function decodeAudioData(
   return buffer;
 }
 
-export function createBlob(data: Float32Array): { data: string; mimeType: string } {
+export function createBlob(data: Float32Array): Blob {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
