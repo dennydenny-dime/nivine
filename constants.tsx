@@ -31,47 +31,6 @@ export const COMMON_LANGUAGES = [
   'Italian'
 ];
 
-/**
- * Safely retrieves the API Key from various environment variable patterns.
- * Supports: Vite, Create React App, Next.js, and standard Node process.env.
- */
-export const getSystemApiKey = (): string | undefined => {
-  let key: string | undefined;
-
-  // 1. Try Vite (import.meta.env)
-  try {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      // @ts-ignore
-      key =
-        import.meta.env.VITE_API_KEY ||
-        import.meta.env.GEMINI_API_KEY ||
-        import.meta.env.REACT_APP_API_KEY ||
-        import.meta.env.API_KEY;
-    }
-  } catch (e) {
-    // Ignore ReferenceErrors if import.meta is not defined
-  }
-
-  if (key) return key;
-
-  // 2. Try Standard Process Env (Webpack, Next.js, CRA)
-  try {
-    // We check typeof process to avoid ReferenceError in pure browser environments
-    if (typeof process !== 'undefined' && process.env) {
-      key = process.env.API_KEY || 
-            process.env.REACT_APP_API_KEY || 
-            process.env.NEXT_PUBLIC_API_KEY ||
-            process.env.GEMINI_API_KEY ||
-            process.env.VITE_API_KEY;
-    }
-  } catch (e) {
-    // Ignore errors accessing process
-  }
-  
-  return key;
-};
-
 export const getBackendApiBaseUrl = (): string | undefined => {
   // @ts-ignore
   if (typeof import.meta !== 'undefined' && import.meta.env) {

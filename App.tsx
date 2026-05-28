@@ -1,15 +1,15 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import LandingPage from './components/LandingPage';
-import MainAppPage from './components/MainAppPage';
-import CustomCoachPage from './components/CustomCoachPage';
-import ConversationRoom from './components/ConversationRoom';
-import DailyQuiz from './components/DailyQuiz';
-import PricingPage from './components/PricingPage';
-import Leaderboard from './components/Leaderboard';
-import AuthPage from './components/AuthPage';
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
+const LandingPage = lazy(() => import('./components/LandingPage'));
+const MainAppPage = lazy(() => import('./components/MainAppPage'));
+const CustomCoachPage = lazy(() => import('./components/CustomCoachPage'));
+const ConversationRoom = lazy(() => import('./components/ConversationRoom'));
+const DailyQuiz = lazy(() => import('./components/DailyQuiz'));
+const PricingPage = lazy(() => import('./components/PricingPage'));
+const Leaderboard = lazy(() => import('./components/Leaderboard'));
+const AuthPage = lazy(() => import('./components/AuthPage'));
 import { clearStoredSession, firebaseApp, hasRealtimeDatabaseConfig, initializeAuthPersistence, mapFirebaseUser, resolveRedirectAuthResult, signOutSession, subscribeToAuthChanges } from './lib/firebaseAuth';
-import PersonalDashboard from './components/PersonalDashboard';
+const PersonalDashboard = lazy(() => import('./components/PersonalDashboard'));
 import { CallCategory, SubscriptionTier, consumeCall, getCoachingResetHoursRemaining, getPlanAccess, getRemainingCalls, hasFullAccessByEmail, isAdminUser } from './lib/subscription';
 import { fetchSubscriptionTierForUser, subscribeToSubscriptionTierForEmail } from './lib/subscriptionSync';
 import { syncInterviewHistoryFromServer } from './lib/interviewHistorySync';
@@ -521,6 +521,7 @@ const App: React.FC = () => {
       </nav>
 
       <main className={`pt-40 md:pt-36 pb-12 px-4 max-w-7xl mx-auto transition-all duration-500 ${currentView === View.CONVERSATION ? 'max-w-none px-0 pt-16' : ''}`}>
+        <Suspense fallback={<div className="w-8 h-8 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin mx-auto" />}>
         <div className="animate-in fade-in duration-300">
           {currentView === View.LANDING && <LandingPage onEnterApp={openApp} />}
           {currentView === View.PERSONAL_DASHBOARD && currentUser && <PersonalDashboard currentUser={currentUser} onContinueTraining={openApp} />}
@@ -572,6 +573,7 @@ const App: React.FC = () => {
           }} />}
           {currentView === View.LEADERBOARD && <Leaderboard onBack={goBack} />}
         </div>
+        </Suspense>
       </main>
 
       <footer className="py-8 text-center text-slate-500 text-sm border-t border-white/10 mt-auto">
