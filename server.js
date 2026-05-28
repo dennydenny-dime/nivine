@@ -23,24 +23,26 @@ const configuredOrigins = [
   process.env.FRONTEND_ORIGIN,
   process.env.CORS_ORIGIN,
   process.env.VERCEL_FRONTEND_URL,
+  process.env.PRODUCTION_DOMAIN,
 ]
   .map(normalizeOrigin)
   .filter(Boolean);
 
-const allowedOrigins = new Set([
-  ...configuredOrigins,
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'https://nivine.vercel.app',
-]);
-
+const allowedOrigins = new Set(configuredOrigins);
 
 const getAllowedOrigins = () => Array.from(allowedOrigins).sort();
 
 const isPreviewVercelOrigin = (normalizedOrigin) => PREVIEW_VERCEL_ORIGIN_PATTERN.test(normalizedOrigin);
 const isLocalhostOrigin = (normalizedOrigin) => LOCALHOST_ORIGIN_PATTERN.test(normalizedOrigin);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) {
+    return true;
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  return allowedOrigins.has(normalizedOrigin) || isPreviewVercelOrigin(normalizedOrigin) || isLocalhostOrigin(normalizedOrigin);
+};
 
 const evaluateOrigin = (origin) => {
   if (!origin) {
@@ -166,8 +168,7 @@ registerApiRequestLogger(app);
 
 const corsOptions = {
   origin(origin, callback) {
-    const { allowed } = evaluateOrigin(origin);
-    if (allowed) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
@@ -346,6 +347,35 @@ app.get('/debug/routes', (_req, res) => {
   }
 });
 
+
+
+app.post('/api/gemini/generate', async (req, res) => {
+  const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+  const systemInstruction = typeof req.body?.systemInstruction === 'string' ? req.body.systemInstruction.trim() : '';
+
+  if (!prompt) {
+    res.status(400).json({ error: 'prompt is required' });
+    return;
+  }
+
+  if (!GEMINI_API_KEY) {
+    res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
+    return;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: GEMINI_PRIMARY_MODEL });
+    const response = await model.generateContent({
+      ...(systemInstruction ? { systemInstruction } : {}),
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+
+    res.status(200).json({ response: response.response.text(), raw: response.response });
+  } catch (error) {
+    console.error('[gemini] /api/gemini/generate failed', error);
+    res.status(500).json({ error: 'Failed to generate Gemini response' });
+  }
+});
 const server = http.createServer(app);
 const io = new Server(server, {
   path: SOCKET_PATH,
@@ -358,7 +388,7 @@ const io = new Server(server, {
 
       const normalized = normalizeOrigin(origin);
       const decision = evaluateOrigin(origin);
-      if (decision.allowed) {
+      if (isAllowedOrigin(origin)) {
         console.info('[SOCKET] cors allow', { origin: normalized, reason: decision.reason });
         callback(null, true);
         return;
