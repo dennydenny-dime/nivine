@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Persona, Gender, Mood } from '../types';
-import { COMMON_LANGUAGES, MOODS } from '../constants';
+import { COMMON_LANGUAGES, MOODS, getSystemApiKey } from '../constants';
 import { PlanAccess, SubscriptionTier } from '../lib/subscription';
 
 interface CustomCoachPageProps {
@@ -30,7 +30,7 @@ const CustomCoachPage: React.FC<CustomCoachPageProps> = ({
   const [hasKey, setHasKey] = useState<boolean>(true);
 
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = getSystemApiKey();
     setHasKey(!!apiKey && apiKey.length > 0);
   }, []);
 
