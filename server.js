@@ -7,6 +7,11 @@ import crypto from 'node:crypto';
 
 const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0';
+const SERVER_NAME = 'nivine-express-socketio-backend';
+const SERVER_VERSION =
+  process.env.RENDER_GIT_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || process.env.npm_package_version || 'local-dev';
+const BOOT_ID = crypto.randomUUID();
+const BOOTED_AT = new Date().toISOString();
 const SOCKET_PATH = process.env.SOCKET_IO_PATH || '/socket.io';
 const DEFAULT_DEEPGRAM_API_KEY = 'af2a111b30319191c42086846041df2fe412544e';
 const DEEPGRAM_API_KEY = (process.env.DEEPGRAM_API_KEY || DEFAULT_DEEPGRAM_API_KEY).trim();
@@ -67,6 +72,66 @@ const evaluateOrigin = (origin) => {
 
 const logAllowedOrigins = () => {
   console.info('[CORS] allowed origins', getAllowedOrigins());
+};
+
+const getRuntimeDiagnostics = () => ({
+  ok: true,
+  service: SERVER_NAME,
+  version: SERVER_VERSION,
+  bootId: BOOT_ID,
+  bootedAt: BOOTED_AT,
+  uptime: process.uptime(),
+  environment: process.env.NODE_ENV || 'development',
+  renderServiceName: process.env.RENDER_SERVICE_NAME || null,
+  renderServiceId: process.env.RENDER_SERVICE_ID || null,
+  renderExternalUrl: process.env.RENDER_EXTERNAL_URL || null,
+  socketPath: SOCKET_PATH,
+  allowedOrigins: getAllowedOrigins(),
+  entrypoint: import.meta.url,
+});
+
+const sendCorsAwareTokenResponse = (req, res, status, body) => {
+  const origin = normalizeOrigin(req.headers.origin);
+  const { allowed } = evaluateOrigin(origin);
+  if (origin && allowed) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.status(status).json(body);
+};
+
+const handleRealtimeSessionToken = (req, res) => {
+  console.info('[TOKEN ROUTE HIT]', {
+    method: req.method,
+    path: req.originalUrl,
+    origin: normalizeOrigin(req.headers.origin) || 'n/a',
+  });
+  const requestedSessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
+  const sessionId = requestedSessionId || `session-${crypto.randomUUID()}`;
+
+  if (!sessionId) {
+    sendCorsAwareTokenResponse(req, res, 400, { error: 'sessionId is required' });
+    return;
+  }
+
+  const token = crypto.randomBytes(24).toString('hex');
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+
+  console.info('[REALTIME] issued session token', { sessionId, expiresAt });
+  console.info('[SESSION] token generated', { sessionId, ttlMs: SESSION_TTL_MS });
+  sendCorsAwareTokenResponse(req, res, 200, { sessionId, token, expiresAt });
+};
+
+const handleRealtimeSessionTokenGet = (req, res) => {
+  res.header('Allow', 'POST, OPTIONS');
+  sendCorsAwareTokenResponse(req, res, 405, {
+    error: 'Use POST /realtime/session-token to issue a realtime session token.',
+    service: SERVER_NAME,
+    version: SERVER_VERSION,
+  });
 };
 
 const registerApiRequestLogger = (appInstance) => {
@@ -242,40 +307,31 @@ app.use((req, res, next) => {
 app.get('/', (_req, res) => {
   res.json({
     status: 'NODE AI backend running',
+    service: SERVER_NAME,
+    version: SERVER_VERSION,
   });
 });
 
 app.get('/health', (_req, res) => {
-  res.status(200).json({ ok: true, uptime: process.uptime(), allowedOrigins: getAllowedOrigins(), environment: process.env.NODE_ENV || 'development' });
+  res.status(200).json(getRuntimeDiagnostics());
 });
 
-app.post('/realtime/session-token', (req, res) => {
-  const origin = normalizeOrigin(req.headers.origin);
-  const { allowed } = evaluateOrigin(origin);
-  if (origin && allowed) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-  }
-  res.header('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  console.info('[TOKEN ROUTE HIT]', { method: 'POST', path: '/realtime/session-token', origin: origin || 'n/a' });
-  const requestedSessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
-  const sessionId = requestedSessionId || `session-${crypto.randomUUID()}`;
-
-  if (!sessionId) {
-    res.status(400).json({ error: 'sessionId is required' });
-    return;
-  }
-
-  const token = crypto.randomBytes(24).toString('hex');
-  const expiresAt = Date.now() + SESSION_TTL_MS;
-
-  console.info('[REALTIME] issued session token', { sessionId, expiresAt });
-  console.info('[SESSION] token generated', { sessionId, ttlMs: SESSION_TTL_MS });
-  res.status(200).json({ sessionId, token, expiresAt });
+app.get('/version', (_req, res) => {
+  res.status(200).json(getRuntimeDiagnostics());
 });
+
+app.get('/piyush-test', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    message: 'piyush-test route reached server.js',
+    ...getRuntimeDiagnostics(),
+  });
+});
+
+app.get('/realtime/session-token', handleRealtimeSessionTokenGet);
+app.post('/realtime/session-token', handleRealtimeSessionToken);
+app.get('/api/realtime/session-token', handleRealtimeSessionTokenGet);
+app.post('/api/realtime/session-token', handleRealtimeSessionToken);
 
 
 const interviewHistoryByUser = new Map();
@@ -338,12 +394,16 @@ const collectRegisteredRoutes = () => {
 app.get('/debug/routes', (_req, res) => {
   try {
     const routes = collectRegisteredRoutes();
-    res.status(200).json({ routes });
+    res.status(200).json({ ...getRuntimeDiagnostics(), routes });
   } catch (error) {
     console.warn('[debug/routes] failed to collect routes', {
       message: error?.message,
     });
-    res.status(200).json({ routes: [], error: 'Route inspection unavailable' });
+    res.status(200).json({
+      ...getRuntimeDiagnostics(),
+      routes: [],
+      error: 'Route inspection unavailable',
+    });
   }
 });
 
